@@ -1,0 +1,141 @@
+#!/bin/sh
+set -e
+# Debian-style boot menu: Try Atlas OS (live) + Install Atlas OS (Calamares).
+# Both entries keep GRUB/syslinux intact; Install appends atlas-install for autostart.
+
+label_live_grub() {
+  f="$1"
+  [ -f "$f" ] || return 0
+  sed -i \
+    -e 's/Live system (amd64 fail-safe mode)/Try Atlas OS (fail-safe)/g' \
+    -e 's/Live system (amd64)/Try Atlas OS/g' \
+    -e 's/Live system (autodetect fail-safe mode)/Try Atlas OS (fail-safe)/g' \
+    -e 's/Live system (autodetect)/Try Atlas OS/g' \
+    -e 's/menuentry "Live system/menuentry "Try Atlas OS/g' \
+    "$f"
+
+  python3 - "$f" <<'PY'
+from pathlib import Path
+import re, sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+
+# Drop any prior Install entry from a previous hook run
+text = re.sub(
+    r'\nmenuentry "Install Atlas OS"[^{]*\{.*?\n\}',
+    '',
+    text,
+    flags=re.M | re.S,
+)
+
+m = re.search(
+    r'^menuentry "Try Atlas OS"(?! \(fail-safe\))[^{]*\{.*?\n\}',
+    text,
+    re.M | re.S,
+)
+if not m:
+    m = re.search(r'^menuentry "[^"]+"[^{]*\{.*?\n\}', text, re.M | re.S)
+if not m:
+    path.write_text(text, encoding="utf-8")
+    raise SystemExit(0)
+
+try_block = m.group(0)
+install = re.sub(
+    r'^menuentry[^\n]*',
+    'menuentry "Install Atlas OS" --hotkey=i {',
+    try_block,
+    count=1,
+    flags=re.M,
+)
+if "atlas-install" not in install:
+    install = re.sub(
+        r'(^\s*linux\s+[^\n]+)$',
+        r'\1 atlas-install',
+        install,
+        count=1,
+        flags=re.M,
+    )
+
+# Order: Install first (bare-metal default), then Try live — like OEM USB + Debian live.
+out = text[: m.start()] + install + "\n" + text[m.start() :]
+if not re.search(r'^\s*set default=', out, re.M):
+    out = re.sub(
+        r'(^source /boot/grub/config\.cfg\n)',
+        r'\1set default=0\nset timeout=8\n',
+        out,
+        count=1,
+        flags=re.M,
+    )
+else:
+    out = re.sub(r'^\s*set default=.*$', 'set default=0', out, count=1, flags=re.M)
+    if not re.search(r'^\s*set timeout=', out, re.M):
+        out = re.sub(
+            r'(^\s*set default=0\n)',
+            r'\1set timeout=8\n',
+            out,
+            count=1,
+            flags=re.M,
+        )
+
+path.write_text(out, encoding="utf-8")
+PY
+}
+
+label_live_syslinux() {
+  f="$1"
+  [ -f "$f" ] || return 0
+  sed -i \
+    -e 's/\^Live system (amd64)/Try Atlas OS/g' \
+    -e 's/Live system (amd64 fail-safe mode)/Try Atlas OS (fail-safe)/g' \
+    -e 's/Live system (amd64)/Try Atlas OS/g' \
+    "$f"
+
+  python3 - "$f" <<'PY'
+from pathlib import Path
+import re, sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+text = re.sub(r'^label\s+install-atlas\n(?:\t.*\n)+', '', text, flags=re.M)
+text = re.sub(r'(?m)^\tmenu default\n', '', text)
+
+m = re.search(r'(^label\s+\S+\n(?:\t.*\n)+)', text, re.M)
+if not m:
+    raise SystemExit(0)
+
+block = m.group(1)
+install = block
+install = re.sub(r'^label\s+\S+', 'label install-atlas', install, count=1, flags=re.M)
+install = re.sub(r'menu label\s+.*', 'menu label ^Install Atlas OS', install, count=1)
+if "atlas-install" not in install:
+    install = re.sub(
+        r'(append\s+[^\n]+)$',
+        r'\1 atlas-install',
+        install,
+        count=1,
+        flags=re.M,
+    )
+install = re.sub(
+    r'(menu label\s+[^\n]+\n)',
+    r'\1\tmenu default\n',
+    install,
+    count=1,
+)
+path.write_text(text[: m.start()] + install + text[m.start() :], encoding="utf-8")
+PY
+}
+
+for f in \
+  binary/boot/grub/grub.cfg \
+  binary/boot/grub/x86_64-efi/grub.cfg \
+  binary/boot/grub/loopback.cfg
+do
+  label_live_grub "$f"
+done
+
+for f in binary/isolinux/live.cfg binary/isolinux/menu.cfg; do
+  label_live_syslinux "$f"
+done
+
+echo "Boot menu: Install Atlas OS (default) + Try Atlas OS (live)."

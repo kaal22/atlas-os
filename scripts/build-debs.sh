@@ -51,6 +51,7 @@ build_simple_deb() {
   local depends="xdg-utils"
   case "$name" in
     atlas-branding) depends="" ;;
+    atlas-shell) depends="xdg-utils, atlas-branding" ;;
     atlas-firstboot) depends="openssl" ;;
   esac
 
@@ -72,7 +73,7 @@ EOF
 
   local deb="$OUT/${name}_${version}_all.deb"
   if command -v dpkg-deb >/dev/null; then
-    dpkg-deb --build "$stage" "$deb"
+    dpkg-deb --root-owner-group --build "$stage" "$deb"
   else
     # Minimal .deb via ar
     local tmp

@@ -6,8 +6,17 @@ if ! command -v apt-get >/dev/null; then
   echo "This script expects a Debian-family host." >&2
   exit 1
 fi
-sudo apt-get update
-sudo apt-get install -y \
+APT=(apt-get)
+if [[ "$(id -u)" -ne 0 ]]; then
+  if command -v sudo >/dev/null 2>&1; then
+    APT=(sudo apt-get)
+  else
+    echo "ERROR: root or sudo required to install packages." >&2
+    exit 1
+  fi
+fi
+"${APT[@]}" update
+"${APT[@]}" install -y \
   live-build \
   debootstrap \
   squashfs-tools \

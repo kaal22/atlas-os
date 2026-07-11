@@ -1,4 +1,6 @@
-# Recovery ISO extras
+# Recovery tooling (included in live chroot; dedicated recovery profile comes later)
+# Do not list Atlas-local packages here unless they exist in packages.chroot /
+# a local apt repo — live-build apt cannot resolve unpublished names.
 gdisk
 parted
 btrfs-progs
@@ -8,4 +10,3 @@ testdisk
 nvme-cli
 smartmontools
 rsync
-atlas-recovery-tools

@@ -1,13 +1,69 @@
 #!/bin/sh
-# Live session: show Install Atlas OS desktop icon
-mkdir -p /etc/skel/Desktop
+set -e
+# Live session: desktop Install icon + boot-menu installer autostart.
+
+mkdir -p /etc/skel/Desktop /etc/xdg/autostart /usr/lib/atlas
+
+cat > /usr/lib/atlas/maybe-autostart-installer.sh <<'EOF'
+#!/bin/sh
+# Launch Calamares when booted with atlas-install (default USB install entry).
+set -e
+if ! grep -qw atlas-install /proc/cmdline 2>/dev/null; then
+  exit 0
+fi
+
+# Wait for the graphical session / display.
+i=0
+while [ "$i" -lt 60 ]; do
+  if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
+    break
+  fi
+  # SDDM/Plasma may not export DISPLAY into xdg autostart the same way; probe.
+  if [ -S /tmp/.X11-unix/X0 ] || [ -S /tmp/.X11-unix/X1 ]; then
+    export DISPLAY="${DISPLAY:-:0}"
+    break
+  fi
+  i=$((i + 1))
+  sleep 1
+done
+
+sleep 2
+export QT_AUTO_SCREEN_SCALE_FACTOR="${QT_AUTO_SCREEN_SCALE_FACTOR:-1}"
+
+if command -v atlas-install >/dev/null 2>&1; then
+  exec atlas-install
+fi
+exec calamares-install-debian
+EOF
+chmod 755 /usr/lib/atlas/maybe-autostart-installer.sh
+
+# Early + normal autostart so installer appears on bare-metal USB boots.
+cat > /etc/xdg/autostart/atlas-install-autostart.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Atlas Install Autostart
+Exec=/usr/lib/atlas/maybe-autostart-installer.sh
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-Phase=Application
+X-KDE-autostart-phase=2
+X-KDE-autostart-after=panel
+OnlyShowIn=KDE;GNOME;XFCE;LXDE;LXQt;MATE;Cinnamon;
+EOF
+
 cat > /etc/skel/Desktop/install-atlas-os.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
+Version=1.0
 Name=Install Atlas OS
-Exec=sudo -E calamares
+GenericName=Atlas OS Installer
+Exec=atlas-install
+Comment=Install Atlas OS on this computer
+Keywords=calamares;system;install;atlas;installer
 Icon=system-software-install
 Terminal=false
-Categories=System;
+Categories=Qt;System;
+StartupWMClass=calamares
+StartupNotify=true
 EOF
 chmod 755 /etc/skel/Desktop/install-atlas-os.desktop

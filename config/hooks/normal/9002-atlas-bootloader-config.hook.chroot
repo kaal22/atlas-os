@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+# Ensure offline bootloader helper is executable and Calamares settings are Atlas-branded.
+chmod 755 /usr/share/calamares/helpers/calamares-bootloader-config 2>/dev/null || true
+if [ -f /usr/share/atlas/calamares/settings.conf ]; then
+  cp /usr/share/atlas/calamares/settings.conf /etc/calamares/settings.conf
+fi
+# Keep Debian packages.conf (removes live-* packages) if present from calamares-settings-debian.

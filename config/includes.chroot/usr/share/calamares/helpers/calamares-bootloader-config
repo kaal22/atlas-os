@@ -1,0 +1,63 @@
+#!/bin/bash
+# Offline-safe bootloader prep for Atlas OS (replaces Debian network apt install).
+# Runs inside the live session against the Calamares target chroot.
+set -e
+
+CHROOT=$(mount | grep proc | grep calamares | awk '{print $3}' | sed -e "s#/proc##g")
+if [ -z "$CHROOT" ] || [ ! -d "$CHROOT" ]; then
+  echo "ERROR: could not locate Calamares target chroot" >&2
+  exit 1
+fi
+
+DEBDIR="/usr/share/atlas/installer-debs"
+
+echo "Running Atlas bootloader-config..."
+
+# LUKS initramfs permissions (from Debian helper)
+if [ "$(mount | grep "$CHROOT " | cut -c -16)" = "/dev/mapper/luks" ]; then
+  echo "UMASK=0077" > "$CHROOT/etc/initramfs-tools/conf.d/initramfs-permissions"
+fi
+
+install_local_debs() {
+  pattern="$1"
+  shopt -s nullglob
+  files=("$DEBDIR"/$pattern)
+  shopt -u nullglob
+  if [ "${#files[@]}" -eq 0 ]; then
+    echo "NOTE: no local debs matching $pattern in $DEBDIR"
+    return 1
+  fi
+  # Copy into target so dpkg paths resolve cleanly
+  mkdir -p "$CHROOT$DEBDIR"
+  cp -n "${files[@]}" "$CHROOT$DEBDIR/" 2>/dev/null || cp "${files[@]}" "$CHROOT$DEBDIR/"
+  DEBIAN_FRONTEND=noninteractive chroot "$CHROOT" dpkg -i "$DEBDIR"/$pattern || \
+    DEBIAN_FRONTEND=noninteractive chroot "$CHROOT" apt-get -f install -y || true
+  return 0
+}
+
+if [ -d /sys/firmware/efi/efivars ]; then
+  echo " * Firmware: UEFI — ensuring grub-efi-amd64 on target"
+  install_local_debs 'grub-efi-amd64_*.deb' || true
+  # Modules must exist for grub-install
+  if [ ! -d "$CHROOT/usr/lib/grub/x86_64-efi" ]; then
+    echo "ERROR: missing $CHROOT/usr/lib/grub/x86_64-efi (grub-efi-amd64-bin not in live image)" >&2
+    exit 1
+  fi
+else
+  echo " * Firmware: BIOS/legacy — ensuring grub-pc on target (i386-pc)"
+  install_local_debs 'grub-pc_*.deb' || true
+  if [ ! -d "$CHROOT/usr/lib/grub/i386-pc" ]; then
+    echo "ERROR: missing $CHROOT/usr/lib/grub/i386-pc (grub-pc-bin not in live image)" >&2
+    echo "       Rebuild ISO with grub-pc-bin in the package list." >&2
+    exit 1
+  fi
+fi
+
+# Re-enable os-prober on the installed system
+if [ -f "$CHROOT/etc/default/grub" ]; then
+  sed -i "s/#GRUB_DISABLE_OS_PROBER=false/# OS_PROBER re-enabled by Atlas installation:\nGRUB_DISABLE_OS_PROBER=false/g" \
+    "$CHROOT/etc/default/grub"
+fi
+
+echo "bootloader-config finished."
+exit 0

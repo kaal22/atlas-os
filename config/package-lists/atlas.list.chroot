@@ -24,7 +24,7 @@ okular
 ark
 vlc
 kate
-spectacle
+kde-spectacle
 dolphin
 calamares
 calamares-settings-debian
@@ -32,9 +32,17 @@ live-boot
 live-config
 live-config-systemd
 user-setup
-os-prober
-grub-efi-amd64
+# GRUB: do not install conflicting meta-packages grub-pc and grub-efi-amd64 together.
+# Ship both platform module sets so Calamares can grub-install for BIOS (i386-pc)
+# or UEFI (x86_64-efi). Meta-packages are applied to the TARGET by bootloader-config.
+grub-common
+grub2-common
+grub-pc-bin
+grub-efi-amd64-bin
+grub-efi-amd64-signed
 shim-signed
+efibootmgr
+os-prober
 systemd-timesyncd
 curl
 ca-certificates

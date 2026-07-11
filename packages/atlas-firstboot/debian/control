@@ -1,0 +1,12 @@
+Source: atlas-firstboot
+Section: admin
+Priority: optional
+Maintainer: Atlas OS Builders <builders@atlas-os.local>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+
+Package: atlas-firstboot
+Architecture: all
+Depends: ${misc:Depends}
+Description: Atlas OS first-boot provisioning service
+ Generates unique secrets and prepares /srv/atlas on first boot.

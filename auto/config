@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+# live-build auto/config for Atlas OS (Debian 13 / trixie)
+
+lb config noauto \
+	--mode debian \
+	--distribution trixie \
+	--archive-areas "main contrib non-free non-free-firmware" \
+	--architectures amd64 \
+	--binary-images iso-hybrid \
+	--bootloaders "grub-efi,syslinux" \
+	--debian-installer none \
+	--firmware-binary true \
+	--firmware-chroot true \
+	--iso-application "Atlas OS" \
+	--iso-preparer "Atlas OS builders" \
+	--iso-publisher "Atlas OS" \
+	--iso-volume "ATLAS_OS" \
+	--memtest none \
+	--win32-loader false \
+	--apt-indices false \
+	--apt-recommends true \
+	--cache true \
+	--checksums sha256 \
+	--chroot-squashfs-compression-type xz \
+	--clean \
+	--color \
+	--compression gzip \
+	--debootstrap-options "--variant=minbase --include=apt-transport-https,ca-certificates" \
+	--security true \
+	--updates true \
+	--backports false \
+	--linux-flavours amd64 \
+	--linux-packages linux-image \
+	--bootappend-live "boot=live components quiet splash username=atlas hostname=atlas-live timezone=UTC" \
+	"${@}"

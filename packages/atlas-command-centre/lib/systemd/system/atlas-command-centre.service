@@ -1,0 +1,17 @@
+[Unit]
+Description=Atlas Command Centre
+After=network.target atlas-firstboot.service
+Wants=atlas-firstboot.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/lib/atlas/command_centre.py
+Restart=on-failure
+# Bind is application-enforced to 127.0.0.1
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/atlas /tmp/atlas-dev
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,6 @@
+From: Atlas OS <builders@atlas-os.local>
+Subject: [PATCH] Disable unauthenticated LAN access
+
+Require Atlas Auth session before proxying to management UI.
+---
+Placeholder patch file.

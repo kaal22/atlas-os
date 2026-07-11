@@ -1,0 +1,13 @@
+{
+  "id": "atlas.system-steward",
+  "name": "System Steward",
+  "purpose": "Tightly constrained maintenance agent. Allowlisted repair workflows only.",
+  "tools": ["system.health.read"],
+  "capabilities": ["system.health.read"],
+  "memory_scopes": ["session"],
+  "knowledge_scopes": ["system_docs"],
+  "approval_rules": {"repair.workflow": "explicit_reauth"},
+  "model_profile": "light",
+  "publisher": "atlas",
+  "version": "1.0.0"
+}

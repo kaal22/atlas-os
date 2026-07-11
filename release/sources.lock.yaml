@@ -1,0 +1,11 @@
+# Populated by scripts/lock-refresh.sh — do not invent digests by hand for production.
+schema: atlas.sources.lock/v1
+atlas_version: "0.1.0-alpha"
+locked_at: null
+status: placeholder
+notes: >
+  Run `make lock-refresh` on an internet-connected Debian build host to resolve
+  immutable digests, SHA-256 hashes, and commit IDs. ISO builds refuse to run
+  while status is placeholder or any required asset lacks sha256/digest.
+
+assets: []

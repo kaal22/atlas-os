@@ -1,0 +1,87 @@
+schema: atlas.licences.lock/v1
+atlas_version: "0.1.0-alpha"
+updated: "2026-07-11"
+
+entries:
+  - id: debian-base
+    component: Debian 13 Stable packages
+    licence: DFSG-compliant (per-package)
+    redistribution: allowed_with_source_offer
+    attribution: docs/legal/debian-attribution.md
+
+  - id: project-nomad
+    component: Project N.O.M.A.D. v1.33.0
+    licence: Apache-2.0
+    source: https://github.com/Crosstalk-Solutions/project-nomad
+    redistribution: allowed
+    attribution_required: true
+    notice: docs/legal/project-nomad-notice.md
+    atlas_modifications: upstream/patches/
+
+  - id: ollama
+    component: Ollama 0.31.2
+    licence: MIT
+    redistribution: allowed
+    attribution_required: true
+
+  - id: qwen3-4b
+    component: Qwen3-4B via Ollama tag qwen3:4b
+    licence: Apache-2.0
+    redistribution: allowed
+    decision: approved_for_starter_pack
+
+  - id: nomic-embed-text-v1.5
+    component: nomic-embed-text:v1.5
+    licence: Apache-2.0
+    redistribution: allowed
+    decision: approved_for_starter_pack
+
+  - id: kiwix-serve
+    component: ghcr.io/kiwix/kiwix-serve
+    licence: GPL-3.0-or-later
+    redistribution: allowed_with_source_offer
+
+  - id: wikipedia-zim
+    component: Kiwix Wikipedia ZIM files
+    licence: CC-BY-SA-3.0 / GFDL (content)
+    redistribution: allowed_with_attribution
+    decision: pack_only_not_core_iso
+
+  - id: pmtiles-maps
+    component: Regional PMTiles / OpenStreetMap extracts
+    licence: ODbL-1.0 (OSM data) + asset-specific font/sprite licences
+    redistribution: allowed_with_attribution
+    decision: regional_packs_only
+
+  - id: qdrant
+    component: qdrant/qdrant
+    licence: Apache-2.0
+    redistribution: allowed
+
+  - id: kolibri
+    component: treehouses/kolibri baseline image
+    licence: MIT (software); channel content varies
+    redistribution: image_ok_channels_require_per_channel_audit
+    decision: channels_locked_individually_before_ship
+
+  - id: mysql
+    component: mysql:8.0
+    licence: GPL-2.0-or-later with FOSS exception (Oracle MySQL)
+    redistribution: review_required_for_commercial_image
+    decision: approved_for_alpha_revisit_before_v1
+
+  - id: redis
+    component: redis:7-alpine
+    licence: RSALv2 / SSPLv1 (Redis 7.4+) or BSD-3-Clause (older)
+    redistribution: verify_tag_licence_at_lock_refresh
+    decision: pending_lock_refresh_licence_check
+
+  - id: cyberchef
+    component: GCHQ CyberChef
+    licence: Apache-2.0
+    redistribution: allowed
+
+  - id: flatnotes
+    component: dullage/flatnotes
+    licence: MIT
+    redistribution: allowed

@@ -1,0 +1,12 @@
+[Unit]
+Description=Atlas OS first-boot provisioning
+After=local-fs.target
+ConditionPathExists=/etc/atlas/firstboot-pending
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/atlas/atlas-firstboot.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

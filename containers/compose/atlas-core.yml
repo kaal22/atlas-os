@@ -1,0 +1,80 @@
+# Atlas core offline payload — tags resolved to digests at lock-refresh.
+# Browser-facing services must NOT mount /var/run/docker.sock.
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql-root
+    volumes:
+      - /srv/atlas/databases/mysql:/var/lib/mysql
+      - /etc/atlas/secrets/mysql-root:/run/secrets/mysql-root:ro
+    networks: [atlas_internal]
+    # no host ports
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${ATLAS_REDIS_PASSWORD}"]
+    networks: [atlas_internal]
+
+  qdrant:
+    image: qdrant/qdrant:v1.16
+    restart: unless-stopped
+    volumes:
+      - /srv/atlas/embeddings/qdrant:/qdrant/storage
+    ports:
+      - "127.0.0.1:6333:6333"
+    networks: [atlas_internal]
+
+  kiwix:
+    image: ghcr.io/kiwix/kiwix-serve:3.8.2
+    restart: unless-stopped
+    volumes:
+      - /srv/atlas/kiwix:/data:ro
+    command: ["/data"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks: [atlas_internal]
+
+  flatnotes:
+    image: dullage/flatnotes:v5.5.4
+    restart: unless-stopped
+    volumes:
+      - /srv/atlas/users/notes:/data
+    ports:
+      - "127.0.0.1:8081:80"
+    networks: [atlas_internal]
+
+  cyberchef:
+    image: ghcr.io/gchq/cyberchef:10.24
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8082:80"
+    networks: [atlas_internal]
+
+  kolibri:
+    image: treehouses/kolibri:0.12.8
+    restart: unless-stopped
+    volumes:
+      - /srv/atlas/kolibri:/root/.kolibri
+    ports:
+      - "127.0.0.1:8083:8080"
+    networks: [atlas_internal]
+
+  atlas-nomad-core:
+    image: ghcr.io/atlas-os/atlas-nomad-core:0.1.0-alpha
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:8090:80"
+    networks: [atlas_internal]
+    # Privileged host ops go through atlas-system-daemon, not docker.sock
+
+networks:
+  atlas_internal:
+    driver: bridge
+    internal: false

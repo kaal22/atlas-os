@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Atlas
+GenericName=Atlas Command Centre
+Comment=Atlas OS launcher
+Exec=atlas-launcher
+Icon=atlas
+Terminal=false
+Categories=Network;Office;System;
+StartupNotify=true

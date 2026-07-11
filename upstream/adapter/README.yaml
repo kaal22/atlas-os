@@ -1,0 +1,15 @@
+# Atlas management adapter notes for Project N.O.M.A.D. v1.33.0
+upstream_release: v1.33.0
+atlas_image: ghcr.io/atlas-os/atlas-nomad-core:0.1.0-alpha
+ollama:
+  mode: host-native
+  endpoint: http://127.0.0.1:11434
+patches:
+  - 0001-bind-loopback-only.patch
+  - 0002-disable-unauthenticated-lan.patch
+  - 0003-route-ollama-to-host.patch
+replacement_boundaries:
+  - authentication  # Atlas Auth
+  - docker_socket   # Atlas System Daemon
+  - updates         # Atlas Updater
+  - secrets         # /etc/atlas/secrets

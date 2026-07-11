@@ -1,0 +1,11 @@
+# Recovery ISO extras
+gdisk
+parted
+btrfs-progs
+cryptsetup
+efibootmgr
+testdisk
+nvme-cli
+smartmontools
+rsync
+atlas-recovery-tools

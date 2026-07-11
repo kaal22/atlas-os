@@ -1,0 +1,13 @@
+{
+  "id": "atlas.research",
+  "name": "Research Agent",
+  "purpose": "Source-linked research over local knowledge and personal documents.",
+  "tools": ["knowledge.search", "documents.read", "network.fetch"],
+  "capabilities": ["knowledge.read", "documents.read"],
+  "memory_scopes": ["session", "research_projects"],
+  "knowledge_scopes": ["local", "personal_documents", "installed_packs"],
+  "approval_rules": {"network.fetch": "explicit"},
+  "model_profile": "balanced",
+  "publisher": "atlas",
+  "version": "1.0.0"
+}

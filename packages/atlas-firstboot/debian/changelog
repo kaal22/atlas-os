@@ -1,0 +1,5 @@
+atlas-firstboot (0.1.0-1) unstable; urgency=medium
+
+  * Initial first-boot service.
+
+ -- Atlas OS Builders <builders@atlas-os.local>  Sat, 11 Jul 2026 12:00:00 +0000

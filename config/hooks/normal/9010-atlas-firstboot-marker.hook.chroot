@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+# Mark first-boot and prepare /srv/atlas skeleton on installed systems.
+mkdir -p /srv/atlas/{users,workspaces,documents,knowledge,embeddings,models,maps,kiwix,kolibri,media,content-packs,agent-packages,backups,exports,databases,logs}
+chmod 755 /srv/atlas
+touch /etc/atlas/firstboot-pending
+cat > /etc/atlas/os-release <<'EOF'
+NAME="Atlas OS"
+ID=atlas
+ID_LIKE=debian
+PRETTY_NAME="Atlas OS 0.1.0-alpha"
+VERSION="0.1.0-alpha"
+VERSION_ID="0.1"
+HOME_URL="https://atlas-os.local/"
+EOF

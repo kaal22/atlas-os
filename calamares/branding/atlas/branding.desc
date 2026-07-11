@@ -1,0 +1,42 @@
+---
+componentName: atlas
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 900px,650px
+windowPlacement: center
+sidebarBackground: "#000000"
+sidebarText: "#e8eef5"
+sidebarTextHighlight: "#ffffff"
+productName: Atlas OS
+shortProductName: Atlas
+version: 0.1.0-alpha
+shortVersion: 0.1
+versionedName: Atlas OS 0.1.0-alpha
+shortVersionedName: Atlas 0.1
+bootloaderEntryName: Atlas OS
+productUrl: https://atlas-os.local/
+welcomeStyleLogo: true
+logo: logo.png
+productLogo: logo.png
+productIcon: productIcon.png
+productWelcome: welcome.png
+productBanner: banner.png
+slideshow: slideshow.qml
+slideshowAPI: 2
+strings:
+  productUrl: https://atlas-os.local/
+  supportUrl: https://atlas-os.local/support
+  knownIssuesUrl: https://atlas-os.local/issues
+  releaseNotesUrl: https://atlas-os.local/notes
+  donateUrl: ""
+images:
+  productBanner: banner.png
+  productLogo: logo.png
+  productIcon: productIcon.png
+  productWelcome: welcome.png
+style:
+  SidebarBackground: "#000000"
+  SidebarText: "#c8c8c8"
+  SidebarTextSelect: "#ffffff"
+  SidebarTextHighlight: "#ffffff"

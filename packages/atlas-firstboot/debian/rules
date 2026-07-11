@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_install:
+	mkdir -p debian/atlas-firstboot/usr/lib/atlas
+	mkdir -p debian/atlas-firstboot/lib/systemd/system
+	cp -a usr/lib/atlas/* debian/atlas-firstboot/usr/lib/atlas/
+	cp -a lib/systemd/system/* debian/atlas-firstboot/lib/systemd/system/

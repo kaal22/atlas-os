@@ -1,0 +1,7 @@
+From: Atlas OS <builders@atlas-os.local>
+Subject: [PATCH] Route Ollama to host-native endpoint
+
+Point NOMAD at host gateway 11434 instead of an in-compose Ollama
+container when ATLAS_OLLAMA_MODE=host-native.
+---
+Placeholder patch file.

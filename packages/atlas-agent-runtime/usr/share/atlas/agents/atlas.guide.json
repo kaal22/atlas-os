@@ -1,0 +1,13 @@
+{
+  "id": "atlas.guide",
+  "name": "Atlas Guide",
+  "purpose": "Default general assistant. Never receives privileged system permissions.",
+  "tools": ["knowledge.search", "notes.write", "documents.read"],
+  "capabilities": ["knowledge.read", "notes.write", "documents.read"],
+  "memory_scopes": ["session", "user_preferences"],
+  "knowledge_scopes": ["local", "installed_packs"],
+  "approval_rules": {"notes.write": "preference_or_task"},
+  "model_profile": "light",
+  "publisher": "atlas",
+  "version": "1.0.0"
+}

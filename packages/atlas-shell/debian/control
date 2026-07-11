@@ -1,0 +1,14 @@
+Source: atlas-shell
+Section: utils
+Priority: optional
+Maintainer: Atlas OS Builders <builders@atlas-os.local>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+Homepage: https://atlas-os.local/
+
+Package: atlas-shell
+Architecture: all
+Depends: ${misc:Depends}, xdg-utils
+Description: Atlas OS desktop launcher and placeholder Command Centre page
+ Provides atlas-launcher and a local HTML placeholder until the full
+ Command Centre service is installed.

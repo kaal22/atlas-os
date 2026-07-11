@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+# Ensure wallpaper helper is executable and backgrounds are world-readable.
+chmod 755 /usr/lib/atlas/set-wallpaper.sh 2>/dev/null || true
+chmod 644 /usr/share/backgrounds/atlas/*.png 2>/dev/null || true
+# Register as XFCE backdrop symlink for chooser UIs
+mkdir -p /usr/share/xfce4/backdrops
+if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper.png ]; then
+  ln -sfn /usr/share/backgrounds/atlas/atlas-wallpaper.png \
+    /usr/share/xfce4/backdrops/atlas-wallpaper.png
+fi

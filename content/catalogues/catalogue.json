@@ -1,0 +1,33 @@
+{
+  "schema": "atlas.pack/v1",
+  "catalogue_version": "0.1.0",
+  "packs": [
+    {
+      "id": "atlas.maps.uk",
+      "version": "2026.07",
+      "type": "atlas.content.map",
+      "name": "United Kingdom Offline Maps",
+      "size_hint_bytes": 0,
+      "signed": false,
+      "channel": "alpha"
+    },
+    {
+      "id": "atlas.models.starter",
+      "version": "0.1.0",
+      "type": "atlas.content.model",
+      "name": "Starter Models (qwen3:4b + nomic-embed-text)",
+      "size_hint_bytes": 0,
+      "signed": false,
+      "channel": "alpha"
+    },
+    {
+      "id": "atlas.knowledge.en-starter",
+      "version": "2026.06",
+      "type": "atlas.content.knowledge",
+      "name": "Starter English Knowledge (curated ZIM)",
+      "size_hint_bytes": 0,
+      "signed": false,
+      "channel": "alpha"
+    }
+  ]
+}

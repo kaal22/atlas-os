@@ -1,0 +1,6 @@
+# Copy Atlas compose definitions into the image for first-boot import.
+set -e
+mkdir -p /usr/share/atlas/compose
+if [ -f /usr/share/atlas/payload/compose/atlas-core.yml ]; then
+  cp /usr/share/atlas/payload/compose/atlas-core.yml /usr/share/atlas/compose/
+fi

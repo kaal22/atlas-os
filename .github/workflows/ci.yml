@@ -1,0 +1,45 @@
+name: Atlas OS CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate catalogue
+        run: ./scripts/validate-catalog.sh release/sources.catalog.yaml
+      - name: Unit tests
+        run: ./scripts/test-unit.sh
+      - name: Security stubs
+        run: ./scripts/test-security.sh
+
+  build-debs:
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build placeholder packages (container)
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src debian:trixie-slim bash -lc '
+            apt-get update && apt-get install -y make rsync
+            ./scripts/build-debs.sh /src/dist/debs || true
+          '
+
+  # Full ISO builds are scheduled / self-hosted (live-build + large cache).
+  iso-nightly:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: self-hosted
+    needs: build-debs
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify cache and build ISO
+        run: |
+          make verify-cache
+          make iso PROFILE=core
+      - name: QEMU install smoke
+        run: make test-install

@@ -1,0 +1,8 @@
+#!/bin/sh
+# atlas-qc — OEM self-test stub
+echo "Atlas QC self-test"
+echo "checking /srv/atlas..."
+test -d /srv/atlas && echo OK_data_dir || echo FAIL_data_dir
+echo "checking firstboot marker handling..."
+test -f /etc/atlas/firstboot-done -o -f /etc/atlas/firstboot-pending && echo OK_firstboot || echo WARN_firstboot
+echo "QC complete"

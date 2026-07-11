@@ -1,0 +1,127 @@
+# Atlas OS approved upstream catalogue
+# Exact digests/hashes live in sources.lock.yaml after lock-refresh.
+schema: atlas.sources.catalog/v1
+atlas_version: "0.1.0-alpha"
+updated: "2026-07-11"
+
+project_nomad:
+  upstream_release: v1.33.0
+  upstream_source_archive: https://github.com/Crosstalk-Solutions/project-nomad/archive/refs/tags/v1.33.0.tar.gz
+  upstream_repository: https://github.com/Crosstalk-Solutions/project-nomad
+  upstream_reference_image: ghcr.io/crosstalk-solutions/project-nomad:v1.33.0
+  licence: Apache-2.0
+  atlas_image: ghcr.io/atlas-os/atlas-nomad-core
+
+core_images:
+  - id: mysql
+    image: mysql:8.0
+    purpose: NOMAD / Atlas relational store
+  - id: redis
+    image: redis:7-alpine
+    purpose: Queues and ephemeral coordination
+  - id: dozzle
+    image: amir20/dozzle:v10.0
+    purpose: Optional log viewer (disabled on public interfaces)
+  - id: nomad_sidecar_updater
+    image: ghcr.io/crosstalk-solutions/project-nomad-sidecar-updater:latest
+    note: Resolve digest at lock-refresh; replace with Atlas Updater before V1
+  - id: nomad_disk_collector
+    image: ghcr.io/crosstalk-solutions/project-nomad-disk-collector:latest
+    note: Resolve digest at lock-refresh; replace with System Daemon before V1
+
+standard_apps:
+  kiwix:
+    image: ghcr.io/kiwix/kiwix-serve:3.8.2
+    purpose: Serve ZIM knowledge archives
+  qdrant:
+    image: qdrant/qdrant:v1.16
+    purpose: Vector database for knowledge retrieval
+  kolibri:
+    image: treehouses/kolibri:0.12.8
+    purpose: Offline education platform
+    warning: Migrate to maintained Learning Equality image before commercial release
+  cyberchef:
+    image: ghcr.io/gchq/cyberchef:10.24
+    purpose: Local data transformation tools
+  flatnotes:
+    image: dullage/flatnotes:v5.5.4
+    purpose: Local Markdown notes
+  ollama_container_fallback:
+    image: ollama/ollama:0.24.0
+    purpose: NOMAD-compatible container baseline (fallback only)
+
+ollama:
+  version: "0.31.2"
+  linux_amd64_archive: https://github.com/ollama/ollama/releases/download/v0.31.2/ollama-linux-amd64.tar.zst
+  linux_amd64_sha256: "2c88f0f31a959bac5a3cad4cc5296ec568551d4aa79f548f554adb2b575b3133"
+  install_target: /usr
+  model_directory: /srv/atlas/models/ollama
+  bind_address: "127.0.0.1:11434"
+  cloud_disabled: true
+  deployment: host-native
+
+models:
+  chat:
+    ollama_tag: "qwen3:4b"
+    upstream_model: Qwen/Qwen3-4B
+    licence: Apache-2.0
+    role: General local chat and agent tool use
+  embeddings:
+    ollama_tag: "nomic-embed-text:v1.5"
+    upstream_model: nomic-ai/nomic-embed-text-v1.5
+    licence: Apache-2.0
+    role: English document embeddings
+
+wikipedia_english:
+  discovery_root: https://download.kiwix.org/zim/wikipedia/
+  mini:
+    file: wikipedia_en_all_mini_2026-06.zim
+    size_hint: 12GB
+    url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_mini_2026-06.zim
+  no_pictures:
+    file: wikipedia_en_all_nopic_2026-06.zim
+    size_hint: 49GB
+    url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim
+  full_with_media:
+    file: wikipedia_en_all_maxi_2026-02.zim
+    size_hint: 115GB
+    url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_maxi_2026-02.zim
+  iso_policy:
+    core: none
+    starter: simple_english_or_curated_small
+    expanded_usb: mini
+    separate_pack: no_pictures
+    oem_or_external: full_with_media
+
+maps:
+  nomad_map_assets:
+    repository: https://github.com/Crosstalk-Solutions/project-nomad-maps
+  protomaps:
+    project: https://protomaps.com/
+    documentation: https://docs.protomaps.com/
+    format: PMTiles
+  initial_packs:
+    - atlas-maps-uk
+    - atlas-maps-ireland
+    - atlas-maps-western-europe
+    - atlas-maps-europe
+
+debian:
+  release: trixie
+  suite: stable
+  arch: amd64
+  snapshot_policy: pin_on_lock_refresh
+
+iso_profiles:
+  core:
+    description: Appliance ISO under ~10GB without large ZIMs or models
+    include_models: false
+    include_zim: false
+  starter:
+    description: Core plus starter model pack and small curated ZIM
+    include_models: true
+    include_zim: curated_small
+  recovery:
+    description: Recovery and factory-repair media
+    include_models: false
+    include_zim: false

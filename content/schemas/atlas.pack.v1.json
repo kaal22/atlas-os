@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlas-os.local/schemas/atlas.pack.v1.json",
+  "title": "Atlas content pack manifest",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "version",
+    "type",
+    "name",
+    "description",
+    "size_bytes",
+    "minimum_os_version",
+    "architectures",
+    "mount_target",
+    "licences",
+    "sources",
+    "dependencies",
+    "conflicts",
+    "digest"
+  ],
+  "properties": {
+    "schema": { "const": "atlas.pack/v1" },
+    "id": { "type": "string" },
+    "version": { "type": "string" },
+    "type": {
+      "type": "string",
+      "enum": [
+        "atlas.content.knowledge",
+        "atlas.content.map",
+        "atlas.content.education",
+        "atlas.content.model",
+        "atlas.content.agent",
+        "atlas.content.workflow",
+        "atlas.content.language",
+        "atlas.content.media"
+      ]
+    },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+  }
+}

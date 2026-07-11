@@ -1,0 +1,14 @@
+{
+  "schema": "atlas.hardware.compatibility/v1",
+  "updated": "2026-07-11",
+  "entries": [
+    {
+      "id": "qemu-uefi-ref",
+      "vendor": "QEMU",
+      "model": "q35 + OVMF",
+      "tier": "ci-reference",
+      "status": "target",
+      "notes": "Primary installer smoke-test platform"
+    }
+  ]
+}

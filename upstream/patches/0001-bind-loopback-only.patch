@@ -1,0 +1,7 @@
+From: Atlas OS <builders@atlas-os.local>
+Subject: [PATCH] Bind management UI to loopback by default
+
+Ensure NOMAD management listeners default to 127.0.0.1 until
+Trusted LAN mode is explicitly enabled via Atlas networking.
+---
+Placeholder patch file — applied during atlas-nomad-core image build.

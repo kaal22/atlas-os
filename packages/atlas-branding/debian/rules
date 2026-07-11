@@ -1,0 +1,10 @@
+#!/usr/bin/make -f
+%:
+	dh $@
+
+override_dh_auto_install:
+	mkdir -p debian/atlas-branding/usr/share/atlas
+	cp -a ../../calamares debian/atlas-branding/usr/share/atlas/ || \
+	  cp -a ../../../calamares debian/atlas-branding/usr/share/atlas/
+	mkdir -p debian/atlas-branding/usr/share/pixmaps
+	mkdir -p debian/atlas-branding/usr/share/atlas/branding

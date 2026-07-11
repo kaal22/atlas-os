@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Atlas Wallpaper
+Comment=Set the Atlas glowing-triangle desktop wallpaper
+Exec=/usr/lib/atlas/set-wallpaper.sh
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+Hidden=false

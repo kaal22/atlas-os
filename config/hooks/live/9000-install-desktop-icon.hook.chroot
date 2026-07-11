@@ -1,0 +1,13 @@
+#!/bin/sh
+# Live session: show Install Atlas OS desktop icon
+mkdir -p /etc/skel/Desktop
+cat > /etc/skel/Desktop/install-atlas-os.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Install Atlas OS
+Exec=sudo -E calamares
+Icon=system-software-install
+Terminal=false
+Categories=System;
+EOF
+chmod 755 /etc/skel/Desktop/install-atlas-os.desktop

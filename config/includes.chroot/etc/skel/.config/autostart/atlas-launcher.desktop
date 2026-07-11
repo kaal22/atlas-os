@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Atlas Launcher
+Comment=Open Atlas Command Centre
+Exec=atlas-launcher
+Icon=atlas
+Terminal=false
+Categories=Network;Office;
+StartupNotify=true
+X-GNOME-Autostart-enabled=true

@@ -1,0 +1,12 @@
+Source: atlas-branding
+Section: misc
+Priority: optional
+Maintainer: Atlas OS Builders <builders@atlas-os.local>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.7.0
+
+Package: atlas-branding
+Architecture: all
+Depends: ${misc:Depends}
+Description: Atlas OS branding assets and Calamares theme
+ Wallpapers, logos, and Calamares branding for Atlas OS.

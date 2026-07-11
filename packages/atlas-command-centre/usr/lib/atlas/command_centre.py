@@ -28,8 +28,13 @@ for c in LIB_CANDIDATES:
 from auth_store import AuthStore  # noqa: E402
 from policy_gateway import default_gateway  # noqa: E402
 from agent_runtime import AgentRuntime, AgentManifest  # noqa: E402
-from model_router import probe_hardware, recommend  # noqa: E402
+from model_router import probe_hardware, recommend, recommendation_bundle  # noqa: E402
 from knowledge_service import KnowledgeService  # noqa: E402
+
+try:
+    from gpu_detect import as_api_dict as gpu_as_api_dict
+except ImportError:
+    gpu_as_api_dict = None  # type: ignore
 
 HOST = "127.0.0.1"
 PORT = 8787
@@ -136,7 +141,12 @@ async function page(){
   }
   if(id==='system'){
     const hw=await api('/api/models/recommend');
-    view.innerHTML=`<h1>System</h1><div class=pre>${JSON.stringify(hw,null,2)}</div>`;
+    const gpu=await api('/api/system/gpu');
+    const warn=hw.warning?`<p style="color:#ffb4b4">${hw.warning}</p>
+      <p><code>${hw.install_command||'sudo atlas-gpu-setup --install-nvidia'}</code></p>`:'';
+    view.innerHTML=`<h1>System</h1>${warn}<h2>AI profile</h2><div class=pre>${JSON.stringify(hw,null,2)}</div>
+      <h2>GPU</h2><div class=pre>${JSON.stringify(gpu,null,2)}</div>
+      <p>Offline guide: <code>/usr/share/atlas/docs/GPU_SETUP.md</code></p>`;
     return;
   }
   if(id==='setup'){
@@ -200,12 +210,27 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
             return
         if path == "/api/system/health":
-            return self._json(200, {"status": "ok", "bind": f"{HOST}:{PORT}", "services": {"command_centre": True}})
+            health = {"status": "ok", "bind": f"{HOST}:{PORT}", "services": {"command_centre": True}}
+            try:
+                bundle = recommendation_bundle()
+                if bundle.get("warning"):
+                    health["status"] = "degraded"
+                    health["gpu_warning"] = bundle["warning"]
+            except Exception:
+                pass
+            return self._json(200, health)
         if path == "/api/agents":
             return self._json(200, {"agents": [a.__dict__ for a in RT.agents.values()]})
         if path == "/api/models/recommend":
-            hw = probe_hardware()
-            return self._json(200, {"ram_gb": hw.ram_gb, "vram_gb": hw.vram_gb, "profile": recommend(hw)})
+            try:
+                return self._json(200, recommendation_bundle())
+            except Exception:
+                hw = probe_hardware()
+                return self._json(200, {"ram_gb": hw.ram_gb, "vram_gb": hw.vram_gb, "profile": recommend(hw)})
+        if path == "/api/system/gpu":
+            if gpu_as_api_dict is None:
+                return self._json(200, {"error": "gpu_detect unavailable"})
+            return self._json(200, gpu_as_api_dict())
         if path == "/api/setup/state":
             state = {"step": 1, "steps": [
                 "welcome", "device", "profile", "privacy", "ai", "content",

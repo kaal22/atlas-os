@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+# Ship offline GPU setup docs into the image.
+mkdir -p /usr/share/atlas/docs
+if [ -f /usr/share/atlas/docs-src/GPU_SETUP.md ]; then
+  cp /usr/share/atlas/docs-src/GPU_SETUP.md /usr/share/atlas/docs/GPU_SETUP.md
+fi
+chmod 755 /usr/bin/atlas-gpu-setup 2>/dev/null || true

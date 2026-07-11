@@ -1,0 +1,89 @@
+#!/bin/sh
+# atlas-gpu-setup — guided NVIDIA / GPU assistance for Atlas OS
+set -e
+
+GUIDE="${ATLAS_GPU_GUIDE:-/usr/share/atlas/docs/GPU_SETUP.md}"
+LIB_DETECT="/usr/lib/atlas/gpu_detect.py"
+
+usage() {
+  cat <<'EOF'
+Usage: atlas-gpu-setup [--check|--guide|--install-nvidia|--help]
+
+  --check            Detect GPU/driver status (JSON)
+  --guide            Show the GPU setup guide
+  --install-nvidia   Install Debian proprietary NVIDIA drivers (needs network + reboot)
+  --help             This help
+
+Atlas never forces proprietary drivers. GPU install is optional and user-approved.
+EOF
+}
+
+cmd_check() {
+  if [ -f "$LIB_DETECT" ]; then
+    python3 "$LIB_DETECT"
+  else
+    echo '{"error":"gpu_detect.py missing"}' >&2
+    exit 1
+  fi
+}
+
+cmd_guide() {
+  if [ -f "$GUIDE" ]; then
+    if command -v less >/dev/null 2>&1; then
+      less -F "$GUIDE"
+    else
+      cat "$GUIDE"
+    fi
+  else
+    echo "Guide not found at $GUIDE" >&2
+    exit 1
+  fi
+}
+
+cmd_install_nvidia() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "Run with sudo: sudo atlas-gpu-setup --install-nvidia" >&2
+    exit 1
+  fi
+
+  echo "=== Atlas NVIDIA driver setup (Debian) ==="
+  echo "This installs proprietary NVIDIA packages from Debian non-free firmware."
+  echo "A reboot is required afterwards."
+  echo
+  printf "Continue? [y/N] "
+  read -r ans
+  case "$ans" in
+    y|Y|yes|YES) ;;
+    *) echo "Cancelled."; exit 0 ;;
+  esac
+
+  export DEBIAN_FRONTEND=noninteractive
+  # Ensure non-free-firmware is available (Debian 12+)
+  if [ -f /etc/apt/sources.list ] && ! grep -q non-free-firmware /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null; then
+    echo "NOTE: Ensure 'non-free-firmware' (and typically 'contrib non-free') are enabled in APT sources."
+  fi
+
+  apt-get update
+  apt-get install -y linux-headers-amd64 build-essential pkg-config
+  # Prefer nvidia-detect when available
+  if apt-cache show nvidia-detect >/dev/null 2>&1; then
+    apt-get install -y nvidia-detect || true
+    nvidia-detect || true
+  fi
+  apt-get install -y nvidia-driver nvidia-smi || {
+    echo "ERROR: nvidia-driver install failed. See $GUIDE" >&2
+    exit 1
+  }
+
+  echo
+  echo "Install finished. Reboot, then run: atlas-gpu-setup --check"
+  echo "After reboot, restart Ollama: sudo systemctl restart ollama"
+}
+
+case "${1:-}" in
+  --check|"") cmd_check ;;
+  --guide) cmd_guide ;;
+  --install-nvidia) cmd_install_nvidia ;;
+  --help|-h) usage ;;
+  *) usage; exit 1 ;;
+esac

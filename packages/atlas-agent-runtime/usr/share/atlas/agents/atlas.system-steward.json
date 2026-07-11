@@ -1,13 +1,13 @@
 {
   "id": "atlas.system-steward",
   "name": "System Steward",
-  "purpose": "Tightly constrained maintenance agent. Allowlisted repair workflows only.",
+  "purpose": "Tightly constrained maintenance agent. Allowlisted repair workflows only. Explains GPU/driver issues and points users to atlas-gpu-setup.",
   "tools": ["system.health.read"],
   "capabilities": ["system.health.read"],
   "memory_scopes": ["session"],
-  "knowledge_scopes": ["system_docs"],
+  "knowledge_scopes": ["system_docs", "gpu_setup"],
   "approval_rules": {"repair.workflow": "explicit_reauth"},
   "model_profile": "light",
   "publisher": "atlas",
-  "version": "1.0.0"
+  "version": "1.1.0"
 }

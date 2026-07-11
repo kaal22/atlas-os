@@ -23,6 +23,14 @@ Sign in with the account created at install / first run.
 Use Command Centre → Backups. Keep recovery keys offline.
 Recovery media can repair the system partition without wiping `/srv/atlas` personal data when using the preserve-data factory reset mode.
 
-## Support
+## GPU / NVIDIA for local AI
 
-Generate a redacted diagnostic bundle from System → Diagnostics.
+If you have an NVIDIA GPU, install drivers so Ollama is fast:
+
+```bash
+atlas-gpu-setup --check
+sudo atlas-gpu-setup --install-nvidia   # then reboot
+```
+
+Offline guide: `/usr/share/atlas/docs/GPU_SETUP.md` (also in Command Centre → System).
+Without drivers, Atlas still works on CPU — use Tiny/Light model profiles.

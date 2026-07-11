@@ -2,7 +2,7 @@
 
 Offline-first AI agent operating environment and knowledge appliance.
 
-Built on Debian 13 Stable (x86-64). Product specification: see `product.md` (Atlas OS product v0.2).
+Built on Debian 13 Stable (x86-64) with **KDE Plasma** + SDDM. Product specification: see `product.md` (Atlas OS product v0.2).
 
 ## Quick start
 

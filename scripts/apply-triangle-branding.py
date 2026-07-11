@@ -36,8 +36,19 @@ OUT_BRAND = ROOT / "calamares" / "branding" / "atlas"
 OUT_MASTER = ROOT / "config" / "includes.chroot" / "usr" / "share" / "atlas" / "branding"
 OUT_PIX = ROOT / "config" / "includes.chroot" / "usr" / "share" / "pixmaps"
 OUT_WALL = ROOT / "config" / "includes.chroot" / "usr" / "share" / "backgrounds" / "atlas"
+OUT_PLASMA = (
+    ROOT
+    / "config"
+    / "includes.chroot"
+    / "usr"
+    / "share"
+    / "wallpapers"
+    / "Atlas"
+    / "contents"
+    / "images"
+)
 
-for d in (OUT_BRAND, OUT_MASTER, OUT_PIX, OUT_WALL):
+for d in (OUT_BRAND, OUT_MASTER, OUT_PIX, OUT_WALL, OUT_PLASMA):
     d.mkdir(parents=True, exist_ok=True)
 
 
@@ -123,6 +134,15 @@ def main() -> None:
     )
     # Compatibility alias used by older hooks
     shutil.copy2(wall_original, OUT_WALL / "atlas-default.png")
+
+    # Plasma wallpaper plugin images
+    master.resize((1920, 1080), Image.Resampling.LANCZOS).save(
+        OUT_PLASMA / "1920x1080.png", optimize=True
+    )
+    master.resize((2560, 1440), Image.Resampling.LANCZOS).save(
+        OUT_PLASMA / "2560x1440.png", optimize=True
+    )
+    shutil.copy2(wall_original, OUT_PLASMA / "1024x576.png")
 
     # Icon for slideshow / about
     logo.resize((160, 160), Image.Resampling.LANCZOS).save(OUT_BRAND / "productIcon.png", optimize=True)

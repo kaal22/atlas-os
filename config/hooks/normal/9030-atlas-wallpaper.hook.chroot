@@ -3,9 +3,30 @@ set -e
 # Ensure wallpaper helper is executable and backgrounds are world-readable.
 chmod 755 /usr/lib/atlas/set-wallpaper.sh 2>/dev/null || true
 chmod 644 /usr/share/backgrounds/atlas/*.png 2>/dev/null || true
-# Register as XFCE backdrop symlink for chooser UIs
-mkdir -p /usr/share/xfce4/backdrops
+
+# Plasma wallpaper plugin tree
+mkdir -p /usr/share/wallpapers/Atlas/contents/images
+if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png ]; then
+  cp -f /usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png \
+    /usr/share/wallpapers/Atlas/contents/images/1920x1080.png
+fi
 if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper.png ]; then
-  ln -sfn /usr/share/backgrounds/atlas/atlas-wallpaper.png \
-    /usr/share/xfce4/backdrops/atlas-wallpaper.png
+  cp -f /usr/share/backgrounds/atlas/atlas-wallpaper.png \
+    /usr/share/wallpapers/Atlas/contents/images/1024x576.png
+fi
+if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-1440p.png ]; then
+  cp -f /usr/share/backgrounds/atlas/atlas-wallpaper-1440p.png \
+    /usr/share/wallpapers/Atlas/contents/images/2560x1440.png
+fi
+
+# SDDM: point Breeze theme at Atlas wallpaper when possible
+if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png ]; then
+  mkdir -p /usr/share/sddm/themes/breeze
+  ln -sfn /usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png \
+    /usr/share/sddm/themes/breeze/atlas-background.png 2>/dev/null || true
+fi
+
+# Prefer SDDM over any leftover display managers
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl enable sddm.service 2>/dev/null || true
 fi

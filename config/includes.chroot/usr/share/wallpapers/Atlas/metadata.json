@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Atlas OS"
+            }
+        ],
+        "Id": "Atlas",
+        "License": "Proprietary",
+        "Name": "Atlas Triangle",
+        "Description": "Glowing triangle on black — default Atlas wallpaper"
+    }
+}

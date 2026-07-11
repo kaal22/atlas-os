@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+# Calamares should install/enable SDDM for Plasma sessions.
+mkdir -p /etc/calamares/modules
+cat > /etc/calamares/modules/displaymanager.conf <<'EOF'
+---
+displaymanagers:
+  - sddm
+defaultDisplayManager: sddm
+EOF

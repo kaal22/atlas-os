@@ -8,3 +8,5 @@ Terminal=false
 Categories=Network;Office;
 StartupNotify=true
 X-GNOME-Autostart-enabled=true
+OnlyShowIn=KDE;
+X-KDE-autostart-after=panel

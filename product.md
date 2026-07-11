@@ -556,8 +556,8 @@ Technical detail remains available in an Advanced section and downloadable diagn
 - x86-64 architecture.
 - Debian `live-build` for ISO generation.
 - Calamares for graphical installation.
-- XFCE as the initial desktop environment.
-- LightDM or an equivalent lightweight display manager.
+- KDE Plasma as the desktop environment.
+- SDDM as the display manager.
 - NetworkManager for network and hotspot management.
 - PipeWire for audio.
 - Flatpak disabled or omitted from the initial appliance build unless explicitly required.
@@ -2929,7 +2929,7 @@ Exit criteria:
 Deliverables:
 
 - Debian live-build configuration.
-- XFCE desktop.
+- KDE Plasma desktop.
 - Branding.
 - Calamares installer.
 - Encrypted install.
@@ -3179,7 +3179,7 @@ The first internal alpha must include:
 - Bootable Debian-based ISO.
 - Calamares installation.
 - Offline installation.
-- XFCE desktop.
+- KDE Plasma desktop.
 - Atlas launcher.
 - Bundled pinned Project N.O.M.A.D. core.
 - Kiwix.
@@ -3334,7 +3334,7 @@ Mitigation:
 These decisions must be resolved before implementation locks:
 
 1. Final product name and trademark availability.
-2. Whether XFCE remains the launch desktop or a kiosk shell becomes primary.
+2. Whether Plasma remains the launch desktop or a kiosk shell becomes primary.
 3. Whether Atlas reuses upstream MySQL or migrates core Atlas domains to PostgreSQL.
 4. Exact local model set and redistribution rights.
 5. Exact embedding model.
@@ -3356,7 +3356,7 @@ These decisions must be resolved before implementation locks:
 To prevent the project from stalling in architecture debate, use these defaults unless testing proves otherwise:
 
 - Debian 13 Stable.
-- XFCE.
+- KDE Plasma.
 - Calamares.
 - Btrfs root with snapshots.
 - Encrypted Atlas data partition.
@@ -3403,7 +3403,7 @@ The coding agent implementing this product must follow these rules:
 
 The first assignment is:
 
-> Create the `atlas-os` monorepo, implement a minimal Debian 13 `live-build` configuration, add XFCE and a branded Calamares installer, package a placeholder Atlas launcher as a `.deb`, build a hybrid ISO, boot it in QEMU with UEFI, install it onto a blank virtual disk, reboot into the installed system, and provide automated scripts and test evidence for the complete path.
+> Create the `atlas-os` monorepo, implement a minimal Debian 13 `live-build` configuration, add KDE Plasma and a branded Calamares installer, package a placeholder Atlas launcher as a `.deb`, build a hybrid ISO, boot it in QEMU with UEFI, install it onto a blank virtual disk, reboot into the installed system, and provide automated scripts and test evidence for the complete path.
 
 Acceptance evidence:
 

@@ -1,9 +1,10 @@
-# Atlas OS live package list
-task-xfce-desktop
-lightdm
-lightdm-gtk-greeter
+# Atlas OS live package list — KDE Plasma desktop
+task-kde-desktop
+sddm
+plasma-workspace
+plasma-nm
+kde-config-sddm
 network-manager
-network-manager-gnome
 pipewire
 pipewire-pulse
 wireplumber
@@ -19,12 +20,12 @@ firefox-esr
 libreoffice-writer
 libreoffice-calc
 libreoffice-impress
-evince
-file-roller
+okular
+ark
 vlc
-mousepad
-xfce4-screenshooter
-thunar
+kate
+spectacle
+dolphin
 calamares
 calamares-settings-debian
 live-boot

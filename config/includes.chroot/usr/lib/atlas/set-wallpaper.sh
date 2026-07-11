@@ -1,5 +1,5 @@
 #!/bin/sh
-# Apply Atlas wallpaper to every XFCE monitor (live + installed sessions).
+# Apply Atlas wallpaper on KDE Plasma (live + installed sessions).
 set -e
 WALL="${ATLAS_WALLPAPER:-/usr/share/backgrounds/atlas/atlas-wallpaper.png}"
 
@@ -7,29 +7,28 @@ if [ ! -f "$WALL" ]; then
   WALL="/usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png"
 fi
 if [ ! -f "$WALL" ]; then
+  WALL="/usr/share/wallpapers/Atlas/contents/images/1920x1080.png"
+fi
+if [ ! -f "$WALL" ]; then
   exit 0
 fi
 
-if ! command -v xfconf-query >/dev/null 2>&1; then
+# Preferred Plasma helper (Plasma 5.25+ / 6)
+if command -v plasma-apply-wallpaperimage >/dev/null 2>&1; then
+  plasma-apply-wallpaperimage "$WALL" >/dev/null 2>&1 || true
   exit 0
 fi
 
-# Create/update any existing last-image properties
-props="$(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep -E '/last-image$' || true)"
-if [ -n "$props" ]; then
-  echo "$props" | while read -r prop; do
-    [ -n "$prop" ] || continue
-    base="${prop%/last-image}"
-    xfconf-query -c xfce4-desktop -p "$prop" -s "$WALL" || true
-    xfconf-query -c xfce4-desktop -p "$base/image-style" -s 5 2>/dev/null || \
-      xfconf-query -c xfce4-desktop -p "$base/image-style" -n -t int -s 5 2>/dev/null || true
-  done
-else
-  # Fresh profile: seed monitor0
-  xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/last-image -n -t string -s "$WALL" 2>/dev/null || \
-    xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/last-image -s "$WALL" 2>/dev/null || true
-  xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/image-style -n -t int -s 5 2>/dev/null || \
-    xfconf-query -c xfce4-desktop -p /backdrop/screen0/monitor0/image-style -s 5 2>/dev/null || true
+# Fallback: dbus call used by older Plasma
+if command -v qdbus >/dev/null 2>&1; then
+  qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
+var allDesktops = desktops();
+for (i=0;i<allDesktops.length;i++) {
+  d = allDesktops[i];
+  d.wallpaperPlugin = 'org.kde.image';
+  d.currentConfigGroup = Array('Wallpaper', 'org.kde.image', 'General');
+  d.writeConfig('Image', 'file://$WALL');
+}" >/dev/null 2>&1 || true
 fi
 
 exit 0

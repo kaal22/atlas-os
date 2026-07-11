@@ -1,0 +1,58 @@
+#!/bin/sh
+set -e
+# Force X11 as the only presented Plasma session (hide Wayland entries).
+# Rationale: NVIDIA proprietary drivers + Ollama + many desktop tools are more
+# reliable on X11 for Atlas appliance targets.
+
+mkdir -p /usr/share/wayland-sessions/atlas-disabled
+mkdir -p /usr/share/xsessions
+
+for f in \
+  /usr/share/wayland-sessions/plasma.desktop \
+  /usr/share/wayland-sessions/plasmawayland.desktop \
+  /usr/share/wayland-sessions/plasma-wayland.desktop
+do
+  if [ -f "$f" ]; then
+    mv -f "$f" /usr/share/wayland-sessions/atlas-disabled/ 2>/dev/null || \
+      rm -f "$f"
+  fi
+done
+
+# Ensure X11 Plasma session exists and is the obvious default name
+if [ -f /usr/share/xsessions/plasma.desktop ]; then
+  # Make sure Name clearly indicates X11 for advanced users who see the picker
+  if ! grep -q "X11" /usr/share/xsessions/plasma.desktop 2>/dev/null; then
+    sed -i 's/^Name=.*/Name=Plasma (X11)/' /usr/share/xsessions/plasma.desktop || true
+  fi
+fi
+
+# Seed SDDM last-session toward X11 Plasma for first boot
+mkdir -p /var/lib/sddm
+cat > /var/lib/sddm/state.conf <<'EOF'
+[Last]
+Session=/usr/share/xsessions/plasma.desktop
+EOF
+
+# System-wide hint for Qt apps when a stray Wayland session appears
+mkdir -p /etc/environment.d
+cat > /etc/environment.d/10-atlas-x11.conf <<'EOF'
+# Atlas OS: prefer X11/xcb unless the user explicitly starts a Wayland session
+QT_QPA_PLATFORM=xcb
+EOF
+
+# Document for support
+mkdir -p /usr/share/atlas/docs
+cat > /usr/share/atlas/docs/X11_DEFAULT.md <<'EOF'
+# Atlas display server policy
+
+Atlas OS defaults to **X11** (Plasma on Xorg via SDDM).
+
+Wayland Plasma session entries are disabled at image build time because:
+
+- Proprietary NVIDIA drivers are more predictable on X11 for appliance users
+- Local AI (Ollama) and screen-capture tooling have fewer edge cases on X11
+- Calamares and first-run tooling assume a classic X11 desktop session
+
+To re-enable Wayland later (advanced): restore desktop files from
+`/usr/share/wayland-sessions/atlas-disabled/` and select Plasma (Wayland) in SDDM.
+EOF

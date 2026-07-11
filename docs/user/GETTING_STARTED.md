@@ -23,7 +23,11 @@ Sign in with the account created at install / first run.
 Use Command Centre → Backups. Keep recovery keys offline.
 Recovery media can repair the system partition without wiping `/srv/atlas` personal data when using the preserve-data factory reset mode.
 
-## GPU / NVIDIA for local AI
+## Display server
+
+Atlas defaults to **X11** (not Wayland) for NVIDIA and desktop compatibility.
+Login session: **Plasma (X11)**.
+
 
 If you have an NVIDIA GPU, install drivers so Ollama is fast:
 

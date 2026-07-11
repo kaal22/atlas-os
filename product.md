@@ -556,8 +556,8 @@ Technical detail remains available in an Advanced section and downloadable diagn
 - x86-64 architecture.
 - Debian `live-build` for ISO generation.
 - Calamares for graphical installation.
-- KDE Plasma as the desktop environment.
-- SDDM as the display manager.
+- KDE Plasma as the desktop environment (X11 session by default; Wayland hidden).
+- SDDM as the display manager (`DisplayServer=x11`).
 - NetworkManager for network and hotspot management.
 - PipeWire for audio.
 - Flatpak disabled or omitted from the initial appliance build unless explicitly required.

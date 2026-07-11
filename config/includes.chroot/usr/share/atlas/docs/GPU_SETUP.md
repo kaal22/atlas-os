@@ -62,7 +62,13 @@ first; see Ollama’s AMD docs for ROCm setup on your specific GPU.
 Use Tiny/Light profiles. Integrated graphics may help some workloads, but Atlas
 treats these systems as CPU-first for reliable recommendations.
 
-## Secure Boot note
+## Display server (X11 default)
+
+Atlas uses **X11 / Plasma (X11)** by default, not Wayland. This avoids common NVIDIA
+and desktop-tooling issues. Wayland session entries are hidden in the login screen.
+
+If the session picker ever shows Wayland options, choose **Plasma (X11)**.
+
 
 Some machines with Secure Boot need NVIDIA’s MOK enrollment after install.
 If the driver fails to load after reboot, temporarily enroll the key when prompted,

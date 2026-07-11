@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""GPU detection should warn when NVIDIA PCI exists without nvidia-smi."""
+"""GPU detection should expose driver readiness fields."""
 import importlib.util
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 path = ROOT / "packages" / "atlas-model-manager" / "usr" / "lib" / "atlas" / "gpu_detect.py"
-spec = importlib.util.spec_from_file_location("gpu_detect", path)
+spec = importlib.util.spec_from_file_location("atlas_gpu_detect", path)
 mod = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
+sys.modules["atlas_gpu_detect"] = mod
 spec.loader.exec_module(mod)
 
 

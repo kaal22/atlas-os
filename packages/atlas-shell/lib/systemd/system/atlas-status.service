@@ -1,0 +1,15 @@
+[Unit]
+Description=Atlas local services status page (127.0.0.1:8791)
+After=network.target
+ConditionKernelCommandLine=!boot=live
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/atlas-launcher --serve
+Restart=on-failure
+RestartSec=2
+# Loopback status only — no privileged paths required beyond /srv logs optional
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

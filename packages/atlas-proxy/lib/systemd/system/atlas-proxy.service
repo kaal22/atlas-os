@@ -1,0 +1,16 @@
+[Unit]
+Description=Atlas nginx reverse proxy (loopback Command Centre)
+After=network.target atlas-command-centre.service
+Wants=atlas-command-centre.service
+ConditionKernelCommandLine=!boot=live
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Ensure site enabled and default site does not steal :80 on all interfaces.
+ExecStart=/usr/lib/atlas/atlas-proxy-enable.sh
+ExecReload=/bin/systemctl reload nginx.service
+ExecStop=/bin/true
+
+[Install]
+WantedBy=multi-user.target

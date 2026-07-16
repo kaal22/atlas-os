@@ -1,0 +1,16 @@
+[Unit]
+Description=Atlas OS offline payload import (after Docker)
+After=docker.service
+Wants=docker.service
+ConditionPathExists=/etc/atlas/payload-enabled
+ConditionPathExists=/etc/atlas/firstboot-pending
+ConditionKernelCommandLine=!boot=live
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/atlas/import-payload.sh
+RemainAfterExit=yes
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

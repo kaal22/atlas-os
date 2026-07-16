@@ -1,15 +1,30 @@
 #!/bin/sh
 set -e
-# Mark first-boot and prepare /srv/atlas skeleton on installed systems.
-mkdir -p /srv/atlas/{users,workspaces,documents,knowledge,embeddings,models,maps,kiwix,kolibri,media,content-packs,agent-packages,backups,exports,databases,logs}
+# Prepare /srv/atlas skeleton + OS identity for the image.
+# Do NOT create firstboot-pending here — that must only appear on the
+# installed target (Calamares), never in the live session.
+mkdir -p /etc/atlas
+mkdir -p /srv/atlas/{users,workspaces,documents,knowledge,embeddings,models,maps,kiwix,kolibri,media,content-packs,agent-packages,backups,exports,databases,logs,tmp}
 chmod 755 /srv/atlas
-touch /etc/atlas/firstboot-pending
-cat > /etc/atlas/os-release <<'EOF'
+rm -f /etc/atlas/firstboot-pending /etc/atlas/firstboot-done
+
+# Public OS identity (Plymouth/login/grub tooling read /etc/os-release).
+cat > /etc/os-release <<'EOF'
+PRETTY_NAME="Atlas OS 0.1.0-alpha"
 NAME="Atlas OS"
+VERSION_ID="0.1"
+VERSION="0.1.0-alpha"
+VERSION_CODENAME=alpha
 ID=atlas
 ID_LIKE=debian
-PRETTY_NAME="Atlas OS 0.1.0-alpha"
-VERSION="0.1.0-alpha"
-VERSION_ID="0.1"
 HOME_URL="https://atlas-os.local/"
+SUPPORT_URL="https://atlas-os.local/support"
+BUG_REPORT_URL="https://atlas-os.local/issues"
+EOF
+cp -f /etc/os-release /etc/atlas/os-release
+
+mkdir -p /etc/default/grub.d
+cat > /etc/default/grub.d/atlas.cfg <<'EOF'
+GRUB_DISTRIBUTOR="Atlas"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet"
 EOF

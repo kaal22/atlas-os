@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Atlas Trust Desktop Launchers
+Comment=Mark Atlas desktop icons as launchable (Plasma)
+Exec=/usr/lib/atlas/trust-desktop-launchers.sh
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=1

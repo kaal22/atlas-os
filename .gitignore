@@ -87,3 +87,8 @@ config/chroot
 config/common
 config/source
 config/package-lists/live.list.chroot
+
+# Offline payloads / host binaries staged into includes (built by lock-refresh / export)
+config/includes.chroot/usr/share/atlas/payload/*.tar.zst
+config/includes.chroot/usr/bin/ollama
+dist/atlas-core-oci-payload.tar.zst

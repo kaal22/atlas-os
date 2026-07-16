@@ -9,6 +9,8 @@
       --bg: #000000;
       --text: #f2f2f2;
       --muted: #8a8a8a;
+      --ok: #6bcf8e;
+      --bad: #d66;
     }
     * { box-sizing: border-box; }
     body {
@@ -16,12 +18,14 @@
       min-height: 100vh;
       font-family: "Segoe UI", "Source Sans 3", system-ui, sans-serif;
       color: var(--text);
-      background: #000;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(255,255,255,0.08), transparent 55%),
+        #000;
       display: grid;
       place-items: center;
       padding: 2rem;
     }
-    main { max-width: 28rem; text-align: center; }
+    main { max-width: 32rem; text-align: center; width: 100%; }
     img.mark {
       width: 140px;
       height: 140px;
@@ -45,14 +49,34 @@
       text-align: left;
     }
     .status h2 {
-      margin: 0 0 0.5rem;
+      margin: 0 0 0.75rem;
       font-size: 0.8rem;
       color: #fff;
       letter-spacing: 0.14em;
       text-transform: uppercase;
     }
-    ul { margin: 0; padding-left: 1.2rem; color: var(--text); }
-    code { color: #fff; }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.4rem 0;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 0.95rem;
+    }
+    .row:first-of-type { border-top: 0; }
+    .name { color: var(--text); }
+    .addr { color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.8rem; }
+    .pill {
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      min-width: 3.5rem;
+      text-align: right;
+    }
+    .pill.ok { color: var(--ok); }
+    .pill.bad { color: var(--bad); }
+    .pill.wait { color: var(--muted); }
+    .note { margin-top: 0.85rem; font-size: 0.85rem; color: var(--muted); }
   </style>
 </head>
 <body>
@@ -61,13 +85,60 @@
     <h1 class="brand">Atlas OS</h1>
     <p>Private offline AI and knowledge environment.</p>
     <div class="status">
-      <h2>Phase 1 placeholder</h2>
-      <ul>
-        <li>Launcher package installed</li>
-        <li>Command Centre arrives after first-boot provisioning</li>
-        <li>Expected endpoint: <code>http://127.0.0.1:8787/</code></li>
-      </ul>
+      <h2>Local services</h2>
+      <p class="note" id="fb" style="margin-top:0"></p>
+      <div id="health"></div>
+      <p class="note">Probes bind to <code>127.0.0.1</code> only. Refresh after first-boot import.</p>
     </div>
   </main>
+  <script>
+    const services = [
+      { name: "Kiwix", url: "http://127.0.0.1:8080/" },
+      { name: "Qdrant", url: "http://127.0.0.1:6333/readyz" },
+      { name: "NOMAD", url: "http://127.0.0.1:8090/api/health" },
+      { name: "Ollama", url: "http://127.0.0.1:11434/api/tags" },
+    ];
+
+    const root = document.getElementById("health");
+    const fb = document.getElementById("fb");
+
+    function row(svc, state) {
+      const el = document.createElement("div");
+      el.className = "row";
+      el.innerHTML =
+        `<span class="name">${svc.name}</span>` +
+        `<span class="addr">${svc.url.replace("http://", "")}</span>` +
+        `<span class="pill ${state}">${state}</span>`;
+      return el;
+    }
+
+    function normalize(h) {
+      if (Array.isArray(h)) return { firstboot: "unknown", message: "", services: h };
+      if (h && typeof h === "object") return h;
+      return { firstboot: "unknown", message: "", services: [] };
+    }
+
+    async function refresh() {
+      root.innerHTML = "";
+      const data = normalize(window.ATLAS_HEALTH);
+      if (fb) {
+        const msg = data.message ? ` — ${data.message}` : "";
+        fb.textContent = `First-boot: ${data.firstboot || "unknown"}${msg}`;
+      }
+      const list = (data.services && data.services.length) ? data.services : [];
+      if (list.length) {
+        for (const item of list) {
+          const svc = { name: item.name, url: item.url };
+          root.appendChild(row(svc, item.ok ? "ok" : "bad"));
+        }
+        return;
+      }
+      for (const svc of services) {
+        root.appendChild(row(svc, "wait"));
+      }
+    }
+
+    refresh();
+  </script>
 </body>
 </html>

@@ -1,0 +1,100 @@
+#!/bin/sh
+# Ensure Atlas + Command Centre desktop icons exist and are executable
+# (Plasma opens non-executable .desktop files in Kate instead of launching them).
+set -e
+mkdir -p /etc/skel/Desktop /usr/share/applications /usr/lib/atlas /usr/bin
+
+# --- Service Check (local services status :8791) ---
+cat > /etc/skel/Desktop/atlas-launcher.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Service Check
+GenericName=Atlas Service Check
+Comment=Check Kiwix, Ollama, NOMAD and other local services
+Exec=/usr/bin/atlas-launcher
+TryExec=/usr/bin/atlas-launcher
+Icon=atlas
+Terminal=false
+Categories=Network;Office;System;
+StartupNotify=true
+Keywords=atlas;status;health;kiwix;ollama;nomad;services;
+DBusActivatable=false
+EOF
+chmod 755 /etc/skel/Desktop/atlas-launcher.desktop
+cp -f /etc/skel/Desktop/atlas-launcher.desktop /usr/share/applications/atlas-launcher.desktop
+chmod 644 /usr/share/applications/atlas-launcher.desktop
+
+# --- Command Centre (http://127.0.0.1/) ---
+if [ ! -x /usr/bin/atlas-open-command-centre ]; then
+  cat > /usr/bin/atlas-open-command-centre <<'EOF'
+#!/bin/sh
+set -e
+URL="${ATLAS_COMMAND_CENTRE_URL:-}"
+if [ -z "$URL" ] && [ -f /etc/atlas/atlas.conf ]; then
+  URL="$(sed -n 's/^ATLAS_COMMAND_CENTRE_URL=//p' /etc/atlas/atlas.conf | head -1 | tr -d '"' | tr -d "'")"
+fi
+URL="${URL:-http://127.0.0.1/}"
+if command -v xdg-open >/dev/null 2>&1; then exec xdg-open "$URL"; fi
+if command -v firefox >/dev/null 2>&1; then exec firefox --new-window "$URL"; fi
+echo "Open Command Centre at: $URL" >&2
+exit 1
+EOF
+  chmod 755 /usr/bin/atlas-open-command-centre
+fi
+
+cat > /etc/skel/Desktop/atlas-command-centre.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Command Centre
+GenericName=Atlas Command Centre
+Comment=Open Atlas Command Centre (AI, models, agents)
+Exec=/usr/bin/atlas-open-command-centre
+TryExec=/usr/bin/atlas-open-command-centre
+Icon=atlas
+Terminal=false
+Categories=Network;Office;System;
+StartupNotify=true
+Keywords=atlas;command;centre;ai;models;ask;
+DBusActivatable=false
+EOF
+chmod 755 /etc/skel/Desktop/atlas-command-centre.desktop
+cp -f /etc/skel/Desktop/atlas-command-centre.desktop /usr/share/applications/atlas-command-centre.desktop
+chmod 644 /usr/share/applications/atlas-command-centre.desktop
+
+# Helper: mark Desktop .desktop files trusted/executable for Plasma
+cat > /usr/lib/atlas/trust-desktop-launchers.sh <<'EOF'
+#!/bin/sh
+# Plasma treats non-executable Desktop *.desktop as text → opens Kate.
+set -e
+desk="${XDG_DESKTOP_DIR:-$HOME/Desktop}"
+[ -d "$desk" ] || desk="$HOME/Desktop"
+[ -d "$desk" ] || exit 0
+for f in "$desk"/*.desktop; do
+  [ -f "$f" ] || continue
+  case "$(basename "$f")" in
+    atlas-launcher.desktop|atlas-command-centre.desktop|install-atlas-os.desktop) ;;
+    *) continue ;;
+  esac
+  chmod a+x "$f" 2>/dev/null || true
+  if command -v gio >/dev/null 2>&1; then
+    gio set -t string "$f" metadata::trusted true 2>/dev/null || true
+  fi
+done
+EOF
+chmod 755 /usr/lib/atlas/trust-desktop-launchers.sh
+
+mkdir -p /etc/skel/.config/autostart
+cat > /etc/skel/.config/autostart/atlas-trust-desktop.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Atlas Trust Desktop Launchers
+Comment=Mark Atlas desktop icons as launchable (Plasma)
+Exec=/usr/lib/atlas/trust-desktop-launchers.sh
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=KDE;
+X-KDE-autostart-phase=1
+EOF

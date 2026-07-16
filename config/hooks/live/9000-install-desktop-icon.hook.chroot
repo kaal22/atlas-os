@@ -1,24 +1,31 @@
 #!/bin/sh
+# Live session: Install icon + installer autostart only (no Atlas provisioning UI).
 set -e
-# Live session: desktop Install icon + boot-menu installer autostart.
 
 mkdir -p /etc/skel/Desktop /etc/xdg/autostart /usr/lib/atlas
 
+# Live must never arm first-boot import.
+rm -f /etc/atlas/firstboot-pending /etc/atlas/firstboot-done
+
+# Do not autostart Atlas launcher in live (installed system keeps skel autostart).
+rm -f /etc/xdg/autostart/atlas-launcher.desktop \
+      /etc/skel/.config/autostart/atlas-launcher.desktop
+
+# Live desktop: Install only (Atlas OS + Command Centre icons are for the installed system).
+rm -f /etc/skel/Desktop/atlas-launcher.desktop \
+      /etc/skel/Desktop/atlas-command-centre.desktop
+
 cat > /usr/lib/atlas/maybe-autostart-installer.sh <<'EOF'
 #!/bin/sh
-# Launch Calamares when booted with atlas-install (default USB install entry).
 set -e
 if ! grep -qw atlas-install /proc/cmdline 2>/dev/null; then
   exit 0
 fi
-
-# Wait for the graphical session / display.
 i=0
 while [ "$i" -lt 60 ]; do
   if [ -n "${DISPLAY:-}" ] || [ -n "${WAYLAND_DISPLAY:-}" ]; then
     break
   fi
-  # SDDM/Plasma may not export DISPLAY into xdg autostart the same way; probe.
   if [ -S /tmp/.X11-unix/X0 ] || [ -S /tmp/.X11-unix/X1 ]; then
     export DISPLAY="${DISPLAY:-:0}"
     break
@@ -26,10 +33,8 @@ while [ "$i" -lt 60 ]; do
   i=$((i + 1))
   sleep 1
 done
-
 sleep 2
 export QT_AUTO_SCREEN_SCALE_FACTOR="${QT_AUTO_SCREEN_SCALE_FACTOR:-1}"
-
 if command -v atlas-install >/dev/null 2>&1; then
   exec atlas-install
 fi
@@ -37,7 +42,6 @@ exec calamares-install-debian
 EOF
 chmod 755 /usr/lib/atlas/maybe-autostart-installer.sh
 
-# Early + normal autostart so installer appears on bare-metal USB boots.
 cat > /etc/xdg/autostart/atlas-install-autostart.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
@@ -45,12 +49,14 @@ Name=Atlas Install Autostart
 Exec=/usr/lib/atlas/maybe-autostart-installer.sh
 Terminal=false
 NoDisplay=true
-X-GNOME-Autostart-Phase=Application
 X-KDE-autostart-phase=2
 X-KDE-autostart-after=panel
 OnlyShowIn=KDE;GNOME;XFCE;LXDE;LXQt;MATE;Cinnamon;
 EOF
 
+# Single desktop launcher (do not also ship install-atlas-os.desktop elsewhere).
+rm -f /etc/skel/Desktop/calamares-install-debian.desktop \
+      /etc/skel/Desktop/install-atlas-os.desktop
 cat > /etc/skel/Desktop/install-atlas-os.desktop <<'EOF'
 [Desktop Entry]
 Type=Application

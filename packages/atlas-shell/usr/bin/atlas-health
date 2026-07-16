@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# Probe Atlas loopback services + firstboot progress; print JSON for launcher.
+set -euo pipefail
+
+probe() {
+  local name="$1" url="$2"
+  local code
+  code="$(curl -sS -o /dev/null -w '%{http_code}' --connect-timeout 1 --max-time 2 "$url" 2>/dev/null || true)"
+  code="$(echo "$code" | tr -cd '0-9' | tail -c 4)"
+  [[ -n "$code" ]] || code="000"
+  if [[ "$code" != "000" ]]; then
+    printf '{"name":"%s","url":"%s","ok":true,"http":%s}' "$name" "$url" "$code"
+  else
+    printf '{"name":"%s","url":"%s","ok":false,"http":0}' "$name" "$url"
+  fi
+}
+
+fb_state="unknown"
+fb_msg=""
+progress=""
+
+if [[ -f /srv/atlas/logs/firstboot-progress.txt.current ]]; then
+  progress="$(tr '\n' ' ' </srv/atlas/logs/firstboot-progress.txt.current | head -c 240)"
+elif [[ -f /srv/atlas/logs/firstboot-progress.txt ]]; then
+  progress="$(tail -1 /srv/atlas/logs/firstboot-progress.txt | head -c 240)"
+fi
+
+if [[ -f /etc/atlas/firstboot-pending ]]; then
+  fb_state="importing"
+  fb_msg="${progress:-firstboot running — docker load can take 10–30 minutes}"
+fi
+if [[ -f /srv/atlas/logs/payload-import.json ]]; then
+  fb_msg="$(python3 -c 'import json;print(json.load(open("/srv/atlas/logs/payload-import.json")).get("message",""))' 2>/dev/null || true)"
+  if python3 -c 'import json,sys;sys.exit(0 if json.load(open("/srv/atlas/logs/payload-import.json")).get("ok") else 1)' 2>/dev/null; then
+    fb_state="imported"
+  else
+    fb_state="import_failed"
+    [[ -n "$progress" ]] && fb_msg="$fb_msg | $progress"
+  fi
+fi
+if [[ -f /etc/atlas/firstboot-done && "$fb_state" != "import_failed" ]]; then
+  fb_state="done"
+  fb_msg="${fb_msg:-firstboot completed}"
+fi
+if [[ ! -f /usr/share/atlas/payload/atlas-core-oci-payload.tar.zst ]]; then
+  if [[ -f /etc/atlas/payload-enabled ]]; then
+    fb_state="missing_payload"
+    fb_msg="payload marker set but archive missing"
+  elif [[ "$fb_state" == "unknown" ]]; then
+    fb_state="no_payload"
+  fi
+fi
+
+# If firstboot unit is active, surface that even without pending file race
+if [[ "$fb_state" == "unknown" || "$fb_state" == "importing" ]]; then
+  if systemctl is-active --quiet atlas-firstboot.service 2>/dev/null; then
+    fb_state="importing"
+    fb_msg="${progress:-atlas-firstboot.service active}"
+  fi
+fi
+
+python3 - "$fb_state" "$fb_msg" "$progress" <<'PY'
+import json, subprocess, sys
+
+state, msg, progress = sys.argv[1:4]
+services = []
+specs = [
+    ("kiwix", "http://127.0.0.1:8080/"),
+    ("qdrant", "http://127.0.0.1:6333/readyz"),
+    ("nomad", "http://127.0.0.1:8090/api/health"),
+    ("ollama", "http://127.0.0.1:11434/api/tags"),
+]
+for name, url in specs:
+    code = "000"
+    try:
+        r = subprocess.run(
+            ["curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+             "--connect-timeout", "1", "--max-time", "2", url],
+            capture_output=True, text=True, check=False,
+        )
+        digits = "".join(ch for ch in (r.stdout or "") if ch.isdigit())
+        if digits:
+            code = digits[-3:].zfill(3) if len(digits) >= 3 else digits.zfill(3)
+            if len(code) > 3:
+                code = code[-3:]
+    except Exception:
+        pass
+    ok = code != "000"
+    services.append({"name": name, "url": url, "ok": ok, "http": int(code) if code.isdigit() else 0})
+
+print(json.dumps({
+    "firstboot": state,
+    "message": msg,
+    "progress": progress,
+    "services": services,
+}))
+PY

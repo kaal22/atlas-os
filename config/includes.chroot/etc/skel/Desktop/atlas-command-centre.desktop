@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Command Centre
+GenericName=Atlas Command Centre
+Comment=Open Atlas Command Centre (AI, models, agents)
+Exec=/usr/bin/atlas-open-command-centre
+TryExec=/usr/bin/atlas-open-command-centre
+Icon=atlas
+Terminal=false
+Categories=Network;Office;System;
+StartupNotify=true
+Keywords=atlas;command;centre;ai;models;ask;
+DBusActivatable=false

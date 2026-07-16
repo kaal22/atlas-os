@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 from typing import Literal
 
 Mode = Literal["private_device", "trusted_lan", "private_hotspot", "offline_isolation"]
+
+DEFAULT_MODE_FILE = Path("/etc/atlas/network-mode")
 
 
 def apply_mode(mode: Mode, dry_run: bool = True) -> list[str]:
@@ -52,6 +55,12 @@ def apply_mode(mode: Mode, dry_run: bool = True) -> list[str]:
     for cmd in commands:
         subprocess.check_call(cmd.split())
     return commands
+
+
+def persist_mode(mode: str, path: Path | None = None) -> None:
+    target = path or DEFAULT_MODE_FILE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(mode + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

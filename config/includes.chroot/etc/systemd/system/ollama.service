@@ -2,20 +2,24 @@
 Description=Ollama (Atlas host-native)
 After=network-online.target
 Wants=network-online.target
+ConditionKernelCommandLine=!boot=live
 
 [Service]
 Type=simple
 Environment=OLLAMA_HOST=127.0.0.1:11434
 Environment=OLLAMA_MODELS=/srv/atlas/models/ollama
 Environment=OLLAMA_NO_CLOUD=1
+Environment=HOME=/srv/atlas/models/ollama
+ExecStartPre=/bin/mkdir -p /srv/atlas/models/ollama
 ExecStart=/usr/bin/ollama serve
 Restart=on-failure
-RestartSec=5
-# Hardening
+RestartSec=3
+# Enough room for model store; avoid overly strict sandbox that kills serve.
 NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=/srv/atlas/models/ollama
+ProtectSystem=full
+ProtectHome=true
 PrivateTmp=true
+ReadWritePaths=/srv/atlas/models/ollama
 
 [Install]
 WantedBy=multi-user.target

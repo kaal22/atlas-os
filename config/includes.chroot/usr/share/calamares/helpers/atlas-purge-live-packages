@@ -1,0 +1,141 @@
+#!/bin/bash
+# Offline-safe removal of live-installer packages from the installed target.
+# Replaces Calamares packages module apt-get purge (fails offline / missing pkgs).
+set -e
+
+CHROOT=$(mount | grep proc | grep calamares | awk '{print $3}' | sed -e "s#/proc##g")
+if [ -z "$CHROOT" ] || [ ! -d "$CHROOT" ]; then
+  echo "ERROR: could not locate Calamares target chroot" >&2
+  exit 1
+fi
+
+echo "Purging live-session packages from target (offline)..."
+
+PKGS="
+live-boot
+live-boot-doc
+live-config
+live-config-doc
+live-config-systemd
+live-config-sysvinit
+live-tools
+live-task-localisation
+live-task-recommended
+calamares
+calamares-settings-debian
+"
+
+for pkg in $PKGS; do
+  if chroot "$CHROOT" dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q 'install ok installed'; then
+    echo "  purge $pkg"
+    chroot "$CHROOT" dpkg --purge "$pkg" 2>/dev/null || \
+      chroot "$CHROOT" dpkg --force-all --purge "$pkg" || true
+  else
+    echo "  skip $pkg (not installed)"
+  fi
+done
+
+# Clear leftover desktop installers on the installed system (skel + live user homes)
+rm -f "$CHROOT/etc/skel/Desktop/install-atlas-os.desktop" \
+      "$CHROOT/etc/skel/Desktop/calamares-install-debian.desktop" \
+      "$CHROOT/etc/xdg/autostart/atlas-install-autostart.desktop" \
+      "$CHROOT/etc/xdg/autostart/calamares-desktop-icon.desktop" \
+      "$CHROOT/usr/share/applications/calamares-install-debian.desktop" \
+      "$CHROOT/usr/share/applications/install-atlas-os.desktop" \
+      "$CHROOT/usr/bin/atlas-install" || true
+
+install_desktop_icon() {
+  app="$1"
+  desktop="$2"
+  if [ ! -f "$CHROOT/usr/share/applications/$desktop" ]; then
+    echo "  WARN: missing $desktop — skip desktop icon"
+    return 0
+  fi
+  mkdir -p "$CHROOT/etc/skel/Desktop"
+  cp -f "$CHROOT/usr/share/applications/$desktop" \
+    "$CHROOT/etc/skel/Desktop/$desktop"
+  chmod 755 "$CHROOT/etc/skel/Desktop/$desktop"
+  echo "  skel Desktop/$desktop"
+}
+
+# Ensure CC opener exists even if .deb postinst did not run yet
+if [ ! -x "$CHROOT/usr/bin/atlas-open-command-centre" ]; then
+  cat > "$CHROOT/usr/bin/atlas-open-command-centre" <<'EOF'
+#!/bin/sh
+set -e
+URL="${ATLAS_COMMAND_CENTRE_URL:-}"
+if [ -z "$URL" ] && [ -f /etc/atlas/atlas.conf ]; then
+  URL="$(sed -n 's/^ATLAS_COMMAND_CENTRE_URL=//p' /etc/atlas/atlas.conf | head -1 | tr -d '"' | tr -d "'")"
+fi
+URL="${URL:-http://127.0.0.1/}"
+if command -v xdg-open >/dev/null 2>&1; then exec xdg-open "$URL"; fi
+if command -v firefox >/dev/null 2>&1; then exec firefox --new-window "$URL"; fi
+echo "Open Command Centre at: $URL" >&2
+exit 1
+EOF
+  chmod 755 "$CHROOT/usr/bin/atlas-open-command-centre"
+fi
+
+install_desktop_icon atlas-launcher atlas-launcher.desktop
+install_desktop_icon atlas-command-centre atlas-command-centre.desktop
+
+# Restore autostart for installed users (live hook strips it from the shared squashfs).
+if [ -f "$CHROOT/usr/share/applications/atlas-launcher.desktop" ]; then
+  mkdir -p "$CHROOT/etc/skel/.config/autostart"
+  cat > "$CHROOT/etc/skel/.config/autostart/atlas-launcher.desktop" <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=Service Check
+Comment=Open Atlas local services status
+Exec=/usr/bin/atlas-launcher
+TryExec=/usr/bin/atlas-launcher
+Icon=atlas
+Terminal=false
+Categories=Network;Office;
+StartupNotify=true
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=KDE;
+X-KDE-autostart-after=panel
+DBusActivatable=false
+EOF
+  chmod 644 "$CHROOT/etc/skel/.config/autostart/atlas-launcher.desktop"
+fi
+
+# Calamares copies the live user's Desktop; purge install launchers from all homes,
+# and ensure Atlas desktop icons are present for each user.
+for desk in "$CHROOT"/home/*/Desktop; do
+  [ -d "$desk" ] || continue
+  rm -f "$desk"/install-atlas-os.desktop \
+        "$desk"/calamares-install-debian.desktop \
+        "$desk"/Install*.desktop 2>/dev/null || true
+  for desktop in atlas-launcher.desktop atlas-command-centre.desktop; do
+    [ -f "$CHROOT/usr/share/applications/$desktop" ] || continue
+    cp -f "$CHROOT/usr/share/applications/$desktop" "$desk/$desktop"
+    chmod 755 "$desk/$desktop"
+    if chroot "$CHROOT" command -v gio >/dev/null 2>&1; then
+      chroot "$CHROOT" gio set -t string \
+        "${desk#"$CHROOT"}/$desktop" metadata::trusted true \
+        2>/dev/null || true
+    fi
+  done
+done
+
+for apps in "$CHROOT"/home/*/.local/share/applications; do
+  [ -d "$apps" ] || continue
+  rm -f "$apps"/install-atlas-os.desktop \
+        "$apps"/calamares-install-debian.desktop 2>/dev/null || true
+done
+
+# Arm first-boot provisioning ONLY on the installed target (never in live squashfs).
+mkdir -p "$CHROOT/etc/atlas" "$CHROOT/srv/atlas/logs"
+rm -f "$CHROOT/etc/atlas/firstboot-done"
+touch "$CHROOT/etc/atlas/firstboot-pending"
+# Ensure units are enabled on the target
+chroot "$CHROOT" systemctl enable docker.service 2>/dev/null || true
+chroot "$CHROOT" systemctl enable atlas-firstboot.service 2>/dev/null || true
+chroot "$CHROOT" systemctl enable ollama.service 2>/dev/null || true
+# Drop-ins already skip boot=live; installed systems do not use boot=live.
+echo "Armed firstboot-pending on installed target."
+
+echo "live-package purge finished."
+exit 0

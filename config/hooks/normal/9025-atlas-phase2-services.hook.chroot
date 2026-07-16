@@ -1,0 +1,73 @@
+#!/bin/sh
+# Enable Docker / firstboot / Ollama for the *installed* system.
+# Live session skips them via ConditionKernelCommandLine=!boot=live drop-ins.
+set -e
+
+mkdir -p /etc/systemd/system/multi-user.target.wants
+mkdir -p /etc/systemd/system/docker.service.d
+mkdir -p /etc/systemd/system/ollama.service.d
+mkdir -p /etc/systemd/system/atlas-firstboot.service.d
+mkdir -p /etc/systemd/system/atlas-payload.service.d
+mkdir -p /etc/systemd/system/containerd.service.d
+
+# Skip heavy services while booted as live media (same squashfs as install).
+cat > /etc/systemd/system/docker.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+# Do not start Docker in the live installer session.
+ConditionKernelCommandLine=!boot=live
+EOF
+
+cat > /etc/systemd/system/containerd.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+cat > /etc/systemd/system/ollama.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+cat > /etc/systemd/system/atlas-firstboot.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+cat > /etc/systemd/system/atlas-payload.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+enable_unit() {
+  unit="$1"
+  src=""
+  for cand in "/lib/systemd/system/$unit" "/usr/lib/systemd/system/$unit" "/etc/systemd/system/$unit"; do
+    if [ -f "$cand" ]; then
+      src="$cand"
+      break
+    fi
+  done
+  if [ -z "$src" ]; then
+    echo "WARN: $unit not found; skip enable" >&2
+    return 0
+  fi
+  ln -sfn "$src" "/etc/systemd/system/multi-user.target.wants/$unit"
+  echo "enabled $unit -> $src"
+}
+
+enable_unit docker.service
+enable_unit containerd.service
+enable_unit atlas-firstboot.service
+enable_unit ollama.service
+
+systemctl enable docker.service 2>/dev/null || true
+systemctl enable containerd.service 2>/dev/null || true
+systemctl enable atlas-firstboot.service 2>/dev/null || true
+systemctl enable ollama.service 2>/dev/null || true
+
+# Never leave a pending marker in the squashfs / live image.
+rm -f /etc/atlas/firstboot-pending /etc/atlas/firstboot-done
+
+mkdir -p /usr/share/atlas/compose
+if [ -f /usr/share/atlas/payload/compose/atlas-core.yml ]; then
+  cp -f /usr/share/atlas/payload/compose/atlas-core.yml /usr/share/atlas/compose/
+fi

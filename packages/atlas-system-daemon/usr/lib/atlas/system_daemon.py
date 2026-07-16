@@ -8,18 +8,28 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 import socketserver
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+HERE = Path(__file__).resolve().parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+
+from network_modes import apply_mode, persist_mode  # noqa: E402
+
 SOCK_PATH = os.environ.get("ATLAS_SYSTEM_SOCK", "/run/atlas/system.sock")
-AUDIT_LOG = Path(os.environ.get("ATLAS_AUDIT_LOG", "/srv/atlas/logs/system-daemon-audit.jsonl"))
+AUDIT_LOG = Path(os.environ.get("ATLAS_AUDIT_LOG", "/srv/atlas/logs/atlas-audit.jsonl"))
+NETWORK_MODE_PATH = Path(os.environ.get("ATLAS_NETWORK_MODE_FILE", "/etc/atlas/network-mode"))
+
 ALLOWED = {
     "system.health.read",
     "system.power.profile.set",
+    "network.mode.apply",
+    "network.mode.read",
     "network.hotspot.enable",
     "network.hotspot.disable",
     "storage.mount",
@@ -36,32 +46,55 @@ ALLOWED = {
     "logs.bundle.create",
 }
 
+# Modes applied live with dry_run=False. Others remain dry-run unless owner confirms.
+LIVE_MODES = {"private_device"}
+
 
 def audit(event: dict[str, Any]) -> None:
     AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
-    event = {**event, "ts": datetime.now(timezone.utc).isoformat()}
+    event = {**event, "ts": datetime.now(timezone.utc).isoformat(), "source": "system_daemon"}
     with AUDIT_LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event) + "\n")
 
 
 def verify_token(token: str | None, capability: str) -> bool:
-    """v0: accept tokens shaped as cap:<capability>:<nonce> from Policy Gateway."""
+    """Accept tokens shaped as cap:<capability>:<nonce>[:exp] from Policy Gateway.
+
+    Expiry (when present) is enforced; missing exp is allowed for legacy v0 tokens.
+    """
     if not token or not token.startswith("cap:"):
         return False
     parts = token.split(":")
     if len(parts) < 3:
         return False
-    return parts[1] == capability or parts[1] == "*"
+    if parts[1] != capability and parts[1] != "*":
+        return False
+    if len(parts) >= 4:
+        try:
+            exp = int(parts[3])
+        except ValueError:
+            return False
+        if exp < int(time.time()):
+            return False
+    return True
+
+
+def read_persisted_mode() -> str | None:
+    if not NETWORK_MODE_PATH.exists():
+        return None
+    return NETWORK_MODE_PATH.read_text(encoding="utf-8").strip() or None
 
 
 def handle(req: dict[str, Any]) -> dict[str, Any]:
     method = req.get("method")
     token = req.get("token")
+    params = req.get("params") or {}
+
     if method not in ALLOWED:
-        audit({"result": "deny", "reason": "unknown_method", "method": method})
+        audit({"event": "privileged", "result": "deny", "reason": "unknown_method", "method": method})
         return {"ok": False, "error": "unknown_method"}
     if not verify_token(token, method):
-        audit({"result": "deny", "reason": "bad_token", "method": method})
+        audit({"event": "privileged", "result": "deny", "reason": "bad_token", "method": method})
         return {"ok": False, "error": "unauthorized"}
 
     if method == "system.health.read":
@@ -70,15 +103,85 @@ def handle(req: dict[str, Any]) -> dict[str, Any]:
             "docker": Path("/var/run/docker.sock").exists(),
             "data": Path("/srv/atlas").exists(),
         }
-        audit({"result": "allow", "method": method})
-        return {"ok": True, "health": services, "status": "ok" if all(services.values()) or services["data"] else "degraded"}
+        audit({"event": "privileged", "result": "allow", "method": method})
+        return {
+            "ok": True,
+            "health": services,
+            "status": "ok" if all(services.values()) or services["data"] else "degraded",
+        }
+
+    if method == "network.mode.read":
+        mode = read_persisted_mode() or "private_device"
+        audit({"event": "privileged", "result": "allow", "method": method, "mode": mode})
+        return {"ok": True, "mode": mode}
+
+    if method == "network.mode.apply":
+        mode = params.get("mode", "private_device")
+        role = params.get("role", "")
+        owner_confirmed = bool(params.get("owner_confirmed"))
+        force_dry = bool(params.get("dry_run", False))
+
+        if mode not in {"private_device", "trusted_lan", "private_hotspot", "offline_isolation"}:
+            audit({"event": "network.mode.apply", "result": "deny", "reason": "bad_mode", "mode": mode})
+            return {"ok": False, "error": "invalid_mode"}
+
+        # Non-private: dry-run unless owner role + confirmation stub.
+        if mode not in LIVE_MODES:
+            if force_dry or not (role == "owner" and owner_confirmed):
+                commands = apply_mode(mode, dry_run=True)  # type: ignore[arg-type]
+                audit({
+                    "event": "network.mode.apply",
+                    "result": "dry_run" if force_dry or role != "owner" else "deny",
+                    "method": method,
+                    "mode": mode,
+                    "role": role,
+                    "commands": commands,
+                })
+                if force_dry:
+                    return {"ok": True, "dry_run": True, "mode": mode, "commands": commands}
+                if role != "owner" or not owner_confirmed:
+                    return {"ok": False, "error": "owner_confirmation_required", "dry_run_only": True,
+                            "commands": commands}
+
+        dry_run = force_dry
+        if mode not in LIVE_MODES and not (role == "owner" and owner_confirmed):
+            dry_run = True
+
+        try:
+            commands = apply_mode(mode, dry_run=dry_run)  # type: ignore[arg-type]
+        except Exception as e:
+            # Persist intent even if ufw cannot run under AF_UNIX hardening.
+            persist_mode(mode, NETWORK_MODE_PATH)
+            audit({
+                "event": "network.mode.apply",
+                "result": "fail",
+                "mode": mode,
+                "error": str(e),
+                "persisted": True,
+            })
+            return {"ok": False, "error": str(e), "persisted": True, "mode": mode}
+
+        if not dry_run:
+            persist_mode(mode, NETWORK_MODE_PATH)
+        elif mode == "private_device":
+            # Always persist private_device intent when requested.
+            persist_mode(mode, NETWORK_MODE_PATH)
+
+        audit({
+            "event": "network.mode.apply",
+            "result": "allow",
+            "method": method,
+            "mode": mode,
+            "dry_run": dry_run,
+            "commands": commands,
+        })
+        return {"ok": True, "mode": mode, "dry_run": dry_run, "commands": commands}
 
     if method.startswith("container."):
-        # v0 stubs — real docker ops gated; no arbitrary commands
-        audit({"result": "allow", "method": method, "params": req.get("params", {})})
+        audit({"event": "privileged", "result": "allow", "method": method, "params": params})
         return {"ok": True, "accepted": True, "method": method}
 
-    audit({"result": "allow", "method": method})
+    audit({"event": "privileged", "result": "allow", "method": method})
     return {"ok": True, "accepted": True, "method": method}
 
 

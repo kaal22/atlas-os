@@ -51,8 +51,16 @@ build_simple_deb() {
   local depends="xdg-utils"
   case "$name" in
     atlas-branding) depends="" ;;
-    atlas-shell) depends="xdg-utils, atlas-branding" ;;
-    atlas-firstboot) depends="openssl" ;;
+    atlas-firstboot) depends="openssl, docker.io, docker-compose, python3, ufw" ;;
+    atlas-shell) depends="xdg-utils, atlas-branding, curl, python3" ;;
+    atlas-auth) depends="python3" ;;
+    atlas-policy-gateway) depends="python3" ;;
+    atlas-model-manager) depends="python3" ;;
+    atlas-knowledge) depends="python3" ;;
+    atlas-agent-runtime) depends="python3, atlas-policy-gateway, atlas-model-manager, atlas-knowledge" ;;
+    atlas-command-centre) depends="python3, atlas-auth, atlas-agent-runtime, atlas-policy-gateway, atlas-model-manager, atlas-knowledge" ;;
+    atlas-system-daemon) depends="python3, ufw" ;;
+    atlas-proxy) depends="nginx, atlas-command-centre" ;;
   esac
 
   cat > "$control_dir/control" <<EOF
@@ -108,6 +116,7 @@ PACKAGES=(
   atlas-backup
   atlas-updater
   atlas-command-centre
+  atlas-proxy
 )
 
 for p in "${PACKAGES[@]}"; do

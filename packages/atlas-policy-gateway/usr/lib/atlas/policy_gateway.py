@@ -86,6 +86,7 @@ def default_gateway() -> PolicyGateway:
     gw.register(ToolRegistration("notes.write", 2, ["notes.write"]))
     gw.register(ToolRegistration("network.fetch", 3, ["network.fetch"]))
     gw.register(ToolRegistration("system.health.read", 0, ["system.health.read"]))
+    gw.register(ToolRegistration("network.mode.apply", 3, ["network.mode.apply"]))
     gw.register(ToolRegistration("backup.restore", 4, ["backup.restore"]))
     return gw
 

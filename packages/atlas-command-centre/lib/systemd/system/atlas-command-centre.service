@@ -1,16 +1,19 @@
 [Unit]
 Description=Atlas Command Centre
-After=network.target atlas-firstboot.service
+After=network.target atlas-firstboot.service local-fs.target
 Wants=atlas-firstboot.service
 
 [Service]
 Type=simple
+ExecStartPre=/bin/mkdir -p /srv/atlas/databases /srv/atlas/logs /srv/atlas/knowledge /srv/atlas/notes /srv/atlas/memory /srv/atlas/documents /srv/atlas/models
 ExecStart=/usr/bin/python3 /usr/lib/atlas/command_centre.py
 Restart=on-failure
+RestartSec=2
 # Bind is application-enforced to 127.0.0.1
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/srv/atlas /tmp/atlas-dev
+# Only /srv/atlas — PrivateTmp remounts /tmp; listing /tmp/atlas-dev caused 226/NAMESPACE
+ReadWritePaths=/srv/atlas
 PrivateTmp=true
 
 [Install]

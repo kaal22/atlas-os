@@ -1,10 +1,16 @@
 #!/bin/sh
 set -e
-# Install Calamares Atlas branding into the chroot image.
-mkdir -p /etc/calamares/branding
+# Install Calamares Atlas branding into locations Calamares 3.3 searches.
+mkdir -p /etc/calamares/branding /usr/share/calamares/branding /etc/calamares/modules
 if [ -d /usr/share/atlas/calamares/branding/atlas ]; then
+  rm -rf /etc/calamares/branding/atlas /usr/share/calamares/branding/atlas
   cp -a /usr/share/atlas/calamares/branding/atlas /etc/calamares/branding/
+  cp -a /usr/share/atlas/calamares/branding/atlas /usr/share/calamares/branding/
 fi
 if [ -f /usr/share/atlas/calamares/settings.conf ]; then
   cp /usr/share/atlas/calamares/settings.conf /etc/calamares/settings.conf
+fi
+# Module configs (partition, finished, …)
+if [ -d /usr/share/atlas/calamares/modules ]; then
+  cp -a /usr/share/atlas/calamares/modules/. /etc/calamares/modules/
 fi

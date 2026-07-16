@@ -1,0 +1,7 @@
+---
+# Offline live-package cleanup (process job). Replaces stock `packages` apt purge.
+type:       "job"
+name:       "atlas-purge-live"
+interface:  "process"
+command:    "/usr/share/calamares/helpers/atlas-purge-live-packages"
+timeout:    600

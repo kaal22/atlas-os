@@ -1,42 +1,41 @@
 ---
+# Calamares 3.3 branding — keys must match Debian/calamares schema
 componentName: atlas
 welcomeStyleCalamares: true
 welcomeExpandingLogo: true
 windowExpanding: normal
 windowSize: 900px,650px
 windowPlacement: center
-sidebarBackground: "#000000"
-sidebarText: "#e8eef5"
-sidebarTextHighlight: "#ffffff"
-productName: Atlas OS
-shortProductName: Atlas
-version: 0.1.0-alpha
-shortVersion: 0.1
-versionedName: Atlas OS 0.1.0-alpha
-shortVersionedName: Atlas 0.1
-bootloaderEntryName: Atlas OS
-productUrl: https://atlas-os.local/
-welcomeStyleLogo: true
-logo: logo.png
-productLogo: logo.png
-productIcon: productIcon.png
-productWelcome: welcome.png
-productBanner: banner.png
-slideshow: slideshow.qml
-slideshowAPI: 2
+
 strings:
-  productUrl: https://atlas-os.local/
-  supportUrl: https://atlas-os.local/support
-  knownIssuesUrl: https://atlas-os.local/issues
-  releaseNotesUrl: https://atlas-os.local/notes
-  donateUrl: ""
+    productName:         Atlas OS
+    shortProductName:    Atlas
+    version:             0.1.0-alpha
+    shortVersion:        0.1
+    versionedName:       Atlas OS 0.1.0-alpha
+    shortVersionedName:  Atlas 0.1
+    bootloaderEntryName: Atlas
+    productUrl:          https://atlas-os.local/
+    supportUrl:          https://atlas-os.local/support
+    knownIssuesUrl:      https://atlas-os.local/issues
+    releaseNotesUrl:     https://atlas-os.local/notes
+    donateUrl:           ""
+
+sidebar: widget
+navigation: widget
+
 images:
-  productBanner: banner.png
-  productLogo: logo.png
-  productIcon: productIcon.png
-  productWelcome: welcome.png
+    productLogo:         "logo.png"
+    productIcon:         "productIcon.png"
+    productWelcome:      "welcome.png"
+
+slideshow:               "slideshow.qml"
+slideshowAPI: 2
+
 style:
-  SidebarBackground: "#000000"
-  SidebarText: "#c8c8c8"
-  SidebarTextSelect: "#ffffff"
-  SidebarTextHighlight: "#ffffff"
+    # Match the dark slideshow panel — avoid bright blue chrome behind the triangle art
+    SidebarBackground:        "#0b0f14"
+    SidebarText:              "#c5cdd8"
+    SidebarTextCurrent:       "#ffffff"
+    SidebarBackgroundCurrent: "#1a2330"
+    SidebarTextHighlight:     "#ffffff"

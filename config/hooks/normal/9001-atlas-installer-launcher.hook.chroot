@@ -1,15 +1,14 @@
 #!/bin/sh
 set -e
-# Brand Calamares as Atlas OS and ensure a reliable live-session installer entry.
+# Brand Calamares as Atlas OS — single launcher, correct branding paths.
 
-# Wrapper keeps Debian live fstab/pkexec behaviour, Atlas naming.
 cat > /usr/bin/atlas-install <<'EOF'
 #!/bin/sh
 exec /usr/bin/calamares-install-debian "$@"
 EOF
 chmod 755 /usr/bin/atlas-install
 
-# Replace Debian-branded menu entry with Atlas.
+# One application menu entry only (used by desktop icon + menu search).
 cat > /usr/share/applications/calamares-install-debian.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
@@ -26,29 +25,28 @@ StartupWMClass=calamares
 StartupNotify=true
 EOF
 
-# Dedicated Atlas entry (same action) for menu search.
-cat > /usr/share/applications/install-atlas-os.desktop <<'EOF'
-[Desktop Entry]
-Type=Application
-Version=1.0
-Name=Install Atlas OS
-GenericName=Atlas OS Installer
-Exec=atlas-install
-Comment=Install Atlas OS on this computer
-Keywords=calamares;system;install;atlas;installer
-Icon=system-software-install
-Terminal=false
-Categories=Qt;System;
-StartupWMClass=calamares
-StartupNotify=true
-EOF
+# Avoid a second identical menu entry.
+rm -f /usr/share/applications/install-atlas-os.desktop
 
-# Ensure branding is where Calamares resolves it.
+# Branding where Calamares 3.3 resolves it (etc takes precedence).
 mkdir -p /usr/share/calamares/branding /etc/calamares/branding
 if [ -d /usr/share/atlas/calamares/branding/atlas ]; then
+  rm -rf /usr/share/calamares/branding/atlas /etc/calamares/branding/atlas
   cp -a /usr/share/atlas/calamares/branding/atlas /usr/share/calamares/branding/
   cp -a /usr/share/atlas/calamares/branding/atlas /etc/calamares/branding/
 fi
 if [ -f /usr/share/atlas/calamares/settings.conf ]; then
   cp /usr/share/atlas/calamares/settings.conf /etc/calamares/settings.conf
+fi
+
+# Stop Debian's "add second Install icon to Desktop" autostart.
+rm -f /etc/xdg/autostart/calamares-desktop-icon.desktop
+# Neutralise the helper if something else invokes it.
+if [ -f /usr/bin/add-calamares-desktop-icon ]; then
+  cat > /usr/bin/add-calamares-desktop-icon <<'EOF'
+#!/bin/sh
+# Atlas OS: desktop icon is shipped via /etc/skel/Desktop — do not duplicate.
+exit 0
+EOF
+  chmod 755 /usr/bin/add-calamares-desktop-icon
 fi

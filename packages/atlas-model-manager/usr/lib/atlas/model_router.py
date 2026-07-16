@@ -124,5 +124,62 @@ def chat_completion_url(host: str = "http://127.0.0.1:11434") -> str:
     return host.rstrip("/") + "/v1/chat/completions"
 
 
+def model_for_profile(profile: str | None = None) -> str:
+    """Resolve Ollama model tag for a profile. No-GPU VMs use tiny/light (vram=0)."""
+    if profile is None:
+        profile = recommend(probe_hardware())
+    # Prefer CPU-safe profiles when VRAM is unavailable
+    hw = probe_hardware()
+    if profile in PROFILES and not is_compatible(profile, hw):
+        profile = recommend(hw)
+    return PROFILES.get(profile, PROFILES["tiny"])["model"]
+
+
+def chat(
+    messages: list[dict[str, str]],
+    profile: str | None = None,
+    host: str = "http://127.0.0.1:11434",
+    timeout: float = 120.0,
+    model: str | None = None,
+) -> dict[str, Any]:
+    """
+    Call Ollama OpenAI-compatible chat completions.
+    Returns {"content": str, "model": str, "profile": str} or raises RuntimeError.
+    """
+    resolved_profile = profile or recommend(probe_hardware())
+    tag = model or model_for_profile(resolved_profile)
+    url = chat_completion_url(host)
+    body = json.dumps(
+        {
+            "model": tag,
+            "messages": messages,
+            "stream": False,
+            "temperature": 0.2,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        raise RuntimeError(f"ollama_chat_failed: {e}") from e
+
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("ollama_chat_failed: empty choices")
+    content = (choices[0].get("message") or {}).get("content") or ""
+    return {
+        "content": content.strip(),
+        "model": data.get("model", tag),
+        "profile": resolved_profile,
+        "raw": data,
+    }
+
+
 if __name__ == "__main__":
     print(json.dumps(recommendation_bundle(), indent=2))

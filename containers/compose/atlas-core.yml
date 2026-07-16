@@ -1,22 +1,49 @@
-# Atlas core offline payload — tags resolved to digests at lock-refresh.
+# Atlas core offline payload — Phase 2
 # Browser-facing services must NOT mount /var/run/docker.sock.
+# All published ports bind to loopback only.
+#
+# Management image: pinned upstream Project N.O.M.A.D. v1.33.0 (interim).
+# Env values come from /srv/atlas/compose/.env (written by firstboot).
+
 services:
   mysql:
     image: mysql:8.0
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql-root
+      MYSQL_ROOT_PASSWORD: ${ATLAS_MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: nomad
+      MYSQL_USER: nomad_user
+      MYSQL_PASSWORD: ${ATLAS_MYSQL_PASSWORD}
     volumes:
       - /srv/atlas/databases/mysql:/var/lib/mysql
-      - /etc/atlas/secrets/mysql-root:/run/secrets/mysql-root:ro
     networks: [atlas_internal]
-    # no host ports
+    # If this stays unhealthy forever after secret rotation, wipe the volume:
+    #   docker compose -f /srv/atlas/compose/atlas-core.yml stop mysql
+    #   rm -rf /srv/atlas/databases/mysql/*
+    # Then recreate mysql (do not block firstboot on healthy — see import-payload.sh).
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
 
+  # Internal-only; no host ports. Disable protected-mode so other compose
+  # services can reach Redis (upstream NOMAD expects no Redis password).
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${ATLAS_REDIS_PASSWORD}"]
+    command: ["redis-server", "--bind", "0.0.0.0", "--protected-mode", "no"]
     networks: [atlas_internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   qdrant:
     image: qdrant/qdrant:v1.16
@@ -30,9 +57,13 @@ services:
   kiwix:
     image: ghcr.io/kiwix/kiwix-serve:3.8.2
     restart: unless-stopped
+    environment:
+      PORT: "8080"
     volumes:
       - /srv/atlas/kiwix:/data:ro
-    command: ["/data"]
+    # Empty library.xml is valid for Phase 2 (ZIMs arrive later as packs).
+    # Args are passed to start.sh → kiwix-serve --port=$PORT <args>
+    command: ["--library", "/data/library.xml"]
     ports:
       - "127.0.0.1:8080:8080"
     networks: [atlas_internal]
@@ -40,6 +71,8 @@ services:
   flatnotes:
     image: dullage/flatnotes:v5.5.4
     restart: unless-stopped
+    environment:
+      FLATNOTES_AUTH_TYPE: none
     volumes:
       - /srv/atlas/users/notes:/data
     ports:
@@ -62,17 +95,55 @@ services:
       - "127.0.0.1:8083:8080"
     networks: [atlas_internal]
 
+  # Upstream NOMAD admin listens on container port 8080 (not 80).
   atlas-nomad-core:
-    image: ghcr.io/atlas-os/atlas-nomad-core:0.1.0-alpha
+    image: ghcr.io/crosstalk-solutions/project-nomad:v1.33.0
     restart: unless-stopped
     environment:
+      NODE_ENV: production
+      PORT: "8080"
+      HOST: "0.0.0.0"
+      LOG_LEVEL: info
+      APP_KEY: ${ATLAS_APP_KEY}
+      URL: http://127.0.0.1:8090
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: nomad
+      DB_NAME: nomad
+      DB_USER: nomad_user
+      DB_PASSWORD: ${ATLAS_MYSQL_PASSWORD}
+      DB_SSL: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      NOMAD_STORAGE_PATH: /srv/atlas/nomad-storage
       OLLAMA_HOST: http://host.docker.internal:11434
+      DISABLE_COMPRESSION: "false"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - /srv/atlas/nomad-storage:/app/storage
     ports:
-      - "127.0.0.1:8090:80"
+      - "127.0.0.1:8090:8080"
     networks: [atlas_internal]
-    # Privileged host ops go through atlas-system-daemon, not docker.sock
+    depends_on:
+      - mysql
+      - redis
+    # Do not use condition: service_healthy here — compose up would block/fail
+    # firstboot if MySQL is slow. Entrypoint already waits for Redis; migrations
+    # retry via restart: unless-stopped.
+    healthcheck:
+      # Image may not include curl; use node which is always present.
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 20s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
 
 networks:
   atlas_internal:

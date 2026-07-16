@@ -18,9 +18,9 @@ STATES = {
 TRANSITIONS = {
     "draft": {"planned", "cancelled"},
     "planned": {"awaiting_approval", "queued", "cancelled"},
-    "awaiting_approval": {"queued", "cancelled", "draft"},
+    "awaiting_approval": {"queued", "cancelled", "draft", "running"},
     "queued": {"running", "cancelled"},
-    "running": {"waiting_for_user", "paused", "completed", "failed", "cancelled"},
+    "running": {"waiting_for_user", "paused", "completed", "failed", "cancelled", "awaiting_approval"},
     "waiting_for_user": {"running", "cancelled", "failed"},
     "paused": {"running", "cancelled"},
     "completed": {"rolled_back"},

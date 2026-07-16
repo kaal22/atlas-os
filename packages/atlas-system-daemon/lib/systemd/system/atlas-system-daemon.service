@@ -12,7 +12,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/run/atlas /srv/atlas/logs
+ReadWritePaths=/run/atlas /srv/atlas/logs /etc/atlas
 CapabilityBoundingSet=
 RestrictAddressFamilies=AF_UNIX
 

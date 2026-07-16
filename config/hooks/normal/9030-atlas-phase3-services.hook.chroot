@@ -1,0 +1,73 @@
+#!/bin/sh
+# Phase 3: enable Command Centre, System Daemon, and nginx loopback proxy
+# on the installed system (skipped in live via ConditionKernelCommandLine).
+set -e
+
+mkdir -p /etc/systemd/system/multi-user.target.wants
+mkdir -p /etc/systemd/system/atlas-command-centre.service.d
+mkdir -p /etc/systemd/system/atlas-system-daemon.service.d
+mkdir -p /etc/systemd/system/atlas-proxy.service.d
+mkdir -p /etc/systemd/system/nginx.service.d
+
+cat > /etc/systemd/system/atlas-command-centre.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+cat > /etc/systemd/system/atlas-system-daemon.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+cat > /etc/systemd/system/atlas-proxy.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+cat > /etc/systemd/system/nginx.service.d/atlas-not-live.conf <<'EOF'
+[Unit]
+ConditionKernelCommandLine=!boot=live
+EOF
+
+enable_unit() {
+  unit="$1"
+  src=""
+  for cand in "/lib/systemd/system/$unit" "/usr/lib/systemd/system/$unit" "/etc/systemd/system/$unit"; do
+    if [ -f "$cand" ]; then
+      src="$cand"
+      break
+    fi
+  done
+  if [ -z "$src" ]; then
+    echo "WARN: $unit not found; skip enable" >&2
+    return 0
+  fi
+  ln -sfn "$src" "/etc/systemd/system/multi-user.target.wants/$unit"
+  echo "enabled $unit -> $src"
+}
+
+enable_unit atlas-system-daemon.service
+enable_unit atlas-command-centre.service
+enable_unit atlas-proxy.service
+enable_unit nginx.service
+enable_unit atlas-status.service
+
+systemctl enable atlas-system-daemon.service 2>/dev/null || true
+systemctl enable atlas-command-centre.service 2>/dev/null || true
+systemctl enable atlas-proxy.service 2>/dev/null || true
+systemctl enable nginx.service 2>/dev/null || true
+systemctl enable atlas-status.service 2>/dev/null || true
+
+# Stage nginx site into place if the package tree was copied without postinst.
+if [ -f /etc/nginx/sites-available/atlas-command-centre ]; then
+  mkdir -p /etc/nginx/sites-enabled
+  ln -sfn /etc/nginx/sites-available/atlas-command-centre /etc/nginx/sites-enabled/atlas-command-centre
+  rm -f /etc/nginx/sites-enabled/default
+fi
+
+# Ensure proxy enable helper is executable
+if [ -f /usr/lib/atlas/atlas-proxy-enable.sh ]; then
+  chmod 755 /usr/lib/atlas/atlas-proxy-enable.sh
+fi
+
+echo "Phase 3 identity/security services wired (live-gated)."

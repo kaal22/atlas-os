@@ -1,0 +1,22 @@
+#!/bin/sh
+# Open Atlas Command Centre in the default browser (loopback only).
+set -e
+
+URL="${ATLAS_COMMAND_CENTRE_URL:-}"
+if [ -z "$URL" ] && [ -f /etc/atlas/atlas.conf ]; then
+  # shellcheck disable=SC1091
+  URL="$(sed -n 's/^ATLAS_COMMAND_CENTRE_URL=//p' /etc/atlas/atlas.conf | head -1 | tr -d '"' | tr -d "'")"
+fi
+URL="${URL:-http://127.0.0.1/}"
+
+if command -v xdg-open >/dev/null 2>&1; then
+  exec xdg-open "$URL"
+fi
+if command -v firefox >/dev/null 2>&1; then
+  exec firefox --new-window "$URL"
+fi
+if command -v kde-open >/dev/null 2>&1; then
+  exec kde-open "$URL"
+fi
+echo "Open Command Centre at: $URL" >&2
+exit 1

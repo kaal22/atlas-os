@@ -49,6 +49,17 @@ mkdir -p "$OUT"
 "$ROOT/scripts/stage-grub-installer-debs.sh" \
   "$ROOT/config/includes.chroot/usr/share/atlas/installer-debs"
 
+# Phase 1 builds must not accidentally embed a prior Phase 2 payload staging.
+# Phase 2 sets ATLAS_PHASE2=1 after staging payload/Ollama into includes.
+if [[ "${ATLAS_PHASE2:-}" != "1" ]]; then
+  rm -f "$ROOT/config/includes.chroot/etc/atlas/payload-enabled"
+  rm -f "$ROOT/config/includes.chroot/usr/share/atlas/payload/atlas-core-oci-payload.tar.zst"
+  rm -f "$ROOT/config/includes.chroot/usr/bin/ollama"
+fi
+
+# Transparent triangle branding (never write 1x1 placeholders over master art)
+"$ROOT/scripts/generate-branding-placeholders.sh"
+
 # Fresh local Atlas debs for packages.chroot (live-build indexes them itself)
 "$ROOT/scripts/build-debs.sh" "$OUT/debs"
 rm -rf "$ROOT/config/packages.chroot"

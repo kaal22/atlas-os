@@ -1,40 +1,67 @@
 #!/usr/bin/env bash
-# Prefer the glowing-triangle master art when available; else tiny placeholders.
+# Build Calamares branding assets from triangle-glow-master.png as transparent PNGs.
+# Uses ImageMagick. Never overwrites master art with 1x1 placeholders.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-
-if python3 -c 'from PIL import Image' 2>/dev/null; then
-  if [[ -f "$ROOT/scripts/apply-triangle-branding.py" ]]; then
-    python3 "$ROOT/scripts/apply-triangle-branding.py" && exit 0
-  fi
-fi
-
-# Fallback 1x1 placeholders
-python3 - <<'PY'
-import struct, zlib, pathlib, sys
-root = pathlib.Path(r'''ROOT'''.replace('ROOT', sys.argv[1] if False else ''))
-PY
 BRAND="$ROOT/calamares/branding/atlas"
+MASTER="$BRAND/triangle-glow-master.png"
 PIX="$ROOT/config/includes.chroot/usr/share/pixmaps"
 SHARE="$ROOT/config/includes.chroot/usr/share/atlas/branding"
-mkdir -p "$BRAND" "$PIX" "$SHARE"
-python3 - "$BRAND" "$PIX" "$SHARE" <<'PY'
-import struct, zlib, pathlib, sys
+INCL_BRAND="$ROOT/config/includes.chroot/usr/share/atlas/calamares/branding/atlas"
 
-def write_png(path, rgb=(0, 0, 0)):
-    r, g, b = rgb
-    raw = bytes([0, r, g, b])
-    compressed = zlib.compress(raw, 9)
-    def chunk(tag, data):
-        return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
-    ihdr = struct.pack('>IIBBBBB', 1, 1, 8, 2, 0, 0, 0)
-    data = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', compressed) + chunk(b'IEND', b'')
-    pathlib.Path(path).write_bytes(data)
+mkdir -p "$BRAND" "$PIX" "$SHARE" "$INCL_BRAND"
 
-brand, pix, share = map(pathlib.Path, sys.argv[1:])
-for name in ('logo.png', 'welcome.png', 'banner.png', 'productIcon.png'):
-    write_png(brand / name)
-write_png(pix / 'atlas.png')
-write_png(share / 'logo.png')
-print('Fallback placeholders written (install Pillow + triangle art for real branding)')
-PY
+if [[ ! -f "$MASTER" ]] || [[ "$(wc -c < "$MASTER")" -lt 1000 ]]; then
+  echo "ERROR: missing usable $MASTER" >&2
+  exit 1
+fi
+
+if ! command -v magick >/dev/null 2>&1; then
+  echo "WARNING: ImageMagick (magick) not found — leaving branding files untouched."
+  echo "         Install imagemagick. Refusing to write 1x1 placeholders over real art."
+  exit 0
+fi
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Alpha from luminance; black → transparent; keep white glow
+magick "$MASTER" \
+  \( +clone -colorspace gray \) \
+  -alpha off -compose CopyOpacity -composite \
+  -trim +repage \
+  -bordercolor none -border 20% \
+  -background none -gravity center -extent '%[fx:max(w,h)]x%[fx:max(w,h)]' \
+  "$TMP/square.png"
+
+magick "$TMP/square.png" -resize 320x320 -strip PNG32:"$BRAND/logo.png"
+magick "$TMP/square.png" -resize 160x160 -strip PNG32:"$BRAND/productIcon.png"
+magick -size 640x300 xc:none \( "$TMP/square.png" -resize 200x200 \) \
+  -gravity center -compose over -composite -strip PNG32:"$BRAND/welcome.png"
+magick -size 920x128 xc:none \( "$TMP/square.png" -resize 90x90 \) \
+  -gravity center -compose over -composite -strip PNG32:"$BRAND/banner.png"
+
+# Desktop / menu icon: force RGB to white so Plasma dark themes show a white triangle
+# (not a black silhouette). Soften alpha so the glow stays visible at 32–48px.
+magick "$TMP/square.png" \
+  \( +clone -alpha extract -level 5%,55% \) \
+  -alpha off -compose CopyOpacity -composite \
+  -channel RGB -evaluate set 100% +channel \
+  -resize 256x256 -strip PNG32:"$PIX/atlas.png"
+magick "$PIX/atlas.png" -strip PNG32:"$SHARE/logo.png"
+mkdir -p "$ROOT/packages/atlas-shell/usr/share/atlas/launcher"
+magick "$PIX/atlas.png" -strip PNG32:"$ROOT/packages/atlas-shell/usr/share/atlas/launcher/logo.png"
+
+# hicolor theme sizes for reliable KDE lookup of Icon=atlas
+for sz in 16 24 32 48 64 128 256; do
+  d="$ROOT/config/includes.chroot/usr/share/icons/hicolor/${sz}x${sz}/apps"
+  mkdir -p "$d"
+  magick "$PIX/atlas.png" -resize "${sz}x${sz}" -strip PNG32:"$d/atlas.png"
+done
+
+cp -a "$BRAND"/. "$INCL_BRAND/"
+# Do not ship local preview helpers into the image
+rm -f "$INCL_BRAND"/.preview-* "$INCL_BRAND"/.logo-*
+
+echo "Branding regenerated (transparent PNGs) from $MASTER"
+wc -c "$BRAND"/logo.png "$BRAND"/productIcon.png "$BRAND"/welcome.png "$BRAND"/banner.png | sed 's|^|  |'

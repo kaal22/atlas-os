@@ -23,6 +23,9 @@ LIB_CANDIDATES = [
     PACKAGES / "atlas-agent-runtime" / "usr" / "lib" / "atlas",
     PACKAGES / "atlas-model-manager" / "usr" / "lib" / "atlas",
     PACKAGES / "atlas-knowledge" / "usr" / "lib" / "atlas",
+    PACKAGES / "atlas-content-manager" / "usr" / "lib" / "atlas",
+    PACKAGES / "atlas-backup" / "usr" / "lib" / "atlas",
+    PACKAGES / "atlas-updater" / "usr" / "lib" / "atlas",
     PACKAGES / "atlas-system-daemon" / "usr" / "lib" / "atlas",
     Path("/usr/lib/atlas"),
 ]
@@ -45,7 +48,31 @@ from policy_gateway import default_gateway  # noqa: E402
 from agent_runtime import AgentRuntime, AgentManifest  # noqa: E402
 from model_router import probe_hardware, recommend, recommendation_bundle  # noqa: E402
 from model_catalog import model_setup_status, start_pull, get_job  # noqa: E402
-from knowledge_service import KnowledgeService  # noqa: E402
+from knowledge_service import KnowledgeService, SUPPORTED_EXTENSIONS  # noqa: E402
+from content_manager import (  # noqa: E402
+    PackError,
+    check_compatibility,
+    find_packs_on_paths,
+    install_pack,
+    list_usb_pack_dirs,
+    load_catalogue,
+    load_installed,
+    merge_catalogue_status,
+    read_pack_metadata,
+    uninstall_pack,
+)
+from backup_service import (  # noqa: E402
+    BackupError,
+    create_backup,
+    list_backups,
+    restore_backup,
+    verify_backup,
+)
+from updater import (  # noqa: E402
+    apply_update,
+    find_update_bundles,
+    read_bundle_metadata,
+)
 
 try:
     from gpu_detect import as_api_dict as gpu_as_api_dict
@@ -62,6 +89,116 @@ AUTH.load()
 GW = default_gateway()
 KS = KnowledgeService(DATA / "knowledge")
 RT = AgentRuntime(gateway=GW, knowledge=KS)
+
+CATALOGUE_PATHS = [
+    Path("/usr/share/atlas/catalogue.json"),
+    PACKAGES / "atlas-content-manager" / "usr" / "share" / "atlas" / "catalogue.json",
+    Path(__file__).resolve().parents[3] / "content" / "catalogues" / "catalogue.json",
+]
+PACK_INCOMING = DATA / "content-packs" / "incoming"
+PACK_BUNDLED = Path("/usr/share/atlas/packs")
+BACKUP_DIR = DATA / "backups" / "full"
+UPDATE_INCOMING = DATA / "updates" / "incoming"
+UPDATE_BUNDLED = Path("/usr/share/atlas/updates")
+
+
+def _catalogue_file() -> Path:
+    for p in CATALOGUE_PATHS:
+        if p.is_file():
+            return p
+    return CATALOGUE_PATHS[0]
+
+
+def _pack_browse_roots() -> list[Path]:
+    roots = [PACK_INCOMING, PACK_BUNDLED, DATA / "content-packs"]
+    roots.extend(Path(p) for p in list_usb_pack_dirs())
+    out: list[Path] = []
+    seen: set[str] = set()
+    for r in roots:
+        try:
+            key = str(r.resolve()) if r.exists() else str(r)
+        except OSError:
+            key = str(r)
+        if key not in seen:
+            seen.add(key)
+            out.append(r)
+    return out
+
+
+def _pack_path_allowed(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    if not str(path).endswith(".atlas-pack"):
+        return False
+    allowed = [Path("/media"), Path("/run/media"), Path("/mnt"), DATA, Path("/usr/share/atlas/packs")]
+    for root in allowed:
+        try:
+            rr = root.resolve() if root.exists() else root
+        except OSError:
+            rr = root
+        if str(resolved).startswith(str(rr)):
+            return True
+    return False
+
+
+def _update_path_allowed(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    if not str(path).endswith(".atlas-update"):
+        return False
+    allowed = [
+        Path("/media"), Path("/run/media"), Path("/mnt"),
+        DATA, UPDATE_INCOMING, UPDATE_BUNDLED, Path("/usr/share/atlas/updates"),
+    ]
+    for root in allowed:
+        try:
+            rr = root.resolve() if root.exists() else root
+        except OSError:
+            rr = root
+        if str(resolved).startswith(str(rr)):
+            return True
+    return False
+
+
+def _backup_path_allowed(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    if not str(path).endswith(".atlasbak"):
+        return False
+    roots = [BACKUP_DIR, DATA / "backups"]
+    for root in roots:
+        try:
+            rr = root.resolve() if root.exists() else root
+        except OSError:
+            rr = root
+        if str(resolved).startswith(str(rr)):
+            return True
+    return False
+
+
+def _resolve_catalogue_pack(catalogue_id: str) -> Path | None:
+    cat = load_catalogue(_catalogue_file())
+    entry = next((p for p in cat.get("packs") or [] if p.get("id") == catalogue_id), None)
+    if entry and entry.get("bundle_file"):
+        candidate = PACK_BUNDLED / str(entry["bundle_file"])
+        if candidate.is_file():
+            return candidate
+    if PACK_BUNDLED.is_dir():
+        for f in PACK_BUNDLED.glob("*.atlas-pack"):
+            try:
+                meta = read_pack_metadata(f)
+                if meta["manifest"].get("id") == catalogue_id:
+                    return f
+            except PackError:
+                continue
+    return None
+
 for agent_file in [
     Path("/usr/share/atlas/agents"),
     HERE.parents[1] / "share" / "atlas" / "agents",
@@ -87,7 +224,7 @@ def audit_event(event: dict[str, Any]) -> None:
         f.write(json.dumps(payload) + "\n")
 
 
-INGEST_EXTENSIONS = {".md", ".txt", ".markdown", ".rst", ".csv", ".json", ".org"}
+INGEST_EXTENSIONS = set(SUPPORTED_EXTENSIONS)
 
 
 def _knowledge_roots(username: str) -> list[tuple[str, Path]]:
@@ -192,18 +329,9 @@ def browse_knowledge(path_str: str, username: str) -> dict[str, Any]:
 
 
 def knowledge_library(username: str) -> dict[str, Any]:
-    docs = []
-    for d in KS.docs.values():
-        if d.user_id != username:
-            continue
-        docs.append({
-            "doc_id": d.doc_id,
-            "path": d.path,
-            "chunks": len(d.chunks),
-            "name": Path(d.path).name,
-        })
-    docs.sort(key=lambda x: x["name"].lower())
-    return {"documents": docs, "count": len(docs)}
+    docs = KS.library(username)
+    st = KS.status()
+    return {"documents": docs, "count": len(docs), "knowledge": st}
 
 
 SERVICE_SPECS = [
@@ -233,7 +361,8 @@ def probe_services() -> dict[str, Any]:
     return {"services": services}
 
 
-UI = """<!DOCTYPE html>
+# Raw string: JS/CSS backslashes must reach the browser unchanged.
+UI = r"""<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Atlas Command Centre</title>
@@ -274,6 +403,10 @@ textarea{min-height:100px}
 .bubble.assistant{align-self:flex-start;background:rgba(255,255,255,.06);color:var(--text)}
 .bubble.system{align-self:center;background:transparent;color:var(--muted);font-size:.85rem;font-style:italic}
 .bubble.err{align-self:flex-start;background:rgba(255,100,100,.12);color:#ffb4b4;border:1px solid rgba(255,100,100,.35)}
+.cite-box{margin-top:.5rem;padding:.5rem .65rem;border-left:2px solid var(--accent);background:rgba(61,184,160,.08);font-size:.8rem;color:var(--muted)}
+.cite-box a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.cite-link{font-size:.85rem}
+.source-viewer{border:1px solid rgba(61,184,160,.35);background:#071525;padding:1rem;margin-top:.75rem;max-height:240px;overflow-y:auto;white-space:pre-wrap;font-size:.9rem;color:var(--text)}
 .chat-input{display:flex;gap:.5rem;padding:.75rem;border-top:1px solid rgba(61,184,160,.2);align-items:flex-end}
 .chat-input textarea{flex:1;min-height:2.5rem;margin:0;resize:vertical}
 .approval-banner{display:none;margin:.75rem 0;padding:.75rem 1rem;border:1px solid #c97858;background:rgba(201,120,88,.12)}
@@ -302,18 +435,87 @@ textarea{min-height:100px}
 .pill-sm.bad{background:rgba(255,100,100,.15);color:#ffb4b4}
 .hidden{display:none}
 #gate{max-width:420px;margin:4rem auto;padding:1.5rem;background:rgba(11,31,51,.75)}
+#gate h1{margin-top:0}
 </style></head><body>
-<div id="gate" class="hidden"></div>
+<div id="gate">
+  <h1>Create owner account</h1>
+  <p>First-run setup. Choose a username and a strong password. There is no default account.</p>
+  <p id="gateStatus" style="color:var(--muted);font-size:.9rem">Starting…</p>
+  <div id="gateForm">
+    <input id="bu" placeholder="username" autocomplete="username" />
+    <input id="bp" type="password" placeholder="password" autocomplete="new-password" />
+    <input id="bp2" type="password" placeholder="confirm password" autocomplete="new-password" />
+    <button class="btn" type="button" onclick="doBootstrap()">Create owner</button>
+    <p id="berr" style="color:#ffb4b4"></p>
+  </div>
+</div>
 <div id="app" class="hidden">
 <header><div class="brand">Atlas <span>OS</span></div><nav>
 <a href="#/ask">Chat</a><a href="#/models">Models</a><a href="#/agents">Agents</a><a href="#/knowledge">Knowledge</a>
-<a href="#/system">System</a><a href="#/setup">Setup</a>
+<a href="#/content">Content</a><a href="#/system">System</a><a href="#/setup">Setup</a>
 <a href="#" id="logoutLink">Logout</a></nav></header>
 <main>
 <aside id="side"></aside>
 <section id="view"></section>
 </main>
 </div>
+<noscript><p style="color:#fff;padding:2rem;text-align:center">JavaScript is required for Atlas Command Centre.</p></noscript>
+<script>
+/* Auth bootstrap — keep tiny and dependency-free so first-user setup always works */
+function csrf(){
+  var m=document.cookie.match(/(?:^|; )atlas_csrf=([^;]*)/);
+  return m?decodeURIComponent(m[1]):'';
+}
+function api(path,opts){
+  opts=opts||{};
+  var method=(opts.method||'GET').toUpperCase();
+  var headers=Object.assign({'Content-Type':'application/json'}, opts.headers||{});
+  if(method!=='GET' && method!=='HEAD'){
+    var t=csrf();
+    if(t) headers['X-CSRF-Token']=t;
+  }
+  return fetch(path,Object.assign({},opts,{headers:headers,credentials:'same-origin'})).then(function(r){
+    return r.text().then(function(txt){
+      var body={};
+      try{body=txt?JSON.parse(txt):{};}catch(e){body={error:'bad_response'};}
+      body._status=r.status;
+      return body;
+    });
+  });
+}
+function doBootstrap(){
+  var bu=document.getElementById('bu');
+  var bp=document.getElementById('bp');
+  var bp2=document.getElementById('bp2');
+  var berr=document.getElementById('berr');
+  if(!bu||!bp||!bp2){alert('Form not ready');return;}
+  if(bp.value!==bp2.value){if(berr)berr.textContent='Passwords do not match';return;}
+  if(berr)berr.textContent='Creating account…';
+  api('/api/auth/bootstrap',{method:'POST',body:JSON.stringify({username:bu.value,password:bp.value})}).then(function(r){
+    if(r.error){if(berr)berr.textContent=r.error;return;}
+    location.hash='#/home';
+    if(typeof boot==='function') boot();
+    else location.reload();
+  }).catch(function(e){
+    if(berr)berr.textContent='Failed: '+(e&&e.message?e.message:e);
+  });
+}
+function doLogin(){
+  var u=document.getElementById('u');
+  var p=document.getElementById('p');
+  var lerr=document.getElementById('lerr');
+  if(!u||!p){alert('Form not ready');return;}
+  if(lerr)lerr.textContent='Signing in…';
+  api('/api/auth/login',{method:'POST',body:JSON.stringify({username:u.value,password:p.value})}).then(function(r){
+    if(r.error){if(lerr)lerr.textContent=r.error;return;}
+    location.hash='#/home';
+    if(typeof boot==='function') boot();
+    else location.reload();
+  }).catch(function(e){
+    if(lerr)lerr.textContent='Failed: '+(e&&e.message?e.message:e);
+  });
+}
+</script>
 <script>
 function csrf(){
   const m=document.cookie.match(/(?:^|; )atlas_csrf=([^;]*)/);
@@ -341,6 +543,44 @@ let _chatHistory=[];
 let _kbPath='';
 let _kbSelected='';
 
+function setGateStatus(text){
+  const el=document.getElementById('gateStatus');
+  if(el) el.textContent=text||'';
+}
+function showBootstrapGate(status){
+  app.classList.add('hidden');
+  gate.classList.remove('hidden');
+  gate.innerHTML=`<h1>Create owner account</h1>
+      <p>First-run setup. Choose a username and a strong password. There is no default account.</p>
+      <p id="gateStatus" style="color:var(--muted);font-size:.9rem">${status||''}</p>
+      <div id="gateForm">
+        <input id="bu" placeholder="username" autocomplete="username" />
+        <input id="bp" type="password" placeholder="password" autocomplete="new-password" />
+        <input id="bp2" type="password" placeholder="confirm password" autocomplete="new-password" />
+        <button class="btn" type="button" onclick="doBootstrap()">Create owner</button>
+        <p id="berr" style="color:#ffb4b4"></p>
+      </div>`;
+}
+function showLoginGate(status){
+  app.classList.add('hidden');
+  gate.classList.remove('hidden');
+  gate.innerHTML=`<h1>Sign in</h1>
+      <p id="gateStatus" style="color:var(--muted);font-size:.9rem">${status||''}</p>
+      <input id="u" placeholder="username" autocomplete="username" />
+      <input id="p" type="password" placeholder="password" autocomplete="current-password" />
+      <button class="btn" type="button" onclick="doLogin()">Login</button>
+      <p id="lerr" style="color:#ffb4b4"></p>`;
+}
+function showGateError(msg){
+  app.classList.add('hidden');
+  gate.classList.remove('hidden');
+  gate.innerHTML=`<h1>Command Centre</h1>
+      <p class="msg err">${escapeHtml(msg||'Could not start. Is atlas-command-centre running?')}</p>
+      <button class="btn" type="button" onclick="boot()">Retry</button>
+      <p style="font-size:.85rem;color:var(--muted)">Also try <code>http://127.0.0.1:8787/</code> or check
+      <code>systemctl status atlas-command-centre</code>.</p>`;
+}
+
 function showMsg(elId,text,kind){
   const el=document.getElementById(elId);
   if(!el) return;
@@ -364,39 +604,43 @@ function formatBytes(n){
   if(n<1048576) return (n/1024).toFixed(1)+' KB';
   return (n/1048576).toFixed(1)+' MB';
 }
+function escapeHtml(s){
+  return String(s==null?'':s)
+    .split('&').join('&amp;')
+    .split('<').join('&lt;')
+    .split('>').join('&gt;')
+    .split('"').join('&quot;');
+}
+function jsQuote(s){
+  return encodeURIComponent(String(s==null?'':s));
+}
 
 function routes(){return [
   ['Home','home'],['Chat','ask'],['Models','models'],['Agents','agents'],['Knowledge','knowledge'],
-  ['System','system'],['Setup','setup']
+  ['Content','content'],['System','system'],['Setup','setup']
 ];}
 function renderNav(active){
   side.innerHTML=routes().map(([l,id])=>`<button class="${active===id?'active':''}" onclick="location.hash='#/${id}'">${l}</button>`).join('');
 }
 
 async function ensureSession(){
-  const boot=await api('/api/auth/bootstrap');
-  if(boot.needs_bootstrap){
-    app.classList.add('hidden');
-    gate.classList.remove('hidden');
-    gate.innerHTML=`<h1>Create owner account</h1>
-      <p>First-run setup. Choose a username and a strong password. There is no default account.</p>
-      <input id=bu placeholder=username />
-      <input id=bp type=password placeholder=password />
-      <input id=bp2 type=password placeholder="confirm password" />
-      <button class=btn onclick="doBootstrap()">Create owner</button>
-      <p id=berr style="color:#ffb4b4"></p>`;
+  setGateStatus('Checking device…');
+  const bootResp=await api('/api/auth/bootstrap');
+  if(bootResp._status>=500 || bootResp.error==='bad_response'){
+    showGateError('Could not reach the Command Centre API (HTTP '+(bootResp._status||'?')+').');
     return false;
   }
-  // Probe an authenticated endpoint
+  if(bootResp.needs_bootstrap){
+    showBootstrapGate('');
+    return false;
+  }
   const me=await api('/api/auth/session');
   if(me._status===401 || me.error==='unauthorized'){
-    app.classList.add('hidden');
-    gate.classList.remove('hidden');
-    gate.innerHTML=`<h1>Sign in</h1>
-      <input id=u placeholder=username />
-      <input id=p type=password placeholder=password />
-      <button class=btn onclick="doLogin()">Login</button>
-      <p id=lerr style="color:#ffb4b4"></p>`;
+    showLoginGate('');
+    return false;
+  }
+  if(me._status>=400){
+    showGateError(me.error||('Session check failed (HTTP '+me._status+')'));
     return false;
   }
   gate.classList.add('hidden');
@@ -405,25 +649,11 @@ async function ensureSession(){
   return true;
 }
 
-async function doBootstrap(){
-  if(bp.value!==bp2.value){berr.textContent='Passwords do not match';return;}
-  const r=await api('/api/auth/bootstrap',{method:'POST',body:JSON.stringify({username:bu.value,password:bp.value})});
-  if(r.error){berr.textContent=r.error;return;}
-  location.hash='#/home';
-  boot();
-}
-async function doLogin(){
-  const r=await api('/api/auth/login',{method:'POST',body:JSON.stringify({username:u.value,password:p.value})});
-  if(r.error){lerr.textContent=r.error;return;}
-  location.hash='#/home';
-  boot();
-}
 async function doLogout(){
   await api('/api/auth/logout',{method:'POST',body:'{}'});
   authed=false;
   boot();
 }
-document.getElementById('logoutLink').addEventListener('click',e=>{e.preventDefault();doLogout();});
 
 async function page(){
   if(!authed) return;
@@ -443,6 +673,8 @@ async function page(){
       `<div class="stat-row"><span>${escapeHtml(s.name)}</span>
         <span class="pill-sm ${s.ok?'ok':'bad'}">${s.ok?'running':'down'}</span></div>`).join('');
     const statusLabel=h.status==='ok'?'Healthy':(h.status==='degraded'?'Needs attention':'Unknown');
+    const gpuNote=h.gpu_warning&&h.status==='ok'
+      ?`<p class="msg info" style="margin-top:1rem">${escapeHtml(h.gpu_warning)}</p>`:'';
     view.innerHTML=`<h1>Welcome</h1>
       <p>Your private Atlas environment on this device.</p>
       ${banner}
@@ -451,7 +683,8 @@ async function page(){
           <h3>Quick links</h3>
           <p><a href="#/ask" style="color:var(--accent)">Chat</a> ·
              <a href="#/models" style="color:var(--accent)">Models</a> ·
-             <a href="#/knowledge" style="color:var(--accent)">Knowledge</a></p>
+             <a href="#/knowledge" style="color:var(--accent)">Knowledge</a> ·
+             <a href="#/content" style="color:var(--accent)">Content</a></p>
           <p><a href="http://127.0.0.1:8791/" style="color:var(--accent)">Service Check</a> (Kiwix, Ollama, NOMAD)</p>
         </div>
         <div class="card">
@@ -459,11 +692,13 @@ async function page(){
           <div class="stat-row"><span>System</span><span class="pill-sm ${h.status==='ok'?'ok':'bad'}">${statusLabel}</span></div>
           <div class="stat-row"><span>AI model</span><span class="pill-sm ${m.ready?'ok':'bad'}">${m.ready?'ready':'not installed'}</span></div>
           <div class="stat-row"><span>Your documents</span><span>${lib.count||0} indexed</span></div>
+          <div class="stat-row"><span>Knowledge search</span><span class="pill-sm ${(h.knowledge&&h.knowledge.mode==='hybrid')?'ok':'bad'}">${(h.knowledge&&h.knowledge.mode)||'?'}</span></div>
         </div>
       </div>
       <h2 style="margin-top:1.25rem">Local services</h2>
       <div class="card">${svcRows||'<p>No service data yet.</p>'}</div>
-      ${h.hint?`<p class="msg info" style="margin-top:1rem">${escapeHtml(h.hint)}</p>`:''}`;
+      ${h.hint?`<p class="msg info" style="margin-top:1rem">${escapeHtml(h.hint)}</p>`:''}
+      ${gpuNote}`;
     return;
   }
   if(id==='models'){
@@ -481,6 +716,7 @@ async function page(){
       <select id=agent onchange="_chatHistory=[];renderChatLog([])">
         <option value="atlas.guide">Atlas Guide</option>
         <option value="atlas.research">Research Agent</option>
+        <option value="atlas.document">Document Agent</option>
         <option value="atlas.system-steward">System Steward</option>
       </select>
       <div class="approval-banner" id=approvalBanner></div>
@@ -510,7 +746,7 @@ async function page(){
         <p>${escapeHtml(ag.purpose)}</p>
         <p class="tools">Tools: ${escapeHtml(tools)}</p>
         <p style="font-size:.85rem;color:var(--muted)">Profile: ${escapeHtml(ag.model_profile||'light')}</p>
-        <button class="btn" style="margin-top:.5rem" onclick="useAgentInChat('${jsQuote(ag.id)}')">Use in Chat</button>
+        <button class="btn" style="margin-top:.5rem" onclick="useAgentInChat(decodeURIComponent('${jsQuote(ag.id)}'))">Use in Chat</button>
       </div>`;
     }).join('');
     view.innerHTML=`<h1>Agents</h1>
@@ -519,14 +755,22 @@ async function page(){
     return;
   }
   if(id==='knowledge'){
+    const st=await api('/api/knowledge/status');
+    const mode=st.mode||'keyword';
+    const kbHint=st.hint?`<div class="msg info">${escapeHtml(st.hint)}</div>`:'';
+    const modeLine=`Search mode: <strong>${escapeHtml(mode)}</strong>`
+      +(st.embed_ready?' · embeddings ready':' · embeddings not installed')
+      +(st.qdrant?' · Qdrant up':' · Qdrant down');
     view.innerHTML=`<h1>Knowledge</h1>
       <p style="margin-top:0">Add your notes and documents so Atlas can search them locally.</p>
+      <p style="font-size:.9rem;color:var(--muted)">${modeLine}</p>
+      ${kbHint}
       <div class="grid-2">
         <div>
           <h2 style="font-size:1rem">Browse files</h2>
           <div class="breadcrumb" id=kbCrumb>Loading…</div>
           <div class="file-browser" id=kbList></div>
-          <p style="font-size:.85rem;color:var(--muted);margin-top:.5rem">Supported: .md, .txt, .markdown, .rst, .csv, .json</p>
+          <p style="font-size:.85rem;color:var(--muted);margin-top:.5rem">Supported: .md, .txt, .pdf, .csv, .json, .html, …</p>
         </div>
         <div>
           <h2 style="font-size:1rem">Import</h2>
@@ -535,6 +779,11 @@ async function page(){
           <div id=kbIngestMsg></div>
           <h2 style="font-size:1rem;margin-top:1.25rem">Your library</h2>
           <div id=kbLibrary class="file-browser" style="min-height:120px;max-height:180px"></div>
+          <h2 style="font-size:1rem;margin-top:1.25rem">Source viewer</h2>
+          <div id=kbSourceViewer class="source-viewer">Select a library entry or citation to read the passage.</div>
+          <h2 style="font-size:1rem;margin-top:1.25rem">Backup</h2>
+          <button class="btn secondary" onclick="backupKnowledge()">Snapshot knowledge</button>
+          <div id=kbBackupMsg></div>
         </div>
       </div>
       <h2 style="margin-top:1.25rem">Search</h2>
@@ -547,15 +796,33 @@ async function page(){
     await loadKbLibrary();
     return;
   }
+  if(id==='content'){
+    await renderContent();
+    return;
+  }
   if(id==='system'){
     const hw=await api('/api/models/recommend');
     const gpu=await api('/api/system/gpu');
+    const bak=await api('/api/backup/list');
+    const upd=await api('/api/updates/browse');
     const warn=hw.warning?`<div class="msg err">${escapeHtml(hw.warning)}
       <br/><code>${escapeHtml(hw.install_command||'sudo atlas-gpu-setup --install-nvidia')}</code></div>`:'';
     const gpuLine=gpu.error?`<p class="msg info">${escapeHtml(gpu.error)}</p>`:
       `<div class="stat-row"><span>GPU</span><span>${escapeHtml(gpu.gpu_name||gpu.gpu||'none')}</span></div>
        <div class="stat-row"><span>VRAM</span><span>${gpu.vram_gb||0} GB</span></div>
        <div class="stat-row"><span>NVIDIA drivers</span><span class="pill-sm ${gpu.nvidia_driver_ok?'ok':'bad'}">${gpu.nvidia_driver_ok?'ok':'missing'}</span></div>`;
+    const bakRows=(bak.backups||[]).map(b=>
+      `<div class="stat-row"><span>${escapeHtml(b.name)}</span>
+        <span>
+          <span class="pill-sm ${b.verified?'ok':'bad'}">${b.verified?'ok':'bad'}</span>
+          <button class="btn secondary" style="margin-left:.35rem" onclick="verifyBackup(decodeURIComponent('${jsQuote(b.path)}'))">Verify</button>
+          <button class="btn" style="margin-left:.35rem" onclick="restoreBackupPrompt(decodeURIComponent('${jsQuote(b.path)}'))">Restore</button>
+        </span></div>`).join('');
+    const updRows=[...(upd.local||[]),...(upd.usb||[])].map(u=>
+      `<div class="file-row" onclick="previewUpdate(decodeURIComponent('${jsQuote(u.path)}'))">
+        <span>[update] ${escapeHtml(u.from_version||'?')} → ${escapeHtml(u.to_version||'?')}</span>
+        <span class="meta">${escapeHtml(u.publisher||'')}</span>
+      </div>`).join('');
     view.innerHTML=`<h1>System</h1>
       ${warn}
       <div class="card">
@@ -568,6 +835,22 @@ async function page(){
         <h3>Graphics</h3>
         ${gpuLine}
         <p style="font-size:.85rem;margin-top:.75rem">Guide: <code>/usr/share/atlas/docs/GPU_SETUP.md</code></p>
+      </div>
+      <div class="card">
+        <h3>Encrypted backup</h3>
+        <p style="font-size:.9rem;color:var(--muted)">Backs up Atlas config, databases, knowledge, content manifests, and user data.</p>
+        <input id=bakPass type=password placeholder="Passphrase" style="max-width:280px" />
+        <button class=btn onclick="createFullBackup()">Create backup</button>
+        <div id=bakMsg style="margin-top:.5rem"></div>
+        <h4 style="margin-top:1rem">Existing backups</h4>
+        ${bakRows||'<p class="msg info">No backups yet.</p>'}
+      </div>
+      <div class="card">
+        <h3>Offline updates</h3>
+        <p style="font-size:.9rem;color:var(--muted)">Import a signed .atlas-update bundle. Failed health checks roll back automatically.</p>
+        <div class="file-browser" style="max-height:160px">${updRows||'<div class="msg info" style="margin:.5rem">No update bundles found.</div>'}</div>
+        <div id=updPreview style="margin-top:.75rem;display:none"></div>
+        <div id=updMsg style="margin-top:.5rem"></div>
       </div>
       <div class="card">
         <h3>Confirm sensitive action</h3>
@@ -615,11 +898,11 @@ async function loadKbBrowser(){
     return;
   }
   if(crumb){
-    if(b.roots) crumb.innerHTML='<a onclick="_kbPath=\'\';loadKbBrowser()">Folders</a>';
+    if(b.roots) crumb.innerHTML=`<a onclick="_kbPath='';loadKbBrowser()">Folders</a>`;
     else{
       const parts=[];
       if(b.parent!==null&&b.parent!==''){
-        parts.push(`<a onclick="_kbPath='${jsQuote(b.parent)}';_kbSelected='';loadKbBrowser()">↑ Up</a>`);
+        parts.push(`<a onclick="_kbPath=decodeURIComponent('${jsQuote(b.parent)}');_kbSelected='';loadKbBrowser()">Up</a>`);
       }else if(b.parent===''){
         parts.push(`<a onclick="_kbPath='';_kbSelected='';loadKbBrowser()">Folders</a>`);
       }
@@ -628,12 +911,12 @@ async function loadKbBrowser(){
     }
   }
   const rows=(b.entries||[]).map(e=>{
-    const icon=e.kind==='dir'?'📁':'📄';
+    const icon=e.kind==='dir'?'[dir]':'[file]';
     const meta=e.kind==='file'?formatBytes(e.size):'folder';
     const sel=_kbSelected===e.path?' selected':'';
     const click=e.kind==='dir'
-      ?`onclick="_kbPath='${jsQuote(e.path)}';_kbSelected='';loadKbBrowser()"`
-      :`onclick="selectKbFile('${jsQuote(e.path)}','${jsQuote(e.name)}')"`;
+      ?`onclick="_kbPath=decodeURIComponent('${jsQuote(e.path)}');_kbSelected='';loadKbBrowser()"`
+      :`onclick="selectKbFile(decodeURIComponent('${jsQuote(e.path)}'),decodeURIComponent('${jsQuote(e.name)}'))"`;
     return `<div class="file-row${sel}" data-path="${escapeHtml(e.path)}" ${click}>
       <span>${icon} ${escapeHtml(e.name)}</span><span class="meta">${meta}</span></div>`;
   }).join('');
@@ -660,7 +943,7 @@ async function ingestSelected(){
     showMsg('kbIngestMsg',kbError(r.error)||'Import failed','err');
     return;
   }
-  showMsg('kbIngestMsg',`Added “${r.name}” (${r.chunks} sections indexed).`,'ok');
+  showMsg('kbIngestMsg','Added '+r.name+' ('+r.chunks+' sections indexed).','ok');
   await loadKbLibrary();
 }
 async function loadKbLibrary(){
@@ -673,9 +956,9 @@ async function loadKbLibrary(){
     return;
   }
   el.innerHTML=docs.map(d=>
-    `<div class="file-row" style="cursor:default">
-      <span>📄 ${escapeHtml(d.name)}</span>
-      <span class="meta">${d.chunks} sections</span>
+    `<div class="file-row" onclick="openSource(decodeURIComponent('${jsQuote(d.doc_id)}'),0)">
+      <span>[doc] ${escapeHtml(d.name)}</span>
+      <span class="meta">${d.chunks} sections${d.vectorized?' · vec':''}</span>
     </div>`).join('');
 }
 async function searchKnowledge(){
@@ -689,10 +972,125 @@ async function searchKnowledge(){
     return;
   }
   el.innerHTML=hits.map(h=>
-    `<div class="card" style="margin:.5rem 0">
-      <p style="margin:0;font-size:.8rem;color:var(--muted)">${escapeHtml(h.path||'')}</p>
+    `<div class="card" style="margin:.5rem 0;cursor:pointer" onclick="openSource(decodeURIComponent('${jsQuote(h.doc_id)}'),${Number(h.chunk_index||0)})">
+      <p style="margin:0;font-size:.8rem;color:var(--muted)">${escapeHtml(h.name||h.path||'')} · ${escapeHtml(h.source||'')}</p>
       <p style="margin:.35rem 0 0">${escapeHtml((h.text||'').slice(0,400))}${(h.text||'').length>400?'…':''}</p>
     </div>`).join('');
+}
+async function backupKnowledge(){
+  showMsg('kbBackupMsg','Creating snapshot…','info');
+  const r=await api('/api/knowledge/backup',{method:'POST',body:'{}'});
+  if(r.error||!r.ok){
+    showMsg('kbBackupMsg',r.error||'Backup failed','err');
+    return;
+  }
+  showMsg('kbBackupMsg','Saved '+r.archive,'ok');
+}
+async function renderContent(){
+  const cat=await api('/api/content/catalogue');
+  const inst=await api('/api/content/installed');
+  const browse=await api('/api/content/browse');
+  const packs=cat.packs||[];
+  const rows=packs.map(p=>{
+    const st=p.installed?`<span class="pill-sm ok">installed ${escapeHtml(p.installed_version||'')}</span>`
+      :`<span class="pill-sm bad">not installed</span>`;
+    const btn=p.installed
+      ?`<button class="btn secondary" onclick="uninstallPack('${escapeHtml(p.id)}')">Remove</button>`
+      :`<button class="btn" onclick="installCataloguePack('${escapeHtml(p.id)}')">Install bundled</button>`;
+    return `<tr>
+      <td><strong>${escapeHtml(p.name||p.id)}</strong><br/><span style="color:var(--muted);font-size:.85rem">${escapeHtml(p.description||p.type||'')}</span></td>
+      <td>${escapeHtml(p.version||'?')}</td>
+      <td>${st}</td>
+      <td>${btn}</td>
+    </tr>`;
+  }).join('');
+  const local=(browse.local||[]).map(p=>
+    `<div class="file-row" onclick="previewPack(decodeURIComponent('${jsQuote(p.path)}'))">
+      <span>[pack] ${escapeHtml(p.name||p.id)}</span>
+      <span class="meta">${escapeHtml(p.version||'')}</span>
+    </div>`).join('');
+  const usb=(browse.usb||[]).map(p=>
+    `<div class="file-row" onclick="previewPack(decodeURIComponent('${jsQuote(p.path)}'))">
+      <span>[usb] ${escapeHtml(p.name||p.id)}</span>
+      <span class="meta">${escapeHtml(p.version||'')}</span>
+    </div>`).join('');
+  view.innerHTML=`<h1>Content packs</h1>
+    <p style="margin-top:0">Install offline maps, knowledge, and model packs. Licences are shown before install.</p>
+    <div class="card">
+      <h3>Catalogue</h3>
+      <table style="width:100%;border-collapse:collapse" cellpadding="8">
+        <thead><tr><th align=left>Pack</th><th>Version</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan=4>No catalogue entries.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="grid-2">
+      <div>
+        <h2 style="font-size:1rem">Local / bundled packs</h2>
+        <div class="file-browser">${local||'<div class="msg info" style="margin:.5rem">No .atlas-pack files found locally.</div>'}</div>
+      </div>
+      <div>
+        <h2 style="font-size:1rem">USB import</h2>
+        <div class="file-browser">${usb||'<div class="msg info" style="margin:.5rem">No USB packs detected. Plug in a drive with .atlas-pack files.</div>'}</div>
+      </div>
+    </div>
+    <div id=contentPreview class="card" style="margin-top:1rem;display:none"></div>
+    <div id=contentMsg style="margin-top:.75rem"></div>
+    <h2 style="font-size:1rem;margin-top:1.25rem">Installed</h2>
+    <div class="card">${(inst.packs||[]).map(p=>
+      `<div class="stat-row"><span>${escapeHtml(p.name||p.id)}</span><span>${escapeHtml(p.version||'')}</span></div>`).join('')||'<p class="msg info">No packs installed yet.</p>'}</div>`;
+}
+async function previewPack(path){
+  const r=await api('/api/content/preview?path='+encodeURIComponent(path));
+  const box=document.getElementById('contentPreview');
+  if(!box) return;
+  if(r.error){
+    box.style.display='block';
+    box.innerHTML=`<div class="msg err">${escapeHtml(r.error)}</div>`;
+    return;
+  }
+  const m=r.manifest||{};
+  const lic=(r.licences||[]).map(l=>`<details><summary>${escapeHtml(l.name)}</summary><pre style="white-space:pre-wrap;font-size:.8rem">${escapeHtml(l.text)}</pre></details>`).join('');
+  const compat=r.compat||{};
+  const compatLine=compat.ok
+    ?'<p style="color:var(--accent)">Compatible with this device.</p>'
+    :`<p class="msg err">${escapeHtml((compat.errors||[]).join('; '))}</p>`;
+  box.style.display='block';
+  box.innerHTML=`<h3>${escapeHtml(m.name||m.id)}</h3>
+    <p>${escapeHtml(m.description||'')}</p>
+    <p style="font-size:.85rem;color:var(--muted)">Type: ${escapeHtml(m.type||'')} · Size ~${Math.round((m.size_bytes||0)/(1024*1024))} MB</p>
+    ${compatLine}
+    ${lic}
+    <button class="btn" style="margin-top:.75rem" onclick="installPackPath(decodeURIComponent('${jsQuote(path)}'))">Install pack</button>`;
+}
+async function installPackPath(path){
+  showMsg('contentMsg','Installing…','info');
+  const r=await api('/api/content/install',{method:'POST',body:JSON.stringify({path})});
+  if(r.error||!r.ok){
+    showMsg('contentMsg',r.error||'Install failed','err');
+    return;
+  }
+  showMsg('contentMsg','Installed '+r.name+' to '+r.target,'ok');
+  renderContent();
+}
+async function installCataloguePack(id){
+  showMsg('contentMsg','Installing bundled pack…','info');
+  const r=await api('/api/content/install',{method:'POST',body:JSON.stringify({catalogue_id:id})});
+  if(r.error||!r.ok){
+    showMsg('contentMsg',r.error||'Install failed','err');
+    return;
+  }
+  showMsg('contentMsg','Installed '+r.name,'ok');
+  renderContent();
+}
+async function uninstallPack(id){
+  if(!confirm('Remove pack '+id+'?')) return;
+  const r=await api('/api/content/uninstall',{method:'POST',body:JSON.stringify({id})});
+  if(r.error||!r.ok){
+    showMsg('contentMsg',r.error||'Remove failed','err');
+    return;
+  }
+  showMsg('contentMsg','Removed '+id,'ok');
+  renderContent();
 }
 async function ask(){
   const qEl=document.getElementById('q');
@@ -719,13 +1117,15 @@ async function ask(){
     return;
   }
   if(res.error||res.detail){
-    const msg=res.hint||res.detail||res.error||'Something went wrong.';
+    const msg=[res.hint,res.detail,res.error].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' — ')
+      ||'Something went wrong.';
     _chatHistory.push({role:'assistant',content:msg,isErr:true});
     renderChatLog(_chatHistory);
     return;
   }
   const answer=res.answer||'(No reply — check Models page or try again.)';
-  _chatHistory.push({role:'assistant',content:answer});
+  const sources=res.sources||[];
+  _chatHistory.push({role:'assistant',content:answer,sources});
   renderChatLog(_chatHistory);
   refreshApprovals();
 }
@@ -734,18 +1134,32 @@ function renderChatLog(msgs,thinking){
   if(!log) return;
   let html=(msgs||[]).map(m=>{
     const cls=m.isErr?'err':(m.role==='user'?'user':'assistant');
-    return `<div class="bubble ${cls}">${escapeHtml(m.content)}</div>`;
+    let body=`<div class="bubble ${cls}">${escapeHtml(m.content)}</div>`;
+    if(m.sources&&m.sources.length){
+      const cites=m.sources.slice(0,5).map(s=>{
+        const label=escapeHtml(s.name||s.path||s.doc_id||'source');
+        const doc=jsQuote(s.doc_id||'');
+        const idx=Number(s.chunk_index||0);
+        return `<a class="cite-link" onclick="openSource(decodeURIComponent('${doc}'),${idx})">${label}</a>`;
+      }).join(' · ');
+      body+=`<div class="cite-box"><strong>Sources</strong> ${cites}</div>`;
+    }
+    return body;
   }).join('');
   if(thinking) html+=`<div class="bubble system"><span class="spinner"></span> Thinking…</div>`;
   if(!html) html='<div class="bubble system">Say hello — Atlas Guide runs on your local model.</div>';
   log.innerHTML=html;
   log.scrollTop=log.scrollHeight;
 }
-function escapeHtml(s){
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-function jsQuote(s){
-  return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+async function openSource(docId,chunkIndex){
+  location.hash='#/knowledge';
+  setTimeout(async()=>{
+    const r=await api('/api/knowledge/chunk?doc_id='+encodeURIComponent(docId)+'&chunk_index='+chunkIndex);
+    const el=document.getElementById('kbSourceViewer');
+    if(!el) return;
+    if(r.error||!r.text){el.textContent=r.error||'Passage not found.';return;}
+    el.innerHTML=`<strong>${escapeHtml(r.name||r.path||'')}</strong> · chunk ${r.chunk_index+1}/${r.total_chunks}\n\n${escapeHtml(r.text)}`;
+  },80);
 }
 async function renderModels(){
   const m=await api('/api/models/status');
@@ -783,6 +1197,16 @@ async function renderModels(){
       <div id=pullJobs><p class="download-msg">No download in progress.</p></div>
     </div>
     ${recBanner}
+    ${(()=>{
+      const emb=(m.catalogue||[]).find(c=>c.kind==='embed');
+      if(!emb) return '';
+      if(emb.installed||m.embed_ready) return `<p style="color:var(--accent)">Knowledge embeddings ready (${emb.tag}).</p>`;
+      return `<div style="border:1px solid #c97858;padding:1rem;margin:1rem 0">
+        <h2 style="margin-top:0">Knowledge embeddings</h2>
+        <p>Semantic document search needs <strong>${emb.title}</strong> (${emb.tag}).</p>
+        <button class="btn dl-btn" data-tag="${emb.tag}" onclick="pullModel('${emb.tag}',this)">Download embeddings model</button>
+      </div>`;
+    })()}
     <h2>All options</h2>
     <table style="width:100%;border-collapse:collapse" cellpadding="8">
       <thead><tr><th align=left>Model</th><th>Size</th><th>Status</th><th></th></tr></thead>
@@ -790,10 +1214,16 @@ async function renderModels(){
     </table>
     <button class="btn secondary" onclick="renderModels()">Refresh list</button>`;
   setPullJobs(m.pull_jobs||[]);
-  pollPulls();
+  const running=(m.pull_jobs||[]).some(j=>j.status==='queued'||j.status==='running');
+  if(running) pollPulls();
+  else if(_pullTimer){clearInterval(_pullTimer);_pullTimer=null;}
 }
 let _pullTimer=null;
 let _activePullJobs=[];
+let _pullRefreshPending=false;
+function onModelsHash(){
+  return (location.hash.replace('#/','')||'home')==='models';
+}
 function setPullJobs(jobs){
   _activePullJobs=(jobs||[]).slice();
   renderPullUI();
@@ -852,10 +1282,18 @@ async function pullModel(tag,btn){
   }
 }
 async function pollPulls(immediate){
-  if(_pullTimer) clearInterval(_pullTimer);
+  if(_pullTimer){clearInterval(_pullTimer);_pullTimer=null;}
   async function tick(){
-    if(!_activePullJobs.length) return;
-    const ids=_activePullJobs.map(j=>j.id).filter(Boolean);
+    if(!onModelsHash()){
+      if(_pullTimer){clearInterval(_pullTimer);_pullTimer=null;}
+      return;
+    }
+    const active=_activePullJobs.filter(j=>j.status==='queued'||j.status==='running');
+    if(!active.length){
+      if(_pullTimer){clearInterval(_pullTimer);_pullTimer=null;}
+      return;
+    }
+    const ids=active.map(j=>j.id).filter(Boolean);
     if(!ids.length) return;
     let anyRunning=false;
     const updated=[];
@@ -865,15 +1303,28 @@ async function pollPulls(immediate){
       updated.push(s);
       if(s.status==='queued'||s.status==='running') anyRunning=true;
     }
-    if(updated.length) setPullJobs(updated);
+    if(updated.length){
+      // Keep completed rows visible, replace matching ids
+      const byId={};
+      _activePullJobs.forEach(j=>{if(j.id) byId[j.id]=j;});
+      updated.forEach(s=>{byId[s.id]=s;});
+      setPullJobs(Object.values(byId));
+    }
     if(!anyRunning){
-      clearInterval(_pullTimer);
-      _pullTimer=null;
-      setTimeout(()=>renderModels(),800);
+      if(_pullTimer){clearInterval(_pullTimer);_pullTimer=null;}
+      if(!_pullRefreshPending && onModelsHash()){
+        _pullRefreshPending=true;
+        setTimeout(()=>{
+          _pullRefreshPending=false;
+          if(onModelsHash()) renderModels();
+        },800);
+      }
     }
   }
   if(immediate) await tick();
-  _pullTimer=setInterval(tick,1200);
+  if(_activePullJobs.some(j=>j.status==='queued'||j.status==='running')){
+    _pullTimer=setInterval(tick,1200);
+  }
 }
 async function refreshApprovals(){
   const el=document.getElementById('approvals');
@@ -910,6 +1361,59 @@ async function decide(aid,tid,ok){
   }
   refreshApprovals();
 }
+async function createFullBackup(){
+  const pass=(document.getElementById('bakPass')||{}).value||'';
+  if(!pass){showMsg('bakMsg','Enter a passphrase.','err');return;}
+  showMsg('bakMsg','Creating encrypted backup…','info');
+  const r=await api('/api/backup/create',{method:'POST',body:JSON.stringify({passphrase:pass})});
+  if(r.error||!r.ok){showMsg('bakMsg',r.error||'Backup failed','err');return;}
+  showMsg('bakMsg','Saved '+r.path,'ok');
+  page();
+}
+async function verifyBackup(path){
+  const r=await api('/api/backup/verify',{method:'POST',body:JSON.stringify({path})});
+  if(r.error||!r.ok){showMsg('bakMsg',r.error||'Verify failed','err');return;}
+  showMsg('bakMsg','Backup verified.','ok');
+}
+async function restoreBackupPrompt(path){
+  const pass=prompt('Passphrase for restore:');
+  if(pass===null) return;
+  if(!confirm('Restore will overwrite Atlas data on this device. Continue?')) return;
+  showMsg('bakMsg','Restoring…','info');
+  const r=await api('/api/backup/restore',{method:'POST',body:JSON.stringify({path,passphrase:pass})});
+  if(r.error||!r.ok){showMsg('bakMsg',r.error||'Restore failed','err');return;}
+  showMsg('bakMsg','Restored: '+(r.restored||[]).join(', '),'ok');
+}
+async function previewUpdate(path){
+  const r=await api('/api/updates/preview?path='+encodeURIComponent(path));
+  const box=document.getElementById('updPreview');
+  if(!box) return;
+  if(r.error){
+    box.style.display='block';
+    box.innerHTML=`<div class="msg err">${escapeHtml(r.error)}</div>`;
+    return;
+  }
+  const m=r.manifest||{};
+  box.style.display='block';
+  box.innerHTML=`<h4>${escapeHtml(m.from_version||'?')} → ${escapeHtml(m.to_version||'?')}</h4>
+    <p style="font-size:.85rem;color:var(--muted)">${escapeHtml(m.publisher||'')}</p>
+    <pre style="white-space:pre-wrap;font-size:.85rem">${escapeHtml(r.release_notes||'No release notes.')}</pre>
+    <button class="btn" onclick="applyUpdateBundle(decodeURIComponent('${jsQuote(path)}'))">Apply update</button>`;
+}
+async function applyUpdateBundle(path){
+  if(!confirm('Apply this update? A snapshot will be taken first.')) return;
+  showMsg('updMsg','Applying update…','info');
+  const r=await api('/api/updates/apply',{method:'POST',body:JSON.stringify({path})});
+  if(r.error==='bad_response'){
+    showMsg('updMsg','Update failed (empty/invalid server response). Check atlas-command-centre logs.','err');
+    return;
+  }
+  if(r.error||r.ok===false){
+    showMsg('updMsg',(r.detail||r.error||'Update failed')+(r.rolled_back?' (rolled back)':''),'err');
+    return;
+  }
+  showMsg('updMsg','Applied '+ (r.version||r.detail),'ok');
+}
 async function nextStep(){
   await api('/api/setup/advance',{method:'POST',body:'{}'});
   page();
@@ -922,10 +1426,21 @@ async function reauth(){
   else el.innerHTML='<div class="msg err">Confirmation failed.</div>';
 }
 async function boot(){
-  const ok=await ensureSession();
-  if(ok) page();
+  try{
+    const ok=await ensureSession();
+    if(ok) page();
+  }catch(e){
+    console.error(e);
+    showGateError('Startup error: '+(e&&e.message?e.message:String(e)));
+  }
 }
-window.addEventListener('hashchange',page);boot();
+const logoutLink=document.getElementById('logoutLink');
+if(logoutLink) logoutLink.addEventListener('click',e=>{e.preventDefault();doLogout();});
+window.addEventListener('hashchange',()=>{
+  if(!onModelsHash() && _pullTimer){clearInterval(_pullTimer);_pullTimer=null;}
+  if(authed) page();
+});
+boot();
 </script></body></html>
 """
 
@@ -1018,7 +1533,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 bundle = recommendation_bundle()
                 if bundle.get("warning"):
-                    health["status"] = "degraded"
+                    # Advisory only — CPU-first installs stay healthy without a GPU.
                     health["gpu_warning"] = bundle["warning"]
             except Exception:
                 pass
@@ -1026,10 +1541,22 @@ class Handler(BaseHTTPRequestHandler):
                 ms = model_setup_status()
                 health["ollama"] = ms.get("ollama_reachable")
                 health["models_ready"] = ms.get("ready")
+                health["embed_ready"] = ms.get("embed_ready")
                 health["model_profile"] = ms.get("profile")
-                if ms.get("ollama_reachable") and not ms.get("ready"):
+                if not ms.get("ollama_reachable"):
+                    health["status"] = "degraded"
+                    health["hint"] = "Ollama is not running — AI chat needs it."
+                elif not ms.get("ready"):
                     health["status"] = "degraded"
                     health["hint"] = "Download a model in Command Centre → Models"
+            except Exception:
+                pass
+            try:
+                health["knowledge"] = KS.status()
+            except Exception:
+                pass
+            try:
+                health["content"] = {"installed": len(load_installed(DATA).get("packs", []))}
             except Exception:
                 pass
             return self._json(200, health)
@@ -1063,6 +1590,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "not_a_directory"})
         if path == "/api/knowledge/library":
             return self._json(200, knowledge_library(sess["username"]))
+        if path == "/api/knowledge/status":
+            try:
+                return self._json(200, KS.status())
+            except Exception as e:
+                return self._json(500, {"error": str(e)})
+        if path == "/api/knowledge/chunk":
+            qs = parse_qs(urlparse(self.path).query)
+            doc_id = (qs.get("doc_id") or [""])[0]
+            try:
+                chunk_index = int((qs.get("chunk_index") or ["0"])[0])
+            except ValueError:
+                chunk_index = 0
+            chunk = KS.get_chunk(sess["username"], doc_id, chunk_index)
+            if not chunk:
+                return self._json(404, {"error": "chunk_not_found"})
+            return self._json(200, chunk)
         if path == "/api/approvals":
             pending = []
             for aid, meta in GW.pending_approvals.items():
@@ -1105,6 +1648,57 @@ class Handler(BaseHTTPRequestHandler):
             if WIZARD_STATE.exists():
                 state = json.loads(WIZARD_STATE.read_text(encoding="utf-8"))
             return self._json(200, state)
+        if path == "/api/content/catalogue":
+            try:
+                cat = merge_catalogue_status(load_catalogue(_catalogue_file()), DATA)
+                return self._json(200, cat)
+            except Exception as e:
+                return self._json(500, {"error": str(e)})
+        if path == "/api/content/installed":
+            return self._json(200, load_installed(DATA))
+        if path == "/api/content/browse":
+            roots = _pack_browse_roots()
+            local = find_packs_on_paths([str(r) for r in roots if r != Path("/media")])
+            usb = find_packs_on_paths(list_usb_pack_dirs())
+            return self._json(200, {"local": local, "usb": usb})
+        if path == "/api/content/preview":
+            qs = parse_qs(urlparse(self.path).query)
+            raw = (qs.get("path") or [""])[0]
+            if not raw:
+                return self._json(400, {"error": "path_required"})
+            p = Path(raw)
+            if not _pack_path_allowed(p):
+                return self._json(403, {"error": "path_not_allowed"})
+            if not p.is_file():
+                return self._json(404, {"error": "pack_not_found"})
+            try:
+                meta = read_pack_metadata(p)
+                compat = check_compatibility(meta["manifest"], DATA)
+                return self._json(200, {**meta, "compat": compat})
+            except PackError as e:
+                return self._json(400, {"error": str(e)})
+        if path == "/api/backup/list":
+            BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            return self._json(200, {"backups": list_backups(BACKUP_DIR)})
+        if path == "/api/updates/browse":
+            local_roots = [UPDATE_INCOMING, UPDATE_BUNDLED, DATA / "updates"]
+            local = find_update_bundles([str(r) for r in local_roots])
+            usb = find_update_bundles(list_usb_pack_dirs())
+            return self._json(200, {"local": local, "usb": usb})
+        if path == "/api/updates/preview":
+            qs = parse_qs(urlparse(self.path).query)
+            raw = (qs.get("path") or [""])[0]
+            if not raw:
+                return self._json(400, {"error": "path_required"})
+            p = Path(raw)
+            if not _update_path_allowed(p):
+                return self._json(403, {"error": "path_not_allowed"})
+            if not p.is_file():
+                return self._json(404, {"error": "bundle_not_found"})
+            try:
+                return self._json(200, read_bundle_metadata(p))
+            except Exception as e:
+                return self._json(400, {"error": str(e)})
         self._json(404, {"error": "not_found"})
 
     def do_POST(self):  # noqa: N802
@@ -1301,6 +1895,171 @@ class Handler(BaseHTTPRequestHandler):
             hits = KS.search(sess["username"], data.get("query", ""))
             return self._json(200, {"hits": hits})
 
+        if path == "/api/knowledge/delete":
+            doc_id = data.get("doc_id") or ""
+            if not doc_id:
+                return self._json(400, {"error": "doc_id_required"})
+            ok = KS.delete_document(sess["username"], doc_id)
+            if not ok:
+                return self._json(404, {"error": "not_found"})
+            audit_event({"event": "knowledge.delete", "doc_id": doc_id, "username": sess["username"]})
+            return self._json(200, {"ok": True})
+
+        if path == "/api/knowledge/backup":
+            bak_root = DATA / "backups" / "knowledge"
+            try:
+                result = KS.backup(bak_root)
+            except Exception as e:
+                return self._json(500, {"error": str(e)})
+            audit_event({"event": "knowledge.backup", "archive": result.get("archive"), "username": sess["username"]})
+            return self._json(200, result)
+
+        if path == "/api/knowledge/restore":
+            archive = data.get("archive") or ""
+            if not archive:
+                return self._json(400, {"error": "archive_required"})
+            p = Path(archive)
+            bak_root = (DATA / "backups" / "knowledge").resolve()
+            try:
+                if not str(p.resolve()).startswith(str(bak_root)):
+                    return self._json(403, {"error": "path_not_allowed"})
+                result = KS.restore(p)
+            except Exception as e:
+                return self._json(400, {"error": str(e)})
+            audit_event({"event": "knowledge.restore", "archive": str(p), "username": sess["username"]})
+            return self._json(200, result)
+
+        if path in {"/api/content/install", "/api/content/uninstall"}:
+            if sess.get("role") not in {"owner", "admin"}:
+                return self._json(403, {"error": "forbidden"})
+
+        if path == "/api/content/install":
+            pack_path: Path | None = None
+            catalogue_id = data.get("catalogue_id") or ""
+            raw_path = data.get("path") or ""
+            if catalogue_id:
+                pack_path = _resolve_catalogue_pack(catalogue_id)
+                if not pack_path:
+                    return self._json(404, {"error": "bundled_pack_not_found"})
+            elif raw_path:
+                pack_path = Path(raw_path)
+                if not _pack_path_allowed(pack_path):
+                    return self._json(403, {"error": "path_not_allowed"})
+                if not pack_path.is_file():
+                    return self._json(404, {"error": "pack_not_found"})
+            else:
+                return self._json(400, {"error": "path_or_catalogue_id_required"})
+            prev = os.environ.get("ATLAS_ALLOW_UNSIGNED")
+            os.environ["ATLAS_ALLOW_UNSIGNED"] = "1"
+            try:
+                result = install_pack(pack_path, DATA)
+            except PackError as e:
+                return self._json(400, {"error": str(e)})
+            except Exception as e:
+                return self._json(500, {"error": str(e)})
+            finally:
+                if prev is None:
+                    os.environ.pop("ATLAS_ALLOW_UNSIGNED", None)
+                else:
+                    os.environ["ATLAS_ALLOW_UNSIGNED"] = prev
+            audit_event({
+                "event": "content.install",
+                "pack_id": result.get("id"),
+                "version": result.get("version"),
+                "path": str(pack_path),
+                "username": sess["username"],
+            })
+            return self._json(200, result)
+
+        if path == "/api/content/uninstall":
+            pack_id = data.get("id") or ""
+            if not pack_id:
+                return self._json(400, {"error": "id_required"})
+            try:
+                result = uninstall_pack(pack_id, DATA)
+            except PackError as e:
+                return self._json(400, {"error": str(e)})
+            audit_event({
+                "event": "content.uninstall",
+                "pack_id": pack_id,
+                "username": sess["username"],
+            })
+            return self._json(200, result)
+
+        if path in {"/api/backup/create", "/api/backup/restore", "/api/backup/verify", "/api/updates/apply"}:
+            if sess.get("role") not in {"owner", "admin"}:
+                return self._json(403, {"error": "forbidden"})
+
+        if path == "/api/backup/create":
+            passphrase = data.get("passphrase") or ""
+            if not passphrase:
+                return self._json(400, {"error": "passphrase_required"})
+            BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            name = f"atlas-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}.atlasbak"
+            dest = BACKUP_DIR / name
+            try:
+                result = create_backup(DATA, dest, passphrase)
+            except BackupError as e:
+                return self._json(400, {"error": str(e)})
+            audit_event({"event": "backup.create", "path": str(dest), "username": sess["username"]})
+            return self._json(200, result)
+
+        if path == "/api/backup/verify":
+            raw_path = data.get("path") or ""
+            p = Path(raw_path)
+            if not _backup_path_allowed(p):
+                return self._json(403, {"error": "path_not_allowed"})
+            try:
+                result = verify_backup(p)
+            except BackupError as e:
+                return self._json(400, {"error": str(e)})
+            return self._json(200, result)
+
+        if path == "/api/backup/restore":
+            raw_path = data.get("path") or ""
+            passphrase = data.get("passphrase") or ""
+            p = Path(raw_path)
+            if not _backup_path_allowed(p):
+                return self._json(403, {"error": "path_not_allowed"})
+            try:
+                result = restore_backup(p, DATA, passphrase)
+            except BackupError as e:
+                return self._json(400, {"error": str(e)})
+            audit_event({"event": "backup.restore", "path": str(p), "username": sess["username"]})
+            return self._json(200, result)
+
+        if path == "/api/updates/apply":
+            raw_path = data.get("path") or ""
+            p = Path(raw_path)
+            if not _update_path_allowed(p):
+                return self._json(403, {"error": "path_not_allowed"})
+            if not p.is_file():
+                return self._json(404, {"error": "bundle_not_found"})
+            prev = os.environ.get("ATLAS_ALLOW_UNSIGNED")
+            os.environ["ATLAS_ALLOW_UNSIGNED"] = "1"
+            try:
+                result = apply_update(p, atlas_data=DATA, dry_run=False)
+            except Exception as e:
+                return self._json(500, {"error": str(e), "ok": False})
+            finally:
+                if prev is None:
+                    os.environ.pop("ATLAS_ALLOW_UNSIGNED", None)
+                else:
+                    os.environ["ATLAS_ALLOW_UNSIGNED"] = prev
+            audit_event({
+                "event": "update.apply",
+                "path": str(p),
+                "ok": result.ok,
+                "rolled_back": result.rolled_back,
+                "version": result.version,
+                "username": sess["username"],
+            })
+            # Always 200 with ok/rolled_back so the UI can parse JSON reliably
+            body = result.to_dict()
+            if not result.ok:
+                body["error"] = result.detail
+            return self._json(200, body)
+
         if path == "/api/setup/advance":
             WIZARD_STATE.parent.mkdir(parents=True, exist_ok=True)
             state = {"step": 1, "steps": [
@@ -1330,6 +2089,11 @@ def main() -> None:
     DATA.mkdir(parents=True, exist_ok=True)
     (DATA / "databases").mkdir(parents=True, exist_ok=True)
     (DATA / "logs").mkdir(parents=True, exist_ok=True)
+    (DATA / "knowledge").mkdir(parents=True, exist_ok=True)
+    (DATA / "backups" / "knowledge").mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    UPDATE_INCOMING.mkdir(parents=True, exist_ok=True)
+    (DATA / "snapshots").mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Atlas Command Centre on http://{HOST}:{PORT}/", flush=True)
     server.serve_forever()

@@ -149,18 +149,27 @@ def model_setup_status(host: str = "http://127.0.0.1:11434") -> dict[str, Any]:
     installed = installed_models(host) if reachable else []
     catalogue = catalogue_for_hardware(hw, installed)
     recommended = pick_recommended(catalogue, profile)
+    # Installed chat models count as ready even if over recommended RAM —
+    # beginners should not be stuck on "download model" after a successful pull.
     chat_ready = any(
-        c["installed"] and c.get("kind") != "embed" and c["compatible"] for c in catalogue
+        c["installed"] and c.get("kind") != "embed" for c in catalogue
     )
-    # Also treat any installed model matching profile tag as ready
     profile_tag = PROFILES.get(profile, PROFILES["tiny"])["model"]
     if _tag_installed(profile_tag, installed):
         chat_ready = True
+    if not chat_ready and installed:
+        chat_ready = any(
+            not str(t).startswith("nomic-embed") for t in installed
+        )
 
     bundle = recommendation_bundle()
+    embed_ready = any(
+        c["installed"] and c.get("kind") == "embed" for c in catalogue
+    ) or _tag_installed("nomic-embed-text", installed)
     return {
         "ollama_reachable": reachable,
         "ready": bool(reachable and chat_ready),
+        "embed_ready": bool(reachable and embed_ready),
         "profile": profile,
         "hardware": {
             "ram_gb": hw.ram_gb,
@@ -176,6 +185,11 @@ def model_setup_status(host: str = "http://127.0.0.1:11434") -> dict[str, Any]:
             "Download the recommended model once (needs internet). After that, Atlas works offline."
             if not chat_ready
             else "A chat model is installed. You can ask Atlas Guide."
+        ),
+        "embed_hint": (
+            None
+            if embed_ready
+            else "Download nomic-embed-text for semantic Knowledge search."
         ),
         "gpu_warning": bundle.get("warning"),
         "pull_jobs": list_jobs(),

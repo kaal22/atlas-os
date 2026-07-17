@@ -5,7 +5,7 @@ Wants=atlas-firstboot.service
 
 [Service]
 Type=simple
-ExecStartPre=/bin/mkdir -p /srv/atlas/databases /srv/atlas/logs /srv/atlas/knowledge /srv/atlas/notes /srv/atlas/memory /srv/atlas/documents /srv/atlas/models
+ExecStartPre=/bin/mkdir -p /srv/atlas/databases /srv/atlas/logs /srv/atlas/knowledge /srv/atlas/notes /srv/atlas/memory /srv/atlas/documents /srv/atlas/models /srv/atlas/backups/knowledge
 ExecStart=/usr/bin/python3 /usr/lib/atlas/command_centre.py
 Restart=on-failure
 RestartSec=2

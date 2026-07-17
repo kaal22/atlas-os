@@ -13,7 +13,7 @@ if [[ -f "$DONE" ]]; then
   exit 0
 fi
 
-mkdir -p "$DATA"/{users,workspaces,documents,knowledge,embeddings,models/ollama,maps,kiwix,kolibri,media,content-packs,agent-packages,backups,exports,databases/mysql,logs,compose,tmp,nomad-storage}
+mkdir -p "$DATA"/{users,workspaces,documents,knowledge,embeddings,models/ollama,maps,kiwix,kolibri,media,content-packs,agent-packages,backups/knowledge,exports,databases/mysql,logs,compose,tmp,nomad-storage}
 mkdir -p "$SECRETS"
 chmod 700 "$SECRETS"
 

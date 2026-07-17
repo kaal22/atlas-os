@@ -56,9 +56,12 @@ build_simple_deb() {
     atlas-auth) depends="python3" ;;
     atlas-policy-gateway) depends="python3" ;;
     atlas-model-manager) depends="python3" ;;
-    atlas-knowledge) depends="python3" ;;
+    atlas-knowledge) depends="python3, poppler-utils" ;;
     atlas-agent-runtime) depends="python3, atlas-policy-gateway, atlas-model-manager, atlas-knowledge" ;;
-    atlas-command-centre) depends="python3, atlas-auth, atlas-agent-runtime, atlas-policy-gateway, atlas-model-manager, atlas-knowledge" ;;
+    atlas-command-centre) depends="python3, atlas-auth, atlas-agent-runtime, atlas-policy-gateway, atlas-model-manager, atlas-knowledge, atlas-content-manager, atlas-backup, atlas-updater" ;;
+    atlas-content-manager) depends="python3" ;;
+    atlas-backup) depends="python3, openssl" ;;
+    atlas-updater) depends="python3" ;;
     atlas-system-daemon) depends="python3, ufw" ;;
     atlas-proxy) depends="nginx, atlas-command-centre" ;;
   esac

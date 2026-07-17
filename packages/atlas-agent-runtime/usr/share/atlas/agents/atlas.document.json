@@ -1,0 +1,13 @@
+{
+  "id": "atlas.document",
+  "name": "Document Agent",
+  "purpose": "Answer questions from your imported documents with clear source citations.",
+  "tools": ["knowledge.search", "documents.read", "notes.write"],
+  "capabilities": ["knowledge.read", "documents.read", "notes.write"],
+  "memory_scopes": ["session"],
+  "knowledge_scopes": ["local", "personal_documents"],
+  "approval_rules": {},
+  "model_profile": "light",
+  "publisher": "atlas",
+  "version": "1.0.0"
+}

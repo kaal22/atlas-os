@@ -1,0 +1,30 @@
+# Dev hot-sync manifest: repo_path|install_path|systemd_unit (unit optional)
+# Used by scripts/dev-pull.sh against scripts/dev-serve.sh on the build host.
+#
+packages/atlas-command-centre/usr/lib/atlas/command_centre.py|/usr/lib/atlas/command_centre.py|atlas-command-centre.service
+packages/atlas-command-centre/usr/lib/atlas/command_centre_ui.html|/usr/lib/atlas/command_centre_ui.html|atlas-command-centre.service
+packages/atlas-command-centre/usr/lib/atlas/chat_store.py|/usr/lib/atlas/chat_store.py|atlas-command-centre.service
+packages/atlas-command-centre/usr/lib/atlas/atlas-logo.png|/usr/lib/atlas/atlas-logo.png|atlas-command-centre.service
+packages/atlas-auth/usr/lib/atlas/auth_store.py|/usr/lib/atlas/auth_store.py|
+packages/atlas-policy-gateway/usr/lib/atlas/policy_gateway.py|/usr/lib/atlas/policy_gateway.py|
+packages/atlas-agent-runtime/usr/lib/atlas/agent_runtime.py|/usr/lib/atlas/agent_runtime.py|
+packages/atlas-model-manager/usr/lib/atlas/model_router.py|/usr/lib/atlas/model_router.py|
+packages/atlas-model-manager/usr/lib/atlas/model_catalog.py|/usr/lib/atlas/model_catalog.py|
+packages/atlas-knowledge/usr/lib/atlas/knowledge_service.py|/usr/lib/atlas/knowledge_service.py|
+packages/atlas-content-manager/usr/lib/atlas/content_manager.py|/usr/lib/atlas/content_manager.py|
+packages/atlas-backup/usr/lib/atlas/backup_service.py|/usr/lib/atlas/backup_service.py|
+packages/atlas-updater/usr/lib/atlas/updater.py|/usr/lib/atlas/updater.py|
+packages/atlas-shell/usr/bin/atlas-health|/usr/bin/atlas-health|
+packages/atlas-shell/usr/bin/atlas-launcher|/usr/bin/atlas-launcher|
+packages/atlas-shell/usr/lib/atlas/trust-desktop-launchers.sh|/usr/lib/atlas/trust-desktop-launchers.sh|
+packages/atlas-shell/usr/share/applications/atlas-launcher.desktop|/usr/share/applications/atlas-launcher.desktop|
+packages/atlas-shell/usr/share/icons/hicolor/index.theme|/usr/share/icons/hicolor/index.theme|
+packages/atlas-shell/usr/share/icons/hicolor/16x16/apps/atlas-services.png|/usr/share/icons/hicolor/16x16/apps/atlas-services.png|
+packages/atlas-shell/usr/share/icons/hicolor/24x24/apps/atlas-services.png|/usr/share/icons/hicolor/24x24/apps/atlas-services.png|
+packages/atlas-shell/usr/share/icons/hicolor/32x32/apps/atlas-services.png|/usr/share/icons/hicolor/32x32/apps/atlas-services.png|
+packages/atlas-shell/usr/share/icons/hicolor/scalable/apps/atlas-services.svg|/usr/share/icons/hicolor/scalable/apps/atlas-services.svg|
+packages/atlas-shell/usr/share/icons/hicolor/48x48/apps/atlas-services.png|/usr/share/icons/hicolor/48x48/apps/atlas-services.png|
+packages/atlas-shell/usr/share/icons/hicolor/64x64/apps/atlas-services.png|/usr/share/icons/hicolor/64x64/apps/atlas-services.png|
+packages/atlas-shell/usr/share/icons/hicolor/128x128/apps/atlas-services.png|/usr/share/icons/hicolor/128x128/apps/atlas-services.png|
+packages/atlas-shell/usr/share/icons/hicolor/256x256/apps/atlas-services.png|/usr/share/icons/hicolor/256x256/apps/atlas-services.png|
+packages/atlas-shell/usr/share/atlas/launcher/index.html|/usr/share/atlas/launcher/index.html|

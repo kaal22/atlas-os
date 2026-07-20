@@ -82,7 +82,51 @@ def test_child_cannot_escalate_capabilities():
         assert "escalation" in str(e)
 
 
+def test_greeting_skips_knowledge_search():
+    class FakeKnowledge:
+        def search(self, user_id: str, query: str, limit: int = 5):
+            return [
+                {
+                    "doc_id": "qm",
+                    "name": "Quantum_mechanics.pdf",
+                    "text": "Schrödinger equation and Hilbert spaces",
+                    "score": 0.91,
+                    "source": "vector",
+                }
+            ]
+
+    with tempfile.TemporaryDirectory() as td:
+        td_path = Path(td)
+        ks = FakeKnowledge()
+        rt = AgentRuntime(
+            dry_run=True,
+            knowledge=ks,
+            memory=MemoryStore(td_path / "memory"),
+            tools=default_registry(knowledge=ks, notes_root=td_path / "notes"),
+        )
+        rt.register_agent(
+            AgentManifest(
+                id="atlas.guide",
+                name="Atlas Guide",
+                purpose="General assistant",
+                tools=["knowledge.search", "notes.write"],
+                capabilities=["knowledge.read", "notes.write"],
+                memory_scopes=["session"],
+                knowledge_scopes=["local"],
+                approval_rules={},
+                model_profile="tiny",
+            )
+        )
+        task = rt.create_task("atlas.guide", "hello", user_id="tester")
+        rt.plan(task.id)
+        result = rt.run_step(task.id)
+        assert task.state == "completed", (task.state, result)
+        assert result.get("sources") == []
+        assert "Quantum" not in (result.get("answer") or "")
+
+
 if __name__ == "__main__":
     test_guide_completes_bounded_task()
     test_child_cannot_escalate_capabilities()
+    test_greeting_skips_knowledge_search()
     print("OK test_agent_ollama_loop")

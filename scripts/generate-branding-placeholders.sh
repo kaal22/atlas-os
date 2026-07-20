@@ -59,6 +59,22 @@ for sz in 16 24 32 48 64 128 256; do
   magick "$PIX/atlas.png" -resize "${sz}x${sz}" -strip PNG32:"$d/atlas.png"
 done
 
+# Service Check icon (gear) — distinct from Atlas triangle
+SVC_SVG="$ROOT/packages/atlas-shell/usr/share/icons/hicolor/scalable/apps/atlas-services.svg"
+if [[ -f "$SVC_SVG" ]] && command -v magick >/dev/null 2>&1; then
+  for sz in 16 24 32 48 64 128 256; do
+    for base in \
+      "$ROOT/packages/atlas-shell/usr/share/icons/hicolor" \
+      "$ROOT/config/includes.chroot/usr/share/icons/hicolor"; do
+      d="$base/${sz}x${sz}/apps"
+      mkdir -p "$d"
+      magick -background none -density 384 "$SVC_SVG" -resize "${sz}x${sz}" -strip PNG32:"$d/atlas-services.png"
+    done
+  done
+  mkdir -p "$ROOT/config/includes.chroot/usr/share/icons/hicolor/scalable/apps"
+  cp -f "$SVC_SVG" "$ROOT/config/includes.chroot/usr/share/icons/hicolor/scalable/apps/atlas-services.svg"
+fi
+
 cp -a "$BRAND"/. "$INCL_BRAND/"
 # Do not ship local preview helpers into the image
 rm -f "$INCL_BRAND"/.preview-* "$INCL_BRAND"/.logo-*

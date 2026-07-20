@@ -116,6 +116,35 @@ def _fallback_summary_from_sources(_prompt: str, sources: list[dict[str, Any]]) 
     return f"Based on {lead}: {body}"
 
 
+_CASUAL_EXACT = frozenset({
+    "hi", "hello", "hey", "hiya", "howdy", "yo", "sup",
+    "thanks", "thank you", "thx", "bye", "goodbye", "cya",
+    "ok", "okay", "k", "yes", "no", "yep", "nope",
+    "good morning", "good afternoon", "good evening", "good night",
+})
+
+_QUESTION_HINTS = (
+    "?", "what ", "who ", "where ", "when ", "why ", "how ",
+    "which ", "find ", "search ", "look up", "show me", "tell me",
+    "explain", "summarize", "summary", "describe", "list ",
+    "document", "file", "note", "pdf", "source", "according to",
+)
+
+
+def _should_auto_knowledge_search(prompt: str) -> bool:
+    """Skip RAG for greetings and other messages that are not document lookups."""
+    text = (prompt or "").strip()
+    if not text:
+        return False
+    lower = " ".join(text.lower().split())
+    stripped = lower.rstrip("!.?,")
+    if stripped in _CASUAL_EXACT:
+        return False
+    if len(stripped) <= 12 and "?" not in stripped:
+        if not any(h in lower for h in _QUESTION_HINTS):
+            return False
+    return True
+
 TRANSITIONS = {
     "draft": {"planned", "cancelled"},
     "planned": {"awaiting_approval", "queued", "cancelled"},
@@ -355,7 +384,7 @@ class AgentRuntime:
         elif "network.fetch" in agent.tools and task.prompt.strip().lower().startswith("http"):
             url = task.prompt.strip().split()[0]
             tools_to_try.append(("network.fetch", {"url": url}))
-        elif "knowledge.search" in agent.tools and not task.tool_context:
+        elif "knowledge.search" in agent.tools and not task.tool_context and _should_auto_knowledge_search(task.prompt):
             tools_to_try.append(("knowledge.search", {"query": task.prompt}))
         elif "system.health.read" in agent.tools and agent.id == "atlas.system-steward":
             tools_to_try.append(("system.health.read", {}))

@@ -374,7 +374,7 @@ class KnowledgeService:
                 continue
             for idx, chunk in enumerate(doc.chunks):
                 score = sum(1 for t in q if t in chunk.lower()) if q else 0
-                if score or (not q and idx == 0):
+                if score > 0:
                     hits.append(
                         {
                             "doc_id": doc.doc_id,
@@ -446,7 +446,16 @@ class KnowledgeService:
                     item["source"] = "hybrid"
                 merged[key] = item
         hits = sorted(merged.values(), key=lambda h: float(h.get("score") or 0), reverse=True)
-        return hits[:limit]
+        relevant: list[dict[str, Any]] = []
+        for h in hits:
+            score = float(h.get("score") or 0)
+            src = str(h.get("source") or "keyword")
+            if src == "keyword" and score < 1.0:
+                continue
+            if src in {"vector", "hybrid"} and score < 0.52:
+                continue
+            relevant.append(h)
+        return relevant[:limit]
 
     def backup(self, dest_dir: Path) -> dict[str, Any]:
         dest = Path(dest_dir)

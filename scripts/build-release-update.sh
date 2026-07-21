@@ -40,7 +40,15 @@ for pkg in "${PKG_LIST[@]}"; do
     continue
   fi
   echo "Staging $pkg..."
-  cp -a "$pkg_dir"/. "$STAGING/payload/"
+  while IFS= read -r -d '' f; do
+    rel="${f#"$pkg_dir"/}"
+    case "$rel" in
+      __pycache__/*|*/__pycache__/*|*.pyc) continue ;;
+    esac
+    mode="644"
+    [[ "$rel" == usr/bin/* ]] && mode="755"
+    install -D -m "$mode" "$f" "$STAGING/payload/$rel"
+  done < <(find "$pkg_dir" -type f -print0)
 done
 
 COMPONENTS=$(printf '"%s",' "${PKG_LIST[@]}")

@@ -117,6 +117,14 @@ def test_download_bundle_rejects_bad_hash():
                 assert "hash_mismatch" in str(e)
 
 
+def test_path_allowed_atlas_systemd_unit():
+    from updater import _path_allowed
+    assert _path_allowed(Path("/lib/systemd/system/atlas-system-daemon.service"))
+    assert _path_allowed(Path("/usr/bin/atlas-open-command-centre"))
+    assert not _path_allowed(Path("/usr/bin/bash"))
+    assert not _path_allowed(Path("/lib/systemd/system/ssh.service"))
+
+
 def test_get_installed_version_fallback():
     with patch.object(updater, "VERSION_FILE", Path("/nonexistent/version.json")):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
@@ -135,5 +143,6 @@ if __name__ == "__main__":
     test_check_online_update_wildcard_passes()
     test_download_bundle_verifies_hash()
     test_download_bundle_rejects_bad_hash()
+    test_path_allowed_atlas_systemd_unit()
     test_get_installed_version_fallback()
     print("All online update tests passed!")

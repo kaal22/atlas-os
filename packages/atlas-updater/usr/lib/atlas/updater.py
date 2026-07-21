@@ -22,6 +22,13 @@ ALLOWED_PAYLOAD_ROOTS = (
     Path("/srv/atlas"),
     Path("/etc/atlas"),
 )
+# Atlas-named files only in these system locations (units, launchers, helpers).
+ATLAS_NAMED_PREFIX_DIRS = (
+    Path("/lib/systemd/system"),
+    Path("/usr/lib/systemd/system"),
+    Path("/usr/bin"),
+    Path("/usr/share/applications"),
+)
 SCHEMA = "atlas.update/v1"
 VERSION_FILE = Path("/etc/atlas/version.json")
 DEFAULT_UPDATE_ENDPOINT = "https://github.com/kaal22/atlas-os/releases/latest/download/channel.json"
@@ -152,14 +159,23 @@ def _path_allowed(dest: Path, install_root: Path | None = None) -> bool:
         except OSError:
             ir = install_root
         return str(resolved).startswith(str(ir))
-    roots = list(ALLOWED_PAYLOAD_ROOTS)
-    for root in roots:
+    for root in ALLOWED_PAYLOAD_ROOTS:
         try:
             rr = root.resolve() if root.exists() else root
         except OSError:
             rr = root
         if str(resolved).startswith(str(rr)):
             return True
+    name = dest.name
+    if name.startswith("atlas-"):
+        parent = resolved.parent
+        for d in ATLAS_NAMED_PREFIX_DIRS:
+            try:
+                dd = d.resolve() if d.exists() else d
+            except OSError:
+                dd = d
+            if parent == dd:
+                return True
     return False
 
 

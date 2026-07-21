@@ -1064,8 +1064,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(404, {"error": "bundle_not_found"})
             import subprocess
             helper = HERE / "atlas-apply-update.py"
+            result_file = Path("/srv/atlas/updates/staging/.apply-result.json")
+            result_file.unlink(missing_ok=True)
             cmd = [
-                "systemd-run", "--wait", "--collect",
+                "systemd-run", "--wait", "--collect", "--pipe",
                 "-p", "ProtectSystem=false",
                 "-p", "ProtectHome=false",
                 "/usr/bin/python3", str(helper), str(p),
@@ -1076,14 +1078,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(500, {"error": "apply timed out", "ok": False})
             except OSError as e:
                 return self._json(500, {"error": f"apply spawn failed: {e}", "ok": False})
-            out = (proc.stdout or "").strip()
-            if not out:
+            body = None
+            if result_file.is_file():
+                try:
+                    body = json.loads(result_file.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    pass
+            if body is None:
+                out = (proc.stdout or "").strip()
+                if out:
+                    try:
+                        body = json.loads(out)
+                    except json.JSONDecodeError:
+                        pass
+            if body is None:
                 err = (proc.stderr or "").strip() or f"apply exited {proc.returncode}"
                 return self._json(500, {"error": err, "ok": False})
-            try:
-                body = json.loads(out)
-            except json.JSONDecodeError:
-                return self._json(500, {"error": "bad apply response", "ok": False})
             result_ok = bool(body.get("ok"))
             audit_event({
                 "event": "update.apply",

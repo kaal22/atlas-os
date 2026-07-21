@@ -14,6 +14,7 @@ packages/atlas-knowledge/usr/lib/atlas/knowledge_service.py|/usr/lib/atlas/knowl
 packages/atlas-content-manager/usr/lib/atlas/content_manager.py|/usr/lib/atlas/content_manager.py|
 packages/atlas-backup/usr/lib/atlas/backup_service.py|/usr/lib/atlas/backup_service.py|
 packages/atlas-updater/usr/lib/atlas/updater.py|/usr/lib/atlas/updater.py|
+packages/atlas-updater/usr/lib/atlas/atlas-apply-update.py|/usr/lib/atlas/atlas-apply-update.py|
 packages/atlas-shell/usr/bin/atlas-health|/usr/bin/atlas-health|
 packages/atlas-shell/usr/bin/atlas-launcher|/usr/bin/atlas-launcher|
 packages/atlas-shell/usr/lib/atlas/trust-desktop-launchers.sh|/usr/lib/atlas/trust-desktop-launchers.sh|

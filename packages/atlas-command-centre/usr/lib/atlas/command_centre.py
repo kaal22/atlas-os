@@ -70,7 +70,6 @@ from backup_service import (  # noqa: E402
     verify_backup,
 )
 from updater import (  # noqa: E402
-    apply_update,
     find_update_bundles,
     read_bundle_metadata,
 )
@@ -1060,29 +1059,39 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(403, {"error": "path_not_allowed"})
             if not p.is_file():
                 return self._json(404, {"error": "bundle_not_found"})
-            prev = os.environ.get("ATLAS_ALLOW_UNSIGNED")
-            os.environ["ATLAS_ALLOW_UNSIGNED"] = "1"
+            import subprocess
+            helper = HERE / "atlas-apply-update.py"
+            cmd = [
+                "systemd-run", "--wait", "--collect",
+                "-p", "ProtectSystem=false",
+                "-p", "ProtectHome=false",
+                "/usr/bin/python3", str(helper), str(p),
+            ]
             try:
-                result = apply_update(p, atlas_data=DATA, dry_run=False)
-            except Exception as e:
-                return self._json(500, {"error": str(e), "ok": False})
-            finally:
-                if prev is None:
-                    os.environ.pop("ATLAS_ALLOW_UNSIGNED", None)
-                else:
-                    os.environ["ATLAS_ALLOW_UNSIGNED"] = prev
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            except subprocess.TimeoutExpired:
+                return self._json(500, {"error": "apply timed out", "ok": False})
+            except OSError as e:
+                return self._json(500, {"error": f"apply spawn failed: {e}", "ok": False})
+            out = (proc.stdout or "").strip()
+            if not out:
+                err = (proc.stderr or "").strip() or f"apply exited {proc.returncode}"
+                return self._json(500, {"error": err, "ok": False})
+            try:
+                body = json.loads(out)
+            except json.JSONDecodeError:
+                return self._json(500, {"error": "bad apply response", "ok": False})
+            result_ok = bool(body.get("ok"))
             audit_event({
                 "event": "update.apply",
                 "path": str(p),
-                "ok": result.ok,
-                "rolled_back": result.rolled_back,
-                "version": result.version,
+                "ok": result_ok,
+                "rolled_back": body.get("rolled_back"),
+                "version": body.get("version"),
                 "username": sess["username"],
             })
-            # Always 200 with ok/rolled_back so the UI can parse JSON reliably
-            body = result.to_dict()
-            if not result.ok:
-                body["error"] = result.detail
+            if not result_ok and "error" not in body:
+                body["error"] = body.get("detail") or "apply failed"
             return self._json(200, body)
 
         if path == "/api/setup/advance":

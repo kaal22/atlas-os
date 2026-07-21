@@ -44,6 +44,9 @@ for pkg in "${PKG_LIST[@]}"; do
     rel="${f#"$pkg_dir"/}"
     case "$rel" in
       __pycache__/*|*/__pycache__/*|*.pyc) continue ;;
+      lib/systemd/*|usr/bin/*|usr/share/applications/*) continue ;;
+      usr/lib/atlas/*|usr/share/atlas/*) ;;
+      *) continue ;;
     esac
     mode="644"
     [[ "$rel" == usr/bin/* ]] && mode="755"

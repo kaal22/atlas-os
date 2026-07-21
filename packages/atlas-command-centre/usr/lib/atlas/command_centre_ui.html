@@ -690,88 +690,113 @@ async function page(){
   if(view) view.classList.toggle('chat-page', id==='ask');
   renderNav(id);
   if(id==='home'){
-    const h=await api('/api/system/health');
-    const m=await api('/api/models/status');
-    const sv=await api('/api/system/services');
-    const lib=await api('/api/knowledge/library');
-    const statusLabel=h.status==='ok'?'Healthy':(h.status==='degraded'?'Needs attention':'Unknown');
-    const kbMode=(h.knowledge&&h.knowledge.mode)||'keyword';
-    const svcList=sv.services||[];
-    const svcOnline=svcList.filter(s=>s.ok).length;
-    renderTopbar(id,{modelReady:!!m.ready,sysOk:h.status==='ok'});
-    const welcome=_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Atlas';
-    const heroCta=m.ready
-      ?`<button class="btn" onclick="location.hash='#/ask'">Open Chat</button>
-         <button class="btn secondary" onclick="location.hash='#/agents'">Launch Agents</button>`
-      :`<button class="btn" onclick="location.hash='#/models'">Set up AI model</button>
-         <button class="btn secondary" onclick="location.hash='#/setup'">Run setup</button>`;
-    const heroStatus=`
-      ${chip(statusLabel,h.status==='ok'?'ok':'bad')}
-      ${chip(m.ready?'AI ready':'Model not installed',m.ready?'ok':'bad')}
-      ${chip(kbMode==='hybrid'?'Hybrid search':'Keyword search',kbMode==='hybrid'?'ok':'neutral')}
-      ${chip('Offline mode','neutral',true)}`;
-    const actions=[
-      actionTile('#/ask','Open Chat','Talk to local agents','💬'),
-      actionTile('#/models','Manage Models','Download offline LLMs','◈'),
-      actionTile('#/agents','Launch Agents','Guide, Research, Steward','◎'),
-      actionTile('#/knowledge','Search Knowledge','Your indexed documents','📄'),
-      actionTile('#/content','Install Content','Maps, packs, models','▣'),
-      actionTile('http://127.0.0.1:8791/','Service Check','Ollama, Qdrant, NOMAD','⚙',true),
-    ].join('');
-    const metrics=[
-      metricCard('System',statusLabel,'Device health overview',h.status==='ok'?'ok':'bad'),
-      metricCard('AI model',m.ready?'Ready':'Not installed',m.profile||'No profile',m.ready?'ok':'bad'),
-      metricCard('Documents',lib.count||0,'Indexed in knowledge base'),
-      metricCard('Services',svcOnline+'/'+svcList.length,'Local loopback services',svcOnline===svcList.length&&svcList.length?'ok':'bad'),
-      metricCard('Search mode',kbMode,'Knowledge retrieval',kbMode==='hybrid'?'ok':'neutral'),
-      metricCard('Network','Private','No public exposure','ok'),
-    ].join('');
-    const services=(svcList.length?svcList.map(serviceCard).join(''):emptyState('No services probed yet','Complete first-boot import to start local services.'));
-    const activity=[
-      m.ready?['AI model ready for chat','Now']:['AI model not installed — visit Models','Setup'],
-      [(lib.count||0)+' documents indexed','Knowledge'],
-      [statusLabel+' system status','System'],
-      h.hint?[h.hint,'Notice']:null,
-    ].filter(Boolean).map(([t,w])=>`<div class="activity-row"><span>${escapeHtml(t)}</span><span class="when">${escapeHtml(w)}</span></div>`).join('');
-    const gpuNote=h.gpu_warning?`<div class="msg info" style="margin-top:1rem">${escapeHtml(h.gpu_warning)}</div>`:'';
-    const setupBanner=!m.ready?`<div class="callout warn" style="margin-top:1rem"><strong>Complete AI setup</strong><p>${escapeHtml(m.hint||'Download a model to unlock Chat and agents.')}</p></div>`:'';
-    view.innerHTML=`
-      <div class="hero">
-        <div class="hero-inner">
-          <p class="hero-eyebrow">Atlas Command Centre</p>
-          <h1>${escapeHtml(welcome)}</h1>
-          <p class="hero-desc">Your private offline-first AI environment. Inference, knowledge, and agents run locally on this device — nothing leaves unless you allow it.</p>
-          <div class="hero-actions">${heroCta}</div>
-          <div class="hero-status">${heroStatus}</div>
+    renderTopbar(id);
+    view.innerHTML=`<div class="hero"><div class="hero-inner">
+      <p class="hero-eyebrow">Atlas Command Centre</p>
+      <h1>${escapeHtml(_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Atlas')}</h1>
+      <p class="hero-desc" style="color:var(--text-3)">Loading system overview…</p>
+    </div></div>
+    <div class="metric-grid" style="opacity:.6">
+      ${metricCard('System','…','Checking',null)}
+      ${metricCard('AI model','…','Checking',null)}
+      ${metricCard('Documents','…','Checking',null)}
+      ${metricCard('Services','…','Checking',null)}
+    </div>`;
+    try{
+      const [h,m,sv,lib,chats]=await Promise.all([
+        api('/api/system/health'),
+        api('/api/models/status'),
+        api('/api/system/services'),
+        api('/api/knowledge/library'),
+        api('/api/chat/threads'),
+      ]);
+      const statusLabel=h.status==='ok'?'Healthy':(h.status==='degraded'?'Needs attention':'Unknown');
+      const kbMode=(h.knowledge&&h.knowledge.mode)||'keyword';
+      const svcList=sv.services||[];
+      const svcOnline=svcList.filter(s=>s.ok).length;
+      renderTopbar(id,{modelReady:!!m.ready,sysOk:h.status==='ok'});
+      const welcome=_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Atlas';
+      const heroCta=m.ready
+        ?`<button class="btn" onclick="location.hash='#/ask'">Open Chat</button>
+           <button class="btn secondary" onclick="location.hash='#/agents'">Launch Agents</button>`
+        :`<button class="btn" onclick="location.hash='#/models'">Set up AI model</button>
+           <button class="btn secondary" onclick="location.hash='#/setup'">Run setup</button>`;
+      const heroStatus=`
+        ${chip(statusLabel,h.status==='ok'?'ok':'bad')}
+        ${chip(m.ready?'AI ready':'Model not installed',m.ready?'ok':'bad')}
+        ${chip(kbMode==='hybrid'?'Hybrid search':'Keyword search',kbMode==='hybrid'?'ok':'neutral')}
+        ${chip('Private device','ok',true)}`;
+      const actions=[
+        actionTile('#/ask','Open Chat','Talk to local agents','💬'),
+        actionTile('#/models','Manage Models','Download offline LLMs','◈'),
+        actionTile('#/agents','Launch Agents','Guide, Research, Steward','◎'),
+        actionTile('#/knowledge','Search Knowledge','Your indexed documents','📄'),
+        actionTile('#/content','Install Content','Maps, packs, models','▣'),
+        actionTile('#/system','System','Updates, backup, hardware','⚙'),
+      ].join('');
+      const metrics=[
+        metricCard('System',statusLabel,'Device health overview',h.status==='ok'?'ok':'bad'),
+        metricCard('AI model',m.ready?'Ready':'Not installed',m.profile||'No profile',m.ready?'ok':'bad'),
+        metricCard('Documents',lib.count||0,'Indexed in knowledge base'),
+        metricCard('Services',svcOnline+'/'+svcList.length,'Local loopback services',svcOnline===svcList.length&&svcList.length?'ok':'bad'),
+        metricCard('Version',h.version||'?','Installed Atlas release'),
+        metricCard('Search mode',kbMode,'Knowledge retrieval',kbMode==='hybrid'?'ok':'neutral'),
+      ].join('');
+      const services=(svcList.length?svcList.map(serviceCard).join(''):emptyState('No services probed yet','Services appear once local daemons start.'));
+      const chatRows=(chats.threads||[]).slice(0,4).map(t=>
+        `<div class="activity-row" style="cursor:pointer" onclick="location.hash='#/ask';setTimeout(()=>selectChatThread(decodeURIComponent('${jsQuote(t.id)}')),50)">
+          <span>${escapeHtml(t.title||'New chat')}</span><span class="when">${escapeHtml(formatChatWhen(t.updated_at||t.created_at))}</span>
+        </div>`).join('');
+      const activity=[
+        m.ready?['AI model ready for chat','Now']:['AI model not installed — visit Models','Setup'],
+        [(lib.count||0)+' documents indexed','Knowledge'],
+        [statusLabel+' system status','System'],
+        h.hint?[h.hint,'Notice']:null,
+      ].filter(Boolean).map(([t,w])=>`<div class="activity-row"><span>${escapeHtml(t)}</span><span class="when">${escapeHtml(w)}</span></div>`).join('');
+      const gpuNote=h.gpu_warning?`<div class="msg info" style="margin-top:1rem">${escapeHtml(h.gpu_warning)}</div>`:'';
+      const setupBanner=!m.ready?`<div class="callout warn" style="margin-top:1rem"><strong>Complete AI setup</strong><p>${escapeHtml(m.hint||'Download a model to unlock Chat and agents.')}</p></div>`:'';
+      view.innerHTML=`
+        <div class="hero">
+          <div class="hero-inner">
+            <p class="hero-eyebrow">Atlas Command Centre</p>
+            <h1>${escapeHtml(welcome)}</h1>
+            <p class="hero-desc">Your private offline-first AI environment. Inference, knowledge, and agents run locally on this device — nothing leaves unless you allow it.</p>
+            <div class="hero-actions">${heroCta}</div>
+            <div class="hero-status">${heroStatus}</div>
+          </div>
         </div>
-      </div>
-      <div class="section-block">${sectionHead('Quick actions','Jump into common workflows')}
-        <div class="action-grid">${actions}</div>
-      </div>
-      <div class="section-block">${sectionHead('System overview','Live status at a glance')}
-        <div class="metric-grid">${metrics}</div>
-      </div>
-      <div class="section-block">${sectionHead('Local services','Loopback-only — bound to 127.0.0.1')}
-        <div class="service-grid">${services}</div>
-      </div>
-      <div class="grid-2 section-block">
-        <div>
-          ${sectionHead('Recent activity','System snapshot')}
-          <div class="card panel">${activity||emptyState('No activity yet','Events appear as services start and content is indexed.')}</div>
+        <div class="section-block">${sectionHead('Quick actions','Jump into common workflows')}
+          <div class="action-grid">${actions}</div>
         </div>
-        <div>
-          ${sectionHead('Knowledge snapshot','Your document library')}
-          <div class="card panel card-interactive" onclick="location.hash='#/knowledge'">
-            <h3>${lib.count||0} documents indexed</h3>
-            <p>Search your notes and files locally with source citations in Chat.</p>
-            <div class="btn-group" style="margin-top:.75rem">
-              <span class="chip chip-${kbMode==='hybrid'?'ok':'neutral'}">${escapeHtml(kbMode)} search</span>
-              <button type="button" class="btn secondary" onclick="event.stopPropagation();location.hash='#/knowledge'">Browse library</button>
+        <div class="section-block">${sectionHead('System overview','Live status at a glance')}
+          <div class="metric-grid">${metrics}</div>
+        </div>
+        <div class="section-block">${sectionHead('Local services','Loopback-only — bound to 127.0.0.1')}
+          <div class="service-grid">${services}</div>
+        </div>
+        <div class="grid-2 section-block">
+          <div>
+            ${sectionHead('Recent activity','Chats and system events')}
+            <div class="card panel">${chatRows||activity||emptyState('Nothing yet','Start a chat or index documents to see activity here.')}</div>
+          </div>
+          <div>
+            ${sectionHead('Knowledge snapshot','Your document library')}
+            <div class="card panel card-interactive" onclick="location.hash='#/knowledge'">
+              <h3>${lib.count||0} documents indexed</h3>
+              <p>Search your notes and files locally with source citations in Chat.</p>
+              <div class="btn-group" style="margin-top:.75rem">
+                <span class="chip chip-${kbMode==='hybrid'?'ok':'neutral'}">${escapeHtml(kbMode)} search</span>
+                <button type="button" class="btn secondary" onclick="event.stopPropagation();location.hash='#/knowledge'">Browse library</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      ${setupBanner}${gpuNote}`;
+        ${setupBanner}${gpuNote}`;
+    }catch(e){
+      view.innerHTML=`<div class="callout warn"><strong>Could not load overview</strong>
+        <p>${escapeHtml(e&&e.message?e.message:String(e))}</p>
+        <button class="btn" type="button" onclick="page()">Retry</button></div>`;
+    }
     return;
   }
   renderTopbar(id);
@@ -935,13 +960,25 @@ async function page(){
         <h4 class="section-title">Saved backups</h4>
         ${bakList||emptyState('No backups yet','Create your first encrypted backup above before major updates or changes.')}
       </div>
-      <div class="card">
-        <h3>Offline updates</h3>
-        <p>Select a signed <code>.atlas-update</code> bundle. Atlas takes a snapshot first; failed health checks roll back automatically.</p>
+      <div class="card" id="updateCard">
+        <h3>Software updates</h3>
+        <div id="updateStatus"><p style="color:var(--muted)">Click below to check for updates from GitHub.</p></div>
+        <div class="btn-group" style="margin-top:.75rem">
+          <button id="btnCheckUpdate" class="btn" onclick="checkOnlineUpdate()">Check for updates</button>
+        </div>
+        <div id="updateProgress" style="display:none;margin-top:1rem">
+          <div class="progress-track"><div id="updateProgressFill" class="progress-fill" style="width:0%"></div></div>
+          <p id="updateProgressText" style="font-size:.85rem;color:var(--muted);margin-top:.35rem"></p>
+        </div>
+        <div id="updateMsg" style="margin-top:.5rem"></div>
+      </div>
+      <details class="card" style="cursor:pointer">
+        <summary style="font-weight:600">Advanced — Import update file</summary>
+        <p style="margin-top:.75rem">Select a signed <code>.atlas-update</code> bundle. Atlas takes a snapshot first; failed health checks roll back automatically.</p>
         <div class="file-browser" style="max-height:200px">${updRows||emptyState('No update bundles found','Copy bundles to /srv/atlas/updates/incoming or plug in a USB drive.')}</div>
         <div id=updPreview style="margin-top:.75rem;display:none"></div>
         <div id=updMsg style="margin-top:.5rem"></div>
-      </div>
+      </details>
       <div class="card">
         <h3>Confirm sensitive action</h3>
         <p>Re-enter your password before privileged operations (future use).</p>
@@ -1636,6 +1673,74 @@ async function confirmRestore(){
   }
   closeModal();
   showMsg('bakMsg','Restored: '+(r.restored||[]).join(', '),'ok');
+}
+let _updateOffer=null;
+async function checkOnlineUpdate(){
+  const btn=document.getElementById('btnCheckUpdate');
+  const box=document.getElementById('updateStatus');
+  const msg=document.getElementById('updateMsg');
+  if(btn) btn.disabled=true;
+  if(box) box.innerHTML='<p style="color:var(--muted)">Checking…</p>';
+  if(msg) msg.innerHTML='';
+  const r=await api('/api/updates/check');
+  if(r._status===404||r.error==='not_found'){
+    if(box) box.innerHTML=`<p class="msg err">Update API not on this device yet — run dev-pull on the VM and restart <code>atlas-command-centre</code>.</p>`;
+    if(btn) btn.disabled=false;
+    return;
+  }
+  if(r.error){
+    if(box) box.innerHTML=`<p class="msg err">${escapeHtml(r.detail||r.error)}</p>`;
+    if(btn) btn.disabled=false;
+    return;
+  }
+  if(r.up_to_date){
+    if(box) box.innerHTML=`<p style="color:var(--accent)">You're up to date (v${escapeHtml(r.version||'?')})</p>`;
+    if(btn) btn.disabled=false;
+    return;
+  }
+  _updateOffer=r;
+  const sz=r.bundle_size?(Math.round(r.bundle_size/(1024*1024))+' MB'):'unknown size';
+  if(box) box.innerHTML=`
+    <p><strong>Update available: v${escapeHtml(r.version)}</strong></p>
+    <p style="font-size:.85rem;color:var(--muted)">${escapeHtml(r.release_notes||'')}</p>
+    <p style="font-size:.85rem;color:var(--muted)">Size: ${sz} · Published ${escapeHtml(r.published_at||'')}</p>`;
+  if(btn){btn.textContent='Download and install';btn.disabled=false;btn.onclick=downloadOnlineUpdate;}
+}
+async function downloadOnlineUpdate(){
+  if(!_updateOffer) return;
+  const btn=document.getElementById('btnCheckUpdate');
+  const prog=document.getElementById('updateProgress');
+  const fill=document.getElementById('updateProgressFill');
+  const ptxt=document.getElementById('updateProgressText');
+  if(btn) btn.disabled=true;
+  if(prog) prog.style.display='block';
+  await api('/api/updates/download',{method:'POST',body:JSON.stringify({url:_updateOffer.bundle_url,sha256:_updateOffer.bundle_sha256})});
+  const poll=setInterval(async()=>{
+    const s=await api('/api/updates/download-status');
+    if(s.done){
+      clearInterval(poll);
+      if(s.error){
+        if(fill) fill.style.width='0%';
+        showMsg('updateMsg',s.error,'err');
+        if(btn){btn.disabled=false;btn.textContent='Retry';btn.onclick=downloadOnlineUpdate;}
+        return;
+      }
+      if(fill) fill.style.width='100%';
+      if(ptxt) ptxt.textContent='Download complete — applying…';
+      const ar=await api('/api/updates/apply',{method:'POST',body:JSON.stringify({path:s.path})});
+      if(ar.ok||ar.success){
+        showMsg('updateMsg','Updated to v'+(_updateOffer.version||'?')+'. Restart services to complete.','ok');
+      } else {
+        showMsg('updateMsg','Apply failed: '+(ar.error||ar.message||'unknown'),'err');
+      }
+      if(btn){btn.disabled=false;btn.textContent='Check for updates';btn.onclick=checkOnlineUpdate;}
+      if(prog) prog.style.display='none';
+    } else if(s.total>0){
+      const pct=Math.round((s.downloaded/s.total)*100);
+      if(fill) fill.style.width=pct+'%';
+      if(ptxt) ptxt.textContent=Math.round(s.downloaded/(1024*1024))+' / '+Math.round(s.total/(1024*1024))+' MB';
+    }
+  },1000);
 }
 async function previewUpdate(path){
   const r=await api('/api/updates/preview?path='+encodeURIComponent(path));

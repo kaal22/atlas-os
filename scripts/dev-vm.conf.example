@@ -1,0 +1,9 @@
+# Copy to scripts/dev-vm.conf and edit for your VM.
+# Only needed for `make dev-push` (SSH one-shot). Manual curl pull does not need this file.
+#
+# SSH target for the Atlas test VM (hostname or IP — NOT your home server)
+# DEV_VM=kaal@192.168.50.179
+#
+# IP this dev machine uses on the LAN — the VM must be able to reach it.
+# dev-push.sh auto-detects this if unset.
+# DEV_HOST_IP=192.168.50.109

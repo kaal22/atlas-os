@@ -20,8 +20,44 @@ ALLOWED_PAYLOAD_ROOTS = (
     Path("/usr/lib/atlas"),
     Path("/usr/share/atlas"),
     Path("/srv/atlas"),
+    Path("/etc/atlas"),
 )
 SCHEMA = "atlas.update/v1"
+VERSION_FILE = Path("/etc/atlas/version.json")
+DEFAULT_UPDATE_ENDPOINT = "https://github.com/kaal22/atlas-os/releases/latest/download/channel.json"
+
+
+def _update_endpoint() -> str:
+    ep_file = Path("/etc/atlas/update-endpoint")
+    if ep_file.is_file():
+        val = ep_file.read_text(encoding="utf-8").strip()
+        if val:
+            return val
+    return DEFAULT_UPDATE_ENDPOINT
+
+
+def get_installed_version() -> dict[str, Any]:
+    if VERSION_FILE.is_file():
+        try:
+            return json.loads(VERSION_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    conf = Path("/etc/atlas/atlas.conf")
+    version = "0.0.0"
+    if conf.is_file():
+        for line in conf.read_text(encoding="utf-8").splitlines():
+            if line.startswith("ATLAS_VERSION="):
+                version = line.split("=", 1)[1].strip().strip('"')
+                break
+    return {"version": version, "channel": "stable", "updated_at": None}
+
+
+def _write_version(version: str) -> None:
+    data = get_installed_version()
+    data["version"] = version
+    data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    VERSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+    VERSION_FILE.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
 
 @dataclass
@@ -390,6 +426,10 @@ def apply_update(
                         "applied": applied,
                     },
                 )
+                try:
+                    _write_version(version)
+                except OSError:
+                    pass
                 return UpdateResult(True, "apply", version, snapshot_id=label, version=version)
             except Exception as e:
                 try:
@@ -414,6 +454,105 @@ def apply_update(
                 )
     except Exception as e:
         return UpdateResult(False, "apply", f"unexpected: {e}")
+
+
+def check_online_update(
+    current_version: str | None = None,
+    channel: str = "stable",
+    endpoint: str | None = None,
+) -> dict[str, Any] | None:
+    """Fetch channel.json from update endpoint and return offer if newer, else None."""
+    if current_version is None:
+        current_version = get_installed_version().get("version", "0.0.0")
+    url = endpoint or _update_endpoint()
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "AtlasUpdater/1"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError) as e:
+        return {"error": "fetch_failed", "detail": str(e)}
+
+    if data.get("schema") != "atlas.channel/v1":
+        return {"error": "bad_schema"}
+
+    latest = data.get("latest")
+    if not latest:
+        return None
+
+    offered = latest.get("version", "")
+    from_versions = latest.get("from_versions") or []
+    if current_version == offered:
+        return None
+    if "*" not in from_versions and current_version not in from_versions:
+        return {"error": "version_incompatible", "detail": f"installed {current_version} not in {from_versions}"}
+
+    base_url = data.get("update_url_base", url.rsplit("/", 1)[0] + "/")
+    bundle_url = base_url + (latest.get("bundle_filename") or "")
+    return {
+        "available": True,
+        "version": offered,
+        "current_version": current_version,
+        "bundle_url": bundle_url,
+        "bundle_sha256": latest.get("bundle_sha256", ""),
+        "bundle_size": int(latest.get("bundle_size") or 0),
+        "release_notes": latest.get("release_notes", ""),
+        "published_at": latest.get("published_at", ""),
+        "channel": data.get("channel", channel),
+    }
+
+
+def download_bundle(
+    url: str,
+    expected_sha256: str,
+    dest_dir: Path,
+    progress_cb: Any | None = None,
+) -> Path:
+    """Download bundle with resume support and hash verification."""
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    filename = url.rsplit("/", 1)[-1] or "update.atlas-update"
+    dest = dest_dir / filename
+    partial = dest_dir / (filename + ".partial")
+
+    existing_size = int(partial.stat().st_size) if partial.is_file() else 0
+    headers: dict[str, str] = {"User-Agent": "AtlasUpdater/1"}
+    if existing_size > 0:
+        headers["Range"] = f"bytes={existing_size}-"
+
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            status = getattr(resp, "status", 200)
+            if status == 200 and existing_size > 0:
+                existing_size = 0
+                mode = "wb"
+            elif status == 206:
+                mode = "ab"
+            else:
+                mode = "wb"
+                existing_size = 0
+
+            total = int(resp.headers.get("Content-Length") or 0) + existing_size
+            downloaded = existing_size
+            with partial.open(mode) as f:
+                while True:
+                    chunk = resp.read(256 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if progress_cb:
+                        progress_cb(downloaded, total)
+    except (urllib.error.URLError, OSError) as e:
+        raise UpdateError(f"download_failed: {e}") from e
+
+    got = sha256_file(partial).replace("sha256:", "")
+    expected = expected_sha256.replace("sha256:", "")
+    if expected and got != expected:
+        partial.unlink(missing_ok=True)
+        raise UpdateError(f"hash_mismatch: expected {expected[:16]}… got {got[:16]}…")
+
+    partial.rename(dest)
+    return dest
 
 
 def read_bundle_metadata(bundle_path: Path) -> dict[str, Any]:

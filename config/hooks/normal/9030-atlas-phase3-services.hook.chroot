@@ -70,4 +70,15 @@ if [ -f /usr/lib/atlas/atlas-proxy-enable.sh ]; then
   chmod 755 /usr/lib/atlas/atlas-proxy-enable.sh
 fi
 
+# Write /etc/atlas/version.json from atlas.conf at build time
+ATLAS_VERSION="0.1.0-alpha"
+if [ -f /etc/atlas/atlas.conf ]; then
+  _ver=$(grep '^ATLAS_VERSION=' /etc/atlas/atlas.conf | cut -d= -f2 | tr -d '"')
+  [ -n "$_ver" ] && ATLAS_VERSION="$_ver"
+fi
+cat > /etc/atlas/version.json <<EOF
+{"version": "$ATLAS_VERSION", "channel": "stable", "updated_at": null}
+EOF
+chmod 644 /etc/atlas/version.json
+
 echo "Phase 3 identity/security services wired (live-gated)."

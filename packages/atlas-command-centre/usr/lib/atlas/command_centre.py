@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -344,22 +345,33 @@ SERVICE_SPECS = [
 ]
 
 
+def _probe_one(name: str, url: str) -> dict[str, Any]:
+    ok = False
+    http = 0
+    try:
+        req = urlrequest.Request(url, method="GET")
+        with urlrequest.urlopen(req, timeout=1.5) as resp:
+            http = int(getattr(resp, "status", 200))
+            ok = True
+    except (URLError, OSError, ValueError):
+        pass
+    except Exception:
+        pass
+    return {"name": name, "url": url, "ok": ok, "http": http}
+
+
 def probe_services() -> dict[str, Any]:
-    """Loopback HTTP probes — no subprocess (CC security boundary)."""
+    """Loopback HTTP probes — parallel, no subprocess (CC security boundary)."""
     services: list[dict[str, Any]] = []
-    for name, url in SERVICE_SPECS:
-        ok = False
-        http = 0
-        try:
-            req = urlrequest.Request(url, method="GET")
-            with urlrequest.urlopen(req, timeout=2) as resp:
-                http = int(getattr(resp, "status", 200))
-                ok = True
-        except URLError:
-            pass
-        except Exception:
-            pass
-        services.append({"name": name, "url": url, "ok": ok, "http": http})
+    with ThreadPoolExecutor(max_workers=min(8, len(SERVICE_SPECS) or 1)) as pool:
+        futures = [pool.submit(_probe_one, name, url) for name, url in SERVICE_SPECS]
+        for fut in as_completed(futures):
+            try:
+                services.append(fut.result())
+            except Exception:
+                pass
+    order = {name: i for i, (name, _) in enumerate(SERVICE_SPECS)}
+    services.sort(key=lambda s: order.get(s["name"], 99))
     return {"services": services}
 
 
@@ -492,6 +504,11 @@ class Handler(BaseHTTPRequestHandler):
                 pass
             try:
                 health["content"] = {"installed": len(load_installed(DATA).get("packs", []))}
+            except Exception:
+                pass
+            try:
+                from updater import get_installed_version
+                health["version"] = get_installed_version().get("version")
             except Exception:
                 pass
             return self._json(200, health)
@@ -634,6 +651,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, read_bundle_metadata(p))
             except Exception as e:
                 return self._json(400, {"error": str(e)})
+        if path == "/api/updates/check":
+            from updater import check_online_update, get_installed_version
+            info = get_installed_version()
+            result = check_online_update(info.get("version"), info.get("channel", "stable"))
+            if result is None:
+                return self._json(200, {"up_to_date": True, "version": info.get("version")})
+            return self._json(200, result)
+        if path == "/api/updates/download-status":
+            status_file = Path("/srv/atlas/updates/staging/.progress")
+            if status_file.is_file():
+                try:
+                    return self._json(200, json.loads(status_file.read_text()))
+                except Exception:
+                    pass
+            return self._json(200, {"downloaded": 0, "total": 0, "done": False})
         if path == "/api/chat/threads":
             return self._json(200, {"threads": CHAT.list_threads(sess["username"])})
         if path.startswith("/api/chat/threads/"):
@@ -948,6 +980,32 @@ class Handler(BaseHTTPRequestHandler):
                 "username": sess["username"],
             })
             return self._json(200, result)
+
+        if path == "/api/updates/download":
+            if sess.get("role") not in {"owner", "admin"}:
+                return self._json(403, {"error": "forbidden"})
+            url = data.get("url") or ""
+            sha256 = data.get("sha256") or ""
+            if not url:
+                return self._json(400, {"error": "url_required"})
+            staging = Path("/srv/atlas/updates/staging")
+            staging.mkdir(parents=True, exist_ok=True)
+            progress_file = staging / ".progress"
+            import threading
+            from updater import download_bundle as _dl_bundle, UpdateError
+            def _do_download():
+                def _cb(downloaded, total):
+                    try:
+                        progress_file.write_text(json.dumps({"downloaded": downloaded, "total": total, "done": False}))
+                    except OSError:
+                        pass
+                try:
+                    dest = _dl_bundle(url, sha256, staging, progress_cb=_cb)
+                    progress_file.write_text(json.dumps({"downloaded": 1, "total": 1, "done": True, "path": str(dest)}))
+                except (UpdateError, Exception) as e:
+                    progress_file.write_text(json.dumps({"done": True, "error": str(e)}))
+            threading.Thread(target=_do_download, daemon=True).start()
+            return self._json(202, {"status": "downloading"})
 
         if path in {"/api/backup/create", "/api/backup/restore", "/api/backup/verify", "/api/updates/apply"}:
             if sess.get("role") not in {"owner", "admin"}:

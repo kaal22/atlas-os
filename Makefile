@@ -5,7 +5,7 @@ RELEASE_DIR ?= $(CURDIR)/release
 OUT_DIR ?= $(CURDIR)/dist
 
 .PHONY: help deps catalog lock-refresh verify-cache build-debs iso phase2-iso phase3-iso phase4-iso oem recovery \
-	test-unit test-integration test-install test-security clean sbom sign dev-serve
+	test-unit test-integration test-install test-security clean sbom sign dev-serve dev-push
 
 help:
 	@echo "Atlas OS $(VERSION) — targets:"
@@ -27,6 +27,7 @@ help:
 	@echo "  sbom            Generate SPDX SBOM"
 	@echo "  sign            Sign release artefacts"
 	@echo "  dev-serve       Serve repo for VM dev pull (scripts/dev-pull.sh)"
+	@echo "  dev-push        One-shot: serve + SSH pull to VM (scripts/dev-push.sh)"
 	@echo "  clean           Remove build artefacts"
 
 deps:
@@ -82,6 +83,9 @@ sign:
 
 dev-serve:
 	./scripts/dev-serve.sh
+
+dev-push:
+	./scripts/dev-push.sh
 
 clean:
 	rm -rf $(OUT_DIR) build/ chroot/ binary/ .build/

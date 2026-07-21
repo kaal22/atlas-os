@@ -2,7 +2,8 @@
 # Serve the Atlas repo over HTTP so a VM can pull dev changes (no scp).
 #
 # On the Debian build host (repo root):
-#   ./scripts/dev-serve.sh
+#   ./scripts/dev-serve.sh          # keep running; pull manually on VM
+#   ./scripts/dev-push.sh           # one-shot: serve + SSH pull to VM
 #
 # On the Atlas VM (QEMU user networking — host is usually 10.0.2.2):
 #   curl -fsSL http://10.0.2.2:8765/scripts/dev-pull.sh | sudo bash -s -- 10.0.2.2

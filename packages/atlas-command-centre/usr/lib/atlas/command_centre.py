@@ -991,6 +991,10 @@ class Handler(BaseHTTPRequestHandler):
             staging = Path("/srv/atlas/updates/staging")
             staging.mkdir(parents=True, exist_ok=True)
             progress_file = staging / ".progress"
+            # Drop stale bundles so a refreshed offer re-downloads cleanly.
+            for old in staging.glob("*.atlas-update*"):
+                old.unlink(missing_ok=True)
+            progress_file.unlink(missing_ok=True)
             import threading
             from updater import download_bundle as _dl_bundle, UpdateError
             def _do_download():

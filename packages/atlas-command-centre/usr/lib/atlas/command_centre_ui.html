@@ -1705,7 +1705,7 @@ async function checkOnlineUpdate(){
     return;
   }
   _updateOffer=r;
-  const sz=r.bundle_size?(Math.round(r.bundle_size/(1024*1024))+' MB'):'unknown size';
+  const sz=r.bundle_size?(r.bundle_size>=1048576?Math.round(r.bundle_size/(1024*1024))+' MB':Math.round(r.bundle_size/1024)+' KB'):'unknown size';
   if(box) box.innerHTML=`
     <p><strong>Update available: v${escapeHtml(r.version)}</strong></p>
     <p style="font-size:.85rem;color:var(--muted)">${escapeHtml(r.release_notes||'')}</p>
@@ -1714,6 +1714,9 @@ async function checkOnlineUpdate(){
 }
 async function downloadOnlineUpdate(){
   if(!_updateOffer) return;
+  // Refresh offer so we don't apply a stale bundle after channel.json changes.
+  const fresh=await api('/api/updates/check');
+  if(fresh&&fresh.available) _updateOffer=fresh;
   const btn=document.getElementById('btnCheckUpdate');
   const prog=document.getElementById('updateProgress');
   const fill=document.getElementById('updateProgressFill');

@@ -529,33 +529,28 @@ def download_bundle(
     dest_dir: Path,
     progress_cb: Any | None = None,
 ) -> Path:
-    """Download bundle with resume support and hash verification."""
+    """Download bundle with hash verification (always fresh — no resume)."""
     dest_dir.mkdir(parents=True, exist_ok=True)
-    filename = url.rsplit("/", 1)[-1] or "update.atlas-update"
+    filename = url.rsplit("/", 1)[-1].split("?", 1)[0] or "update.atlas-update"
     dest = dest_dir / filename
-    partial = dest_dir / (filename + ".partial")
+    partial = dest_dir / f".{filename}.download"
 
-    existing_size = int(partial.stat().st_size) if partial.is_file() else 0
-    headers: dict[str, str] = {"User-Agent": "AtlasUpdater/1"}
-    if existing_size > 0:
-        headers["Range"] = f"bytes={existing_size}-"
+    # Never reuse partials — release bundles are small and hashes change between uploads.
+    dest.unlink(missing_ok=True)
+    partial.unlink(missing_ok=True)
+
+    fetch_url = url if "?" in url else f"{url}?sha256={expected_sha256[:16]}"
+    headers: dict[str, str] = {
+        "User-Agent": "AtlasUpdater/1",
+        "Cache-Control": "no-cache",
+    }
 
     try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            status = getattr(resp, "status", 200)
-            if status == 200 and existing_size > 0:
-                existing_size = 0
-                mode = "wb"
-            elif status == 206:
-                mode = "ab"
-            else:
-                mode = "wb"
-                existing_size = 0
-
-            total = int(resp.headers.get("Content-Length") or 0) + existing_size
-            downloaded = existing_size
-            with partial.open(mode) as f:
+        req = urllib.request.Request(fetch_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            total = int(resp.headers.get("Content-Length") or 0)
+            downloaded = 0
+            with partial.open("wb") as f:
                 while True:
                     chunk = resp.read(256 * 1024)
                     if not chunk:
@@ -565,6 +560,7 @@ def download_bundle(
                     if progress_cb:
                         progress_cb(downloaded, total)
     except (urllib.error.URLError, OSError) as e:
+        partial.unlink(missing_ok=True)
         raise UpdateError(f"download_failed: {e}") from e
 
     got = sha256_file(partial).replace("sha256:", "")

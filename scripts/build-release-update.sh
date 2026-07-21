@@ -25,8 +25,12 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(dirname "$SCRIPT_DIR")"
+STAGING="$OUT_DIR/staging"
+BUNDLE_NAME="atlas-update-${FROM_VER}-to-${TO_VER}.atlas-update"
+BUNDLE_PATH="$OUT_DIR/$BUNDLE_NAME"
 
-mkdir -p "$OUT_DIR/staging/payload"
+rm -rf "$STAGING"
+mkdir -p "$STAGING/payload"
 
 IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
 for pkg in "${PKG_LIST[@]}"; do
@@ -36,37 +40,49 @@ for pkg in "${PKG_LIST[@]}"; do
     continue
   fi
   echo "Staging $pkg..."
-  cp -a "$pkg_dir"/. "$OUT_DIR/staging/payload/"
+  cp -a "$pkg_dir"/. "$STAGING/payload/"
 done
 
-HEALTH_URLS='["http://127.0.0.1:8790/health","http://127.0.0.1:11434/api/tags"]'
 COMPONENTS=$(printf '"%s",' "${PKG_LIST[@]}")
 COMPONENTS="[${COMPONENTS%,}]"
 
-cat > "$OUT_DIR/staging/update.json" <<EOF
+cat > "$STAGING/update.json" <<EOF
 {
   "schema": "atlas.update/v1",
-  "version": "$TO_VER",
   "from_version": "$FROM_VER",
+  "to_version": "$TO_VER",
+  "version": "$TO_VER",
   "publisher": "Atlas OS",
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "components": $COMPONENTS,
-  "health_check_urls": $HEALTH_URLS,
-  "restart_services": ["atlas-command-centre","atlas-system-daemon","atlas-agent-runtime"]
+  "health_urls": ["http://127.0.0.1:8787/"],
+  "restart_services": ["atlas-command-centre", "atlas-system-daemon", "atlas-agent-runtime"]
 }
 EOF
 
-cat > "$OUT_DIR/staging/RELEASE_NOTES.txt" <<EOF
+cat > "$STAGING/RELEASE_NOTES.txt" <<EOF
 Atlas OS $TO_VER (from $FROM_VER)
 
 See https://github.com/kaal22/atlas-os/releases/tag/v$TO_VER for full changelog.
 EOF
 
-BUNDLE_NAME="atlas-update-${FROM_VER}-to-${TO_VER}.atlas-update"
-BUNDLE_PATH="$OUT_DIR/$BUNDLE_NAME"
+export ATLAS_ALLOW_UNSIGNED=1
+export ATLAS_ROOT="$ROOT"
+export ATLAS_STAGING="$STAGING"
+export ATLAS_BUNDLE="$BUNDLE_PATH"
+python3 - <<'PY'
+import os, sys
+from pathlib import Path
 
-cd "$OUT_DIR/staging"
-tar czf "../$BUNDLE_NAME" .
-cd "$ROOT"
+ROOT = Path(os.environ["ATLAS_ROOT"])
+sys.path.insert(0, str(ROOT / "packages" / "atlas-updater" / "usr" / "lib" / "atlas"))
+from updater import build_update_bundle
+
+staging = Path(os.environ["ATLAS_STAGING"])
+out = Path(os.environ["ATLAS_BUNDLE"])
+digest = build_update_bundle(staging, out)
+print(f"Built {out} ({digest})")
+PY
 
 BUNDLE_SHA256=$(sha256sum "$BUNDLE_PATH" | awk '{print $1}')
 BUNDLE_SIZE=$(stat -c%s "$BUNDLE_PATH" 2>/dev/null || stat -f%z "$BUNDLE_PATH")

@@ -604,6 +604,12 @@ function actionTile(href,title,desc,iconChar,external){
     <span>${escapeHtml(desc)}</span>
   </${tag}>`;
 }
+const SVC_DESC={
+  kiwix:'Offline Wikipedia and ZIM content server',
+  qdrant:'Vector database for hybrid knowledge search',
+  nomad:'Local map and navigation tile server',
+  ollama:'Local LLM inference for chat and agents',
+};
 function serviceCard(s){
   const desc=SVC_DESC[s.name]||'Local loopback service';
   const url=(s.url||'').replace('http://','');

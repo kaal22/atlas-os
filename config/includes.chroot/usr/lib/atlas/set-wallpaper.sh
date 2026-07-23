@@ -1,17 +1,44 @@
 #!/bin/sh
 # Apply Atlas wallpaper on KDE Plasma (live + installed sessions).
 set -e
-WALL="${ATLAS_WALLPAPER:-/usr/share/backgrounds/atlas/atlas-wallpaper.png}"
 
-if [ ! -f "$WALL" ]; then
-  WALL="/usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png"
-fi
-if [ ! -f "$WALL" ]; then
-  WALL="/usr/share/wallpapers/Atlas/contents/images/1920x1080.png"
-fi
-if [ ! -f "$WALL" ]; then
-  exit 0
-fi
+pick_wall() {
+  base="/usr/share/backgrounds/atlas"
+  if [ -n "${ATLAS_WALLPAPER:-}" ] && [ -f "$ATLAS_WALLPAPER" ]; then
+    printf '%s' "$ATLAS_WALLPAPER"
+    return 0
+  fi
+  w=1920
+  h=1080
+  if command -v xrandr >/dev/null 2>&1; then
+    geo="$(xrandr --current 2>/dev/null | awk '/\*\+/ {print $1; exit}')"
+    if [ -n "$geo" ]; then
+      w="${geo%%x*}"
+      h="${geo##*x}"
+    fi
+  fi
+  if [ "$w" -ge 3200 ] || [ "$h" -ge 1800 ]; then
+    [ -f "$base/atlas-wallpaper-4k.png" ] && { printf '%s' "$base/atlas-wallpaper-4k.png"; return 0; }
+  fi
+  if [ "$w" -ge 2400 ] || [ "$h" -ge 1350 ]; then
+    [ -f "$base/atlas-wallpaper-1440p.png" ] && { printf '%s' "$base/atlas-wallpaper-1440p.png"; return 0; }
+  fi
+  if [ -f "$base/atlas-wallpaper-1080p.png" ]; then
+    printf '%s' "$base/atlas-wallpaper-1080p.png"
+    return 0
+  fi
+  if [ -f "$base/atlas-wallpaper.png" ]; then
+    printf '%s' "$base/atlas-wallpaper.png"
+    return 0
+  fi
+  if [ -f "/usr/share/wallpapers/Atlas/contents/images/1920x1080.png" ]; then
+    printf '%s' "/usr/share/wallpapers/Atlas/contents/images/1920x1080.png"
+    return 0
+  fi
+  return 1
+}
+
+WALL="$(pick_wall)" || exit 0
 
 # Preferred Plasma helper (Plasma 5.25+ / 6)
 if command -v plasma-apply-wallpaperimage >/dev/null 2>&1; then

@@ -121,7 +121,12 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
+      # NOMAD storage (maps/pmtiles, basemaps-assets, viewer)
       - /srv/atlas/nomad-storage:/app/storage
+      # Same host path so symlinks from nomad-storage/maps/pmtiles → /srv/atlas/maps/... resolve
+      - /srv/atlas/maps:/srv/atlas/maps:ro
+      # Atlas country-picker viewer (MapLibre) at http://127.0.0.1:8090/viewer/
+      - /usr/share/atlas/maps-viewer:/app/storage/maps/viewer:ro
     ports:
       - "127.0.0.1:8090:8080"
     networks: [atlas_internal]

@@ -74,24 +74,110 @@ models:
 
 wikipedia_english:
   discovery_root: https://download.kiwix.org/zim/wikipedia/
+  # Default Content Install fetch (small; suitable for online pull without confirm_large)
+  starter_100_nopic:
+    file: wikipedia_en_100_nopic_2026-04.zim
+    size_hint: 14MB
+    url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_nopic_2026-04.zim
+    note: Default ATLAS_ZIM_URL / pack meta.zim_fetch.default_url
+  starter_100_maxi:
+    file: wikipedia_en_100_maxi_2026-04.zim
+    size_hint: 48MB
+    url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_maxi_2026-04.zim
+  starter_100_with_media:
+    file: wikipedia_en_100_2026-04.zim
+    size_hint: 309MB
+    url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_100_2026-04.zim
   mini:
     file: wikipedia_en_all_mini_2026-06.zim
     size_hint: 12GB
     url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_mini_2026-06.zim
+    size_class: large
   no_pictures:
     file: wikipedia_en_all_nopic_2026-06.zim
     size_hint: 49GB
     url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim
+    size_class: large
   full_with_media:
     file: wikipedia_en_all_maxi_2026-02.zim
     size_hint: 115GB
     url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_maxi_2026-02.zim
+    size_class: large
   iso_policy:
     core: none
-    starter: simple_english_or_curated_small
+    starter: curated_markdown_plus_en_100_nopic_on_install
     expanded_usb: mini
     separate_pack: no_pictures
     oem_or_external: full_with_media
+  atlas_fetch: |
+    Catalogue SKUs:
+      atlas.knowledge.wikipedia-en       — curated Markdown + starter_100_nopic (~13 MB)
+      atlas.knowledge.wikipedia-en-mini  — wikipedia_en_all_mini (size_class large, confirm_large)
+      atlas.knowledge.wikipedia-en-nopic — wikipedia_en_all_nopic (size_class large, confirm_large)
+      atlas.knowledge.wikipedia-en-maxi  — wikipedia_en_all_maxi (size_class large, confirm_large)
+    Content Install async-downloads zim_fetch.default_url (or ATLAS_ZIM_URL) into
+    /srv/atlas/knowledge/packs/wikipedia-en[-mini|-nopic|-maxi] and registers with Kiwix.
+    Skip with ATLAS_ZIM_SKIP_FETCH=1. Large dumps require confirm_large / free disk.
+
+# Offline Library ZIMs (Kiwix) beyond Wikipedia — install-time fetch only; never commit multi-GB into git.
+library_zim:
+  medicine_english:
+    discovery_root: https://download.kiwix.org/zim/wikipedia/
+    starter_mini:
+      file: wikipedia_en_medicine_mini_2026-04.zim
+      size_hint: 155MB
+      url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_medicine_mini_2026-04.zim
+      note: Default atlas.knowledge.medicine-en zim_fetch
+    nopic:
+      file: wikipedia_en_medicine_nopic_2026-04.zim
+      size_hint: 822MB
+      url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_medicine_nopic_2026-04.zim
+      size_class: medium
+    maxi:
+      file: wikipedia_en_medicine_maxi_2026-04.zim
+      size_hint: 2.1GB
+      url: https://download.kiwix.org/zim/wikipedia/wikipedia_en_medicine_maxi_2026-04.zim
+      size_class: large
+  howto_ifixit_english:
+    discovery_root: https://download.kiwix.org/zim/ifixit/
+    full:
+      file: ifixit_en_all_2025-12.zim
+      size_hint: 3.3GB
+      url: https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim
+      size_class: large
+      note: DIY / device repair how-to (iFixit via Kiwix)
+  gutenberg_english:
+    discovery_root: https://download.kiwix.org/zim/gutenberg/
+    literature_slice:
+      file: gutenberg_en_lcc-pn_2026-03.zim
+      size_hint: 3.0GB
+      url: https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim
+      size_class: large
+      note: Project Gutenberg English literature (LCC PN) starter; full en_all is ~206 GB OEM/external
+    full_all:
+      file: gutenberg_en_all_2025-11.zim
+      size_hint: 206GB
+      url: https://download.kiwix.org/zim/gutenberg/gutenberg_en_all_2025-11.zim
+      size_class: large
+      note: Not a default catalogue SKU — OEM / external SSD only
+  atlas_fetch: |
+    Catalogue SKUs (Command Centre Library + Content):
+      atlas.knowledge.medicine-en     — medicine mini (~155 MB)
+      atlas.knowledge.howto-ifixit-en — iFixit EN (~3.3 GB, confirm_large)
+      atlas.knowledge.gutenberg-en    — Gutenberg EN literature slice (~3 GB, confirm_large)
+    Same zim_fetch / Kiwix register path as Wikipedia packs.
+
+kolibri_channels:
+  note: |
+    Kolibri app image is in standard_apps / compose (127.0.0.1:8083).
+    Learning channels (Khan Academy, K-12 curricula) are separate locked assets —
+    not shipped in the core ISO. Alpha MVP: open Kolibri from Command Centre Education;
+    import channels via Kolibri UI or future atlas.education.kolibri-* packs.
+  pending:
+    - khan_academy_math_science
+    - k12_curriculum_channels
+  atlas_education:
+    kids_home: atlas.education.kids-home  # Markdown RAG for tutors (ships now)
 
 maps:
   nomad_map_assets:
@@ -100,6 +186,12 @@ maps:
     project: https://protomaps.com/
     documentation: https://docs.protomaps.com/
     format: PMTiles
+    downloads: https://docs.protomaps.com/basemaps/downloads
+    daily_builds: https://build.protomaps.com/
+    atlas_fetch: |
+      Country packs use `pmtiles extract` against a daily planet URL (range requests)
+      with bbox from content/packs/maps/countries.json. Default maxzoom 11.
+      Override: ATLAS_PMTILES_PLANET_URL / ATLAS_PMTILES_URL / ATLAS_PMTILES_MAXZOOM.
   initial_packs:
     - atlas-maps-uk
     - atlas-maps-ireland

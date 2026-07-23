@@ -30,8 +30,8 @@ if ! grep -q '/api/content/catalogue' "$ROOT/packages/atlas-command-centre/usr/l
   exit 1
 fi
 
-echo "=== Building stub maps pack ==="
-"$ROOT/scripts/build-stub-pack.sh"
+echo "=== Building content packs (maps + knowledge) ==="
+"$ROOT/scripts/build-content-packs.sh"
 
 mkdir -p "$ROOT/config/includes.chroot/usr/share/atlas"
 cp -f "$ROOT/packages/atlas-content-manager/usr/share/atlas/catalogue.json" \

@@ -5,18 +5,18 @@
 <style>
 /* Atlas Command Centre — premium dark design system */
 :root{
-  --bg-0:#030304;--bg-1:#08090d;--bg-2:#0e1016;
-  --surface-0:#111318;--surface-1:#161922;--surface-2:#1c2030;--surface-3:#222838;
-  --border:rgba(255,255,255,.06);--border-strong:rgba(255,255,255,.11);
-  --primary:#6366f1;--primary-bright:#818cf8;--primary-dim:rgba(99,102,241,.14);
-  --cyan:#38bdf8;--cyan-dim:rgba(56,189,248,.1);
-  --success:#34d399;--success-dim:rgba(52,211,153,.12);
-  --warn:#fbbf24;--warn-dim:rgba(251,191,36,.1);
-  --danger:#f87171;--danger-dim:rgba(248,113,113,.1);
-  --text:#f4f4f5;--text-2:#a1a1aa;--text-3:#71717a;
+  --bg-0:#0a0b10;--bg-1:#10121a;--bg-2:#161925;
+  --surface-0:#151822;--surface-1:#1b1f2c;--surface-2:#232836;--surface-3:#2b3142;
+  --border:rgba(255,255,255,.12);--border-strong:rgba(255,255,255,.2);
+  --primary:#6366f1;--primary-bright:#818cf8;--primary-dim:rgba(99,102,241,.16);
+  --cyan:#38bdf8;--cyan-dim:rgba(56,189,248,.12);
+  --success:#34d399;--success-dim:rgba(52,211,153,.14);
+  --warn:#fbbf24;--warn-dim:rgba(251,191,36,.12);
+  --danger:#f87171;--danger-dim:rgba(248,113,113,.12);
+  --text:#f4f4f5;--text-2:#b8bac3;--text-3:#8b8f9a;
   --radius-sm:8px;--radius:12px;--radius-lg:16px;
   --shadow-sm:0 1px 2px rgba(0,0,0,.35);
-  --shadow-md:0 8px 24px rgba(0,0,0,.45);
+  --shadow-md:0 8px 24px rgba(0,0,0,.4);
   --shadow-glow:0 0 40px rgba(99,102,241,.08);
   --font:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
   --mono:ui-monospace,"Cascadia Code","SF Mono",monospace;
@@ -40,11 +40,11 @@ a:hover{color:#fff}
 .hidden{display:none!important}
 
 /* Shell */
-.shell{display:flex;min-height:100vh}
+.shell{display:flex;min-height:100vh;height:100vh}
 .sidebar{
   width:252px;flex-shrink:0;display:flex;flex-direction:column;
-  background:linear-gradient(180deg,var(--surface-0) 0%,var(--bg-1) 100%);
-  border-right:1px solid var(--border);padding:1.25rem .85rem;
+  background:linear-gradient(180deg,var(--surface-1) 0%,var(--bg-1) 100%);
+  border-right:1px solid var(--border-strong);padding:1.25rem .85rem;
 }
 .sidebar-brand{display:flex;align-items:center;gap:.65rem;padding:.25rem .65rem 1.25rem;margin-bottom:.5rem}
 .sidebar-brand .mark,.auth-brand .mark{
@@ -67,12 +67,12 @@ a:hover{color:#fff}
   box-shadow:inset 0 0 0 1px rgba(99,102,241,.25);
 }
 .nav-item.active svg{opacity:1;color:var(--primary-bright)}
-.sidebar-foot{margin-top:auto;padding:.75rem .65rem 0;border-top:1px solid var(--border);font-size:.75rem;color:var(--text-3)}
+.sidebar-foot{margin-top:auto;padding:.75rem .65rem 0;border-top:1px solid var(--border-strong);font-size:.75rem;color:var(--text-3)}
 .shell-main{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
 .topbar{
   height:60px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:1rem;
-  padding:0 1.75rem;border-bottom:1px solid var(--border);
-  background:rgba(8,9,13,.75);backdrop-filter:blur(16px);position:sticky;top:0;z-index:20;
+  padding:0 1.75rem;border-bottom:1px solid var(--border-strong);
+  background:rgba(16,18,26,.88);backdrop-filter:blur(16px);position:sticky;top:0;z-index:20;
 }
 .topbar-left{display:flex;flex-direction:column;gap:.1rem;min-width:0}
 .topbar-title{font-size:1.05rem;font-weight:600;letter-spacing:-.02em;color:var(--text);margin:0}
@@ -80,19 +80,33 @@ a:hover{color:#fff}
 .topbar-right{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .content{flex:1;padding:1.5rem 1.75rem 2.5rem;overflow-y:auto;animation:fadeIn .25s var(--ease);min-height:0}
 .content.chat-page{display:flex;flex-direction:column;overflow:hidden;padding:.75rem 1.25rem 1rem}
+.content.maps-page{display:flex;flex-direction:column;overflow:hidden;padding:.75rem 1.25rem 1rem;flex:1;min-height:0;height:100%}
+.maps-page-shell{display:flex;flex-direction:column;flex:1;min-height:0;gap:.5rem;height:100%}
+.maps-toolbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;flex-shrink:0}
+.maps-toolbar .maps-hint{margin:0;font-size:.8rem;color:var(--text-3);flex:1;min-width:12rem}
+/* In-page MapLibre host — explicit px floor so flex layouts cannot collapse the WebGL canvas. */
+.maps-frame-wrap{position:relative;display:block;flex:1 1 auto;min-height:560px;height:min(70vh,720px);width:100%;border:1px solid var(--border-strong);border-radius:var(--radius);background:#0f1419;overflow:hidden}
+.maps-frame-wrap .atlas-maps-host{min-height:560px!important;height:100%!important;width:100%!important}
+.maps-frame-wrap .maplibregl-map,.maps-frame-wrap .maplibregl-canvas{width:100%!important;min-height:480px!important}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* Typography */
 h1.page-title{font-size:1.5rem;font-weight:600;margin:0 0 .35rem;letter-spacing:-.02em}
-h2.section-head{font-size:.7rem;font-weight:600;margin:0 0 .75rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.12em}
+h2.section-head{font-size:.75rem;font-weight:650;margin:0 0 .85rem;color:var(--text-2);text-transform:uppercase;letter-spacing:.1em}
 .page-intro{margin:0 0 1.5rem;color:var(--text-2);line-height:1.6;max-width:40rem;font-size:.9rem}
 p,li{color:var(--text-2);line-height:1.55}
-.section-title{font-size:.7rem;font-weight:600;margin:1.75rem 0 .75rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.12em}
-.section-block{margin-bottom:1.75rem}
-.section-head-row{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;margin-bottom:.85rem}
-.section-head-row h2{margin:0}
+.section-title{font-size:.75rem;font-weight:650;margin:1.75rem 0 .85rem;color:var(--text-2);text-transform:uppercase;letter-spacing:.1em}
+.section-block{
+  margin-bottom:1.5rem;padding:1.15rem 1.2rem 1.25rem;
+  border:1px solid var(--border);border-radius:var(--radius-lg);
+  background:rgba(255,255,255,.02);
+}
+.section-block .section-head-row,.section-block > h2.section-head{margin-bottom:.9rem}
+.section-head-row{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;margin-bottom:.85rem;padding-bottom:.65rem;border-bottom:1px solid var(--border)}
+.section-head-row h2{margin:0;color:var(--text-2)}
 .section-head-row p{margin:0;font-size:.8125rem;color:var(--text-3)}
+.grid-2.section-block{padding:1.15rem 1.2rem}
 
 /* Buttons & inputs */
 input,textarea,select{
@@ -135,12 +149,13 @@ textarea{min-height:100px;resize:vertical}
 
 /* Cards */
 .card,.panel{
-  border:1px solid var(--border);background:linear-gradient(180deg,var(--surface-1) 0%,var(--surface-0) 100%);
+  border:1px solid var(--border-strong);background:var(--surface-1);
   padding:1.15rem 1.25rem;margin:.75rem 0;border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
   transition:transform .2s var(--ease),box-shadow .2s var(--ease),border-color .2s;
 }
 .card-interactive{cursor:pointer}
-.card-interactive:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:rgba(99,102,241,.2)}
+.card-interactive:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:rgba(99,102,241,.35)}
 .card h3{margin:0 0 .4rem;font-size:.95rem;color:var(--text);font-weight:600}
 .card p{margin:.35rem 0;font-size:.875rem}
 .card .tools{font-size:.8125rem;color:var(--text-3);font-family:var(--mono)}
@@ -149,7 +164,7 @@ textarea{min-height:100px;resize:vertical}
 .hero{
   position:relative;border-radius:var(--radius-lg);padding:1.75rem 1.85rem;margin-bottom:1.5rem;
   border:1px solid var(--border-strong);
-  background:linear-gradient(135deg,var(--surface-2) 0%,var(--surface-0) 55%,var(--bg-1) 100%);
+  background:linear-gradient(135deg,var(--surface-2) 0%,var(--surface-1) 55%,var(--bg-1) 100%);
   box-shadow:var(--shadow-glow);overflow:hidden;
 }
 .hero::before{
@@ -166,10 +181,10 @@ textarea{min-height:100px;resize:vertical}
 .action-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:.75rem}
 .action-tile{
   display:flex;flex-direction:column;gap:.45rem;padding:1rem;border-radius:var(--radius);
-  border:1px solid var(--border);background:var(--surface-1);cursor:pointer;text-decoration:none!important;
+  border:1px solid var(--border-strong);background:var(--surface-1);cursor:pointer;text-decoration:none!important;
   transition:transform .2s var(--ease),box-shadow .2s,border-color .2s;
 }
-.action-tile:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:rgba(99,102,241,.25)}
+.action-tile:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:rgba(99,102,241,.35)}
 .action-tile .ico{
   width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
   background:var(--primary-dim);color:var(--primary-bright);font-size:1rem;
@@ -179,17 +194,17 @@ textarea{min-height:100px;resize:vertical}
 
 .metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:.75rem}
 .metric-card{
-  padding:1rem 1.05rem;border-radius:var(--radius);border:1px solid var(--border);
+  padding:1rem 1.05rem;border-radius:var(--radius);border:1px solid var(--border-strong);
   background:var(--surface-1);transition:transform .2s,border-color .2s;
 }
-.metric-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.1)}
+.metric-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.22)}
 .metric-card .label{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:.45rem}
 .metric-card .value{font-size:1.25rem;font-weight:600;color:var(--text);letter-spacing:-.02em}
 .metric-card .meta{font-size:.75rem;color:var(--text-3);margin-top:.25rem}
 
 .service-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem}
 .service-card{
-  padding:1rem;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface-1);
+  padding:1rem;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--surface-1);
   display:flex;flex-direction:column;gap:.5rem;
 }
 .service-card-head{display:flex;justify-content:space-between;align-items:center;gap:.5rem}
@@ -199,7 +214,7 @@ textarea{min-height:100px;resize:vertical}
 
 .activity-list{display:flex;flex-direction:column;gap:0}
 .activity-row{
-  display:flex;justify-content:space-between;gap:1rem;padding:.65rem 0;
+  display:flex;justify-content:space-between;gap:1rem;padding:.7rem 0;
   border-bottom:1px solid var(--border);font-size:.8125rem;
 }
 .activity-row:last-child{border-bottom:0}
@@ -213,7 +228,7 @@ textarea{min-height:100px;resize:vertical}
   .nav-item{justify-content:center;padding:.65rem}
 }
 @media(max-width:760px){
-  .shell{flex-direction:column}
+  .shell{flex-direction:column;height:auto;min-height:100vh}
   .sidebar{width:100%;flex-direction:row;flex-wrap:wrap;padding:.75rem}
   .sidebar-brand{padding:0 .5rem}
   .shell-main .topbar{padding:0 1rem}
@@ -227,6 +242,71 @@ textarea{min-height:100px;resize:vertical}
 .download-panel h2{margin:0 0 .75rem;font-size:.875rem;color:var(--text);font-weight:600}
 .progress-track{height:6px;background:var(--bg-0);border-radius:999px;overflow:hidden}
 .progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--cyan));width:0%;transition:width .35s ease;border-radius:999px}
+.progress-fill.is-indeterminate{
+  width:42% !important;
+  animation:contentFetchSlide 1.35s ease-in-out infinite alternate;
+}
+.spinner[hidden],.content-fetch-check[hidden]{display:none!important;animation:none!important}
+.content-fetch-check{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:1rem;height:1rem;margin-right:.35rem;flex-shrink:0;
+  color:var(--success);font-weight:700;font-size:.95rem;line-height:1;
+}
+@keyframes contentFetchSlide{
+  0%{transform:translateX(0);opacity:.85}
+  100%{transform:translateX(130%);opacity:1}
+}
+.content-fetch-panel{
+  margin:0 0 1rem;padding:1rem 1.15rem;
+  position:sticky;top:0;z-index:6;
+  background:var(--surface-1);
+  box-shadow:0 8px 24px rgba(0,0,0,.28);
+  border:1px solid rgba(56,189,248,.35);
+}
+.content-fetch-panel h3{margin:0 0 .65rem;font-size:.95rem;display:flex;align-items:center;gap:.45rem}
+.content-fetch-panel .progress-track{height:10px;margin:.35rem 0 .55rem;background:rgba(255,255,255,.06)}
+.content-fetch-stats{font-size:.8125rem;color:var(--text-2);font-family:var(--mono);margin:.25rem 0}
+.content-fetch-msg{font-size:.85rem;color:var(--text-3);margin:.35rem 0 0;line-height:1.4}
+.content-fetch-panel.is-error{border-color:rgba(248,113,113,.45)}
+.content-fetch-panel.is-cancelled{border-color:rgba(251,191,36,.45)}
+.content-fetch-panel.is-ok{border-color:rgba(52,211,153,.45)}
+.content-fetch-panel.is-busy{border-color:rgba(56,189,248,.4)}
+.content-fetch-panel[hidden],.content-fetch-panel.is-hidden{display:none !important}
+.viewer-frame-wrap{margin:.75rem 0 0;border:1px solid var(--border-strong);border-radius:var(--radius);overflow:hidden;background:#0a0b10}
+.viewer-frame{display:block;width:100%;height:min(68vh,720px);border:0;background:#0a0b10}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;margin:1rem 0}
+.feature-card{border:1px solid var(--border);background:var(--surface-1);border-radius:var(--radius);padding:1rem 1.05rem}
+.feature-card h3{margin:0 0 .35rem;font-size:.9rem}
+.feature-card p{margin:0 0 .75rem;font-size:.8125rem;color:var(--text-2);line-height:1.45}
+.feature-card .meta{font-size:.75rem;color:var(--text-3);margin-bottom:.65rem}
+.powered-by{font-size:.75rem;color:var(--text-3);margin:.35rem 0 0}
+.wizard-wrap{max-width:40rem}
+.wizard-steps{display:flex;flex-wrap:wrap;gap:.35rem;margin:0 0 1rem;padding:0;list-style:none}
+.wizard-steps li{
+  font-size:.68rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--text-3);padding:.25rem .5rem;border-radius:999px;border:1px solid transparent;
+}
+.wizard-steps li.done{color:var(--success)}
+.wizard-steps li.current{color:var(--text);border-color:rgba(99,102,241,.35);background:var(--primary-dim)}
+.wizard-panel{margin:1rem 0 1.25rem}
+.wizard-panel h2{margin:0 0 .5rem;font-size:1.25rem;font-weight:600;letter-spacing:-.02em;color:var(--text)}
+.wizard-panel > p{margin:0 0 1rem;color:var(--text-2);line-height:1.55}
+.wizard-nav{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-top:1.25rem}
+.wizard-nav .spacer{flex:1}
+.wiz-choice{
+  display:block;width:100%;text-align:left;margin:.4rem 0;padding:.85rem 1rem;
+  border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-1);
+  color:inherit;font:inherit;cursor:pointer;transition:border-color .15s,background .15s;
+}
+.wiz-choice:hover{border-color:var(--border-strong);background:var(--surface-2)}
+.wiz-choice.selected{border-color:rgba(99,102,241,.45);background:var(--primary-dim)}
+.wiz-choice strong{display:block;color:var(--text);font-size:.9rem}
+.wiz-choice span{display:block;margin-top:.25rem;font-size:.8125rem;color:var(--text-3);line-height:1.4}
+.wiz-pack-row{
+  display:flex;justify-content:space-between;align-items:center;gap:1rem;
+  padding:.75rem 0;border-bottom:1px solid var(--border);
+}
+.wiz-pack-row:last-child{border-bottom:0}
 .download-msg{font-size:.8125rem;color:var(--text-3);margin-top:.35rem;font-family:var(--mono)}
 .spinner{display:inline-block;width:1rem;height:1rem;border:2px solid var(--border);border-top-color:var(--primary-bright);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.35rem}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -235,15 +315,15 @@ textarea{min-height:100px;resize:vertical}
 .chat-toolbar select{margin:0;flex:1;min-width:160px}
 .chat-toolbar .btn,.chat-toolbar .btn.secondary{margin:0}
 .chat-intro{margin:0;font-size:.8125rem;color:var(--text-3);flex:1 1 100%}
-.chat-wrap{display:flex;flex-direction:column;flex:1;min-height:0;border:1px solid var(--border);background:var(--bg-1);border-radius:var(--radius);overflow:hidden}
+.chat-wrap{display:flex;flex-direction:column;flex:1;min-height:0;border:1px solid var(--border-strong);background:var(--bg-1);border-radius:var(--radius);overflow:hidden}
 .chat-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:.75rem;flex:1;min-height:0;margin:0}
 .chat-threads-panel{
-  border:1px solid var(--border);background:var(--surface-0);border-radius:var(--radius);
+  border:1px solid var(--border-strong);background:var(--surface-1);border-radius:var(--radius);
   display:flex;flex-direction:column;min-height:0;overflow:hidden;height:100%;
 }
 .chat-threads-head{
-  padding:.7rem .8rem;border-bottom:1px solid var(--border);font-size:.68rem;font-weight:600;
-  text-transform:uppercase;letter-spacing:.1em;color:var(--text-3);flex-shrink:0;
+  padding:.7rem .8rem;border-bottom:1px solid var(--border-strong);font-size:.68rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--text-2);flex-shrink:0;
 }
 .chat-threads-list{flex:1;overflow-y:auto;padding:.35rem}
 .chat-thread-item{
@@ -268,7 +348,7 @@ textarea{min-height:100px;resize:vertical}
 .chat-thread-delete:hover{color:var(--danger)}
 .chat-thread-actions{display:flex;flex-direction:column;gap:.1rem;flex-shrink:0;padding-top:.2rem}
 .chat-main{min-width:0;display:flex;flex-direction:column;flex:1;min-height:0;height:100%}
-.chat-input{display:flex;gap:.5rem;padding:.85rem 1rem;border-top:1px solid var(--border);align-items:flex-end;background:var(--surface-0);flex-shrink:0}
+.chat-input{display:flex;gap:.5rem;padding:.85rem 1rem;border-top:1px solid var(--border-strong);align-items:flex-end;background:var(--surface-1);flex-shrink:0}
 .chat-input textarea{flex:1;min-height:2.75rem;max-height:140px;margin:0;resize:none}
 .chat-input .btn{flex-shrink:0;margin:0}
 .approval-banner{display:none;margin:0;padding:.65rem .85rem;border:1px solid rgba(251,191,36,.35);background:var(--warn-dim);border-radius:var(--radius-sm);flex-shrink:0}
@@ -283,26 +363,26 @@ textarea{min-height:100px;resize:vertical}
 .chat-log{flex:1;overflow-y:auto;padding:1rem 1rem 1.25rem;display:flex;flex-direction:column;gap:.75rem;min-height:0}
 .bubble{max-width:85%;padding:.65rem .9rem;border-radius:var(--radius-sm);line-height:1.5;font-size:.9rem;white-space:pre-wrap;word-break:break-word}
 .bubble.user{align-self:flex-end;background:var(--primary-dim);border:1px solid rgba(99,102,241,.2)}
-.bubble.assistant{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border)}
+.bubble.assistant{align-self:flex-start;background:var(--surface-2);border:1px solid var(--border-strong)}
 .bubble.system{align-self:center;color:var(--text-3);font-size:.8125rem}
 .bubble.err{align-self:flex-start;background:var(--danger-dim);color:var(--danger);border:1px solid rgba(248,113,113,.25)}
 .cite-box{margin-top:.5rem;padding:.5rem .65rem;border-left:2px solid var(--primary);background:var(--primary-dim);font-size:.8125rem;color:var(--text-2);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
-.file-browser{border:1px solid var(--border);background:var(--bg-0);min-height:220px;max-height:320px;overflow-y:auto;border-radius:var(--radius-sm)}
+.file-browser{border:1px solid var(--border-strong);background:var(--bg-1);min-height:220px;max-height:320px;overflow-y:auto;border-radius:var(--radius-sm)}
 .file-row{display:flex;justify-content:space-between;align-items:center;padding:.55rem .75rem;border-bottom:1px solid var(--border);cursor:pointer;font-size:.875rem;transition:background .12s}
-.file-row:hover{background:rgba(255,255,255,.03)}
+.file-row:hover{background:rgba(255,255,255,.04)}
 .file-row.selected{background:var(--primary-dim)}
 .file-row .meta{color:var(--text-3);font-size:.8125rem}
 .breadcrumb{font-size:.8125rem;color:var(--text-3);margin:.5rem 0 .75rem;font-family:var(--mono)}
 .msg{padding:.65rem .85rem;margin:.75rem 0;border-radius:var(--radius-sm);font-size:.875rem}
 .msg.ok{background:var(--success-dim);color:var(--success);border:1px solid rgba(52,211,153,.2)}
 .msg.err{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(248,113,113,.25)}
-.msg.info{background:rgba(255,255,255,.03);color:var(--text-2);border:1px solid var(--border)}
-.stat-row{display:flex;justify-content:space-between;padding:.45rem 0;border-top:1px solid var(--border);font-size:.875rem}
-.stat-row:first-child{border-top:0}
+.msg.info{background:rgba(255,255,255,.04);color:var(--text-2);border:1px solid var(--border)}
+.stat-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.55rem 0;border-bottom:1px solid var(--border);font-size:.875rem}
+.stat-row:last-child{border-bottom:0}
 .callout{border:1px solid var(--border-strong);background:var(--surface-2);padding:1rem 1.15rem;margin:1rem 0;border-radius:var(--radius)}
 .callout.warn{border-color:rgba(251,191,36,.3);background:var(--warn-dim)}
 .callout.ok{border-color:rgba(99,102,241,.25);background:var(--primary-dim)}
-.empty-state{text-align:center;padding:1.75rem 1rem;color:var(--text-3);border:1px dashed var(--border);border-radius:var(--radius)}
+.empty-state{text-align:center;padding:1.75rem 1rem;color:var(--text-3);border:1px dashed var(--border-strong);border-radius:var(--radius);background:rgba(255,255,255,.02)}
 .empty-state strong{display:block;color:var(--text);margin-bottom:.35rem;font-weight:600}
 .data-table{width:100%;border-collapse:collapse;font-size:.875rem}
 .data-table th,.data-table td{padding:.65rem .5rem;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
@@ -403,6 +483,9 @@ let _chatThreadId=null;
 let _chatThreads=[];
 let _kbPath='';
 let _kbSelected='';
+let _contentFetchState=null;
+let _contentFetchPoll=0;
+let _contentFetchActive=false;
 
 function showAuth(){
   if(authScreen) authScreen.classList.remove('hidden');
@@ -560,7 +643,10 @@ const NAV=[
   {id:'models',label:'Models',section:'Workspace',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6M9 12h6M9 15h4"/></svg>'},
   {id:'agents',label:'Agents',section:'Workspace',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 19c0-2.8 2.7-5 6-5s6 2.2 6 5M14 19c0-2 1.8-3.5 4-3.5"/></svg>'},
   {id:'knowledge',label:'Knowledge',section:'Workspace',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4z"/><path d="M8 4v13a3 3 0 0 0 3 3"/></svg>'},
-  {id:'content',label:'Content',section:'Library',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3 20 7v10l-8 4-8-4V7l8-4z"/><path d="M12 11 20 7M12 11v10M12 11 4 7"/></svg>'},
+  {id:'library',label:'Library',section:'Learn',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h6"/></svg>'},
+  {id:'education',label:'Education',section:'Learn',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/></svg>'},
+  {id:'maps',label:'Maps',section:'Catalogue',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20V6.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>'},
+  {id:'content',label:'Content',section:'Catalogue',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3 20 7v10l-8 4-8-4V7l8-4z"/><path d="M12 11 20 7M12 11v10M12 11 4 7"/></svg>'},
   {id:'system',label:'System',section:'Device',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'},
   {id:'setup',label:'Setup',section:'Device',icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg>'},
 ];
@@ -570,10 +656,15 @@ const PAGE_META={
   models:{title:'Models',sub:'Download and manage offline AI models'},
   agents:{title:'Agents',sub:'Installed assistants and tool policies'},
   knowledge:{title:'Knowledge',sub:'Documents, search, and source-grounded answers'},
-  content:{title:'Content',sub:'Offline packs — maps, models, and knowledge'},
+  library:{title:'Library',sub:'Offline Wikipedia, medical, how-to, and books — powered by Kiwix'},
+  education:{title:'Education',sub:'Interactive courses and home learning — powered by Kolibri'},
+  maps:{title:'Maps',sub:'Offline country maps — view ready tiles on this device'},
+  content:{title:'Content',sub:'Offline packs — maps, models, library ZIMs, and education'},
   system:{title:'System',sub:'Hardware, backups, and offline updates'},
   setup:{title:'Setup',sub:'First-run configuration wizard'},
 };
+const KIWIX_URL='http://127.0.0.1:8080/';
+const KOLIBRI_URL='http://127.0.0.1:8083/';
 const ATLAS_LOGO='/assets/atlas-logo.png';
 function brandMark(){
   return `<img class="mark" src="${ATLAS_LOGO}" alt="Atlas OS" width="34" height="34" />`;
@@ -605,9 +696,10 @@ function actionTile(href,title,desc,iconChar,external){
   </${tag}>`;
 }
 const SVC_DESC={
-  kiwix:'Offline Wikipedia and ZIM content server',
+  kiwix:'Atlas Library — offline ZIM reader (Kiwix Serve)',
+  kolibri:'Atlas Education — offline courses (Kolibri)',
   qdrant:'Vector database for hybrid knowledge search',
-  nomad:'Local map and navigation tile server',
+  nomad:'Optional map tile engine (view maps in Atlas → Maps)',
   ollama:'Local LLM inference for chat and agents',
 };
 function serviceCard(s){
@@ -692,8 +784,17 @@ async function doLogout(){
 
 async function page(){
   if(!authed) return;
-  const id=(location.hash.replace('#/','')||'home');
-  if(view) view.classList.toggle('chat-page', id==='ask');
+  const hashRaw=(location.hash.replace(/^#\/?/,'')||'home');
+  const qIdx=hashRaw.indexOf('?');
+  const id=(qIdx<0?hashRaw:hashRaw.slice(0,qIdx)).split('/')[0]||'home';
+  const hashParams=new URLSearchParams(qIdx<0?'':hashRaw.slice(qIdx+1));
+  if(id!=='maps' && window.AtlasMaps && typeof AtlasMaps.unmount==='function'){
+    try{ AtlasMaps.unmount(); }catch(_e){}
+  }
+  if(view){
+    view.classList.toggle('chat-page', id==='ask');
+    view.classList.toggle('maps-page', id==='maps');
+  }
   renderNav(id);
   if(id==='home'){
     renderTopbar(id);
@@ -709,12 +810,13 @@ async function page(){
       ${metricCard('Services','…','Checking',null)}
     </div>`;
     try{
-      const [h,m,sv,lib,chats]=await Promise.all([
+      const [h,m,sv,lib,chats,setup]=await Promise.all([
         api('/api/system/health'),
         api('/api/models/status'),
         api('/api/system/services'),
         api('/api/knowledge/library'),
         api('/api/chat/threads'),
+        api('/api/setup/state'),
       ]);
       const statusLabel=h.status==='ok'?'Healthy':(h.status==='degraded'?'Needs attention':'Unknown');
       const kbMode=(h.knowledge&&h.knowledge.mode)||'keyword';
@@ -722,11 +824,15 @@ async function page(){
       const svcOnline=svcList.filter(s=>s.ok).length;
       renderTopbar(id,{modelReady:!!m.ready,sysOk:h.status==='ok'});
       const welcome=_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Atlas';
-      const heroCta=m.ready
+      const setupDone=!!setup.completed;
+      const heroCta=!setupDone
+        ?`<button class="btn" onclick="location.hash='#/setup'">Continue setup</button>
+           <button class="btn secondary" onclick="location.hash='#/ask'">Open Chat</button>`
+        :(m.ready
         ?`<button class="btn" onclick="location.hash='#/ask'">Open Chat</button>
            <button class="btn secondary" onclick="location.hash='#/agents'">Launch Agents</button>`
         :`<button class="btn" onclick="location.hash='#/models'">Set up AI model</button>
-           <button class="btn secondary" onclick="location.hash='#/setup'">Run setup</button>`;
+           <button class="btn secondary" onclick="location.hash='#/setup'">Run setup</button>`);
       const heroStatus=`
         ${chip(statusLabel,h.status==='ok'?'ok':'bad')}
         ${chip(m.ready?'AI ready':'Model not installed',m.ready?'ok':'bad')}
@@ -734,9 +840,10 @@ async function page(){
         ${chip('Private device','ok',true)}`;
       const actions=[
         actionTile('#/ask','Open Chat','Talk to local agents','💬'),
-        actionTile('#/models','Manage Models','Download offline LLMs','◈'),
-        actionTile('#/agents','Launch Agents','Guide, Research, Steward','◎'),
+        actionTile('#/library','Library','Wikipedia & offline refs','📚'),
+        actionTile('#/education','Education','Courses & home learning','🎓'),
         actionTile('#/knowledge','Search Knowledge','Your indexed documents','📄'),
+        actionTile('/maps/?country=uk','Open Maps','View offline country maps','🗺'),
         actionTile('#/content','Install Content','Maps, packs, models','▣'),
         actionTile('#/system','System','Updates, backup, hardware','⚙'),
       ].join('');
@@ -760,7 +867,11 @@ async function page(){
         h.hint?[h.hint,'Notice']:null,
       ].filter(Boolean).map(([t,w])=>`<div class="activity-row"><span>${escapeHtml(t)}</span><span class="when">${escapeHtml(w)}</span></div>`).join('');
       const gpuNote=h.gpu_warning?`<div class="msg info" style="margin-top:1rem">${escapeHtml(h.gpu_warning)}</div>`:'';
-      const setupBanner=!m.ready?`<div class="callout warn" style="margin-top:1rem"><strong>Complete AI setup</strong><p>${escapeHtml(m.hint||'Download a model to unlock Chat and agents.')}</p></div>`:'';
+      const setupBanner=!setupDone
+        ?`<div class="callout warn" style="margin-top:1rem"><strong>Finish first-run setup</strong>
+          <p>Step ${Number(setup.step)||1} of ${(setup.steps||[]).length||7} — configure AI, sharing, and recovery.</p>
+          <button class="btn" type="button" onclick="location.hash='#/setup'">Open Setup</button></div>`
+        :(!m.ready?`<div class="callout warn" style="margin-top:1rem"><strong>Complete AI setup</strong><p>${escapeHtml(m.hint||'Download a model to unlock Chat and agents.')}</p></div>`:'');
       view.innerHTML=`
         <div class="hero">
           <div class="hero-inner">
@@ -852,6 +963,7 @@ async function page(){
     renderChatLog(_chatHistory);
     refreshApprovals();
     initChatPage();
+    applyDefaultAgentFromSetup();
     const qEl=document.getElementById('q');
     if(qEl) qEl.addEventListener('keydown',e=>{
       if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask();}
@@ -917,6 +1029,19 @@ async function page(){
   }
   if(id==='content'){
     await renderContent();
+    return;
+  }
+  if(id==='maps'){
+    renderTopbar(id);
+    await renderMaps(hashParams);
+    return;
+  }
+  if(id==='library'){
+    await renderLibrary();
+    return;
+  }
+  if(id==='education'){
+    await renderEducation();
     return;
   }
   if(id==='system'){
@@ -997,19 +1122,8 @@ async function page(){
     return;
   }
   if(id==='setup'){
-    const st=await api('/api/setup/state');
-    const steps=st.steps||[];
-    const step=st.step||1;
-    const pct=steps.length?Math.round((step/steps.length)*100):0;
-    const current=steps[step-1]||'welcome';
-    view.innerHTML=`<p class="page-intro">Step ${step} of ${steps.length}: <strong>${escapeHtml(current)}</strong></p>
-      <div class="progress-track" style="margin:1rem 0"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <p style="color:var(--muted);font-size:.9rem">Complete the wizard to configure Atlas. You can return here anytime.</p>
-      <button class=btn onclick="nextStep()">Next step</button>
-      <details style="margin-top:1rem;color:var(--muted);font-size:.85rem"><summary>All steps</summary>
-        <ol style="margin:.5rem 0;padding-left:1.25rem">${steps.map((s,i)=>
-          `<li style="color:${i+1===step?'var(--accent)':'var(--muted)'}">${escapeHtml(s)}</li>`).join('')}</ol>
-      </details>`;
+    await renderSetupWizard();
+    return;
   }
 }
 function useAgentInChat(agentId){
@@ -1120,23 +1234,379 @@ async function backupKnowledge(){
   }
   showMsg('kbBackupMsg','Saved '+r.archive,'ok');
 }
+function formatContentBytes(n){
+  n=Number(n)||0;
+  if(n>=1e9) return (n/1e9).toFixed(2)+' GB';
+  if(n>=1e6) return (n/1e6).toFixed(1)+' MB';
+  if(n>=1e3) return (n/1e3).toFixed(0)+' KB';
+  return n+' B';
+}
+function contentFetchPanelHtml(){
+  return `<div id="contentFetchPanel" class="card content-fetch-panel is-hidden" aria-live="polite" hidden>
+      <h3 id="contentFetchTitle"><span class="spinner" id="contentFetchSpinner" hidden></span><span class="content-fetch-check" id="contentFetchCheck" hidden aria-hidden="true">✓</span><span id="contentFetchTitleText">Download</span></h3>
+      <div class="progress-track"><div id="contentFetchFill" class="progress-fill" style="width:0%"></div></div>
+      <div id="contentFetchStats" class="content-fetch-stats"></div>
+      <div id="contentFetchMsg" class="content-fetch-msg"></div>
+      <div id="contentFetchActions" class="btn-group" style="margin-top:.75rem"></div>
+    </div>
+    <div id="contentMsg" style="margin-top:.75rem"></div>`;
+}
+function formatEta(sec){
+  // Number(null)===0 would otherwise show "~1s left" whenever eta is cleared.
+  if(sec==null||sec==='') return '';
+  sec=Number(sec);
+  if(!Number.isFinite(sec)||sec<=0) return '';
+  if(sec<60) return '~'+Math.max(1,Math.round(sec))+'s left';
+  if(sec<3600) return '~'+Math.round(sec/60)+' min left';
+  return '~'+(sec/3600).toFixed(1)+' h left';
+}
+function formatFetchAge(state){
+  const ts=Number(state&&state.updated_at);
+  if(!Number.isFinite(ts)||ts<=0) return '';
+  const age=Math.max(0,Math.round((Date.now()/1000)-ts));
+  if(age<3) return 'updated just now';
+  if(age<60) return 'updated '+age+'s ago';
+  return 'updated '+Math.round(age/60)+'m ago';
+}
+function contentFetchRetryButtons(state){
+  const failed=!!(state.error||state.status==='error');
+  const cancelled=state.status==='cancelled'||!!state.cancelled;
+  if((failed||cancelled)&&state.retryKind==='zim'&&state.packId){
+    return `<button class="btn" onclick="retryFetchZim('${escapeHtml(state.packId)}')">Retry ZIM</button>`;
+  }
+  if((failed||cancelled)&&state.retryKind==='maps'&&state.packId){
+    return `<button class="btn" onclick="retryFetchTiles('${escapeHtml(state.packId)}','${escapeHtml(state.country||'')}')">Retry tiles</button>`;
+  }
+  if((failed||cancelled)&&state.retryKind==='expand'&&state.packId){
+    return `<button class="btn" onclick="retryFetchExpand('${escapeHtml(state.packId)}')">Retry expand</button>`;
+  }
+  return '';
+}
+function paintContentFetchPanel(state){
+  _contentFetchState=state||null;
+  const panel=document.getElementById('contentFetchPanel');
+  if(!panel) return;
+  if(!state){
+    panel.hidden=true;
+    panel.classList.add('is-hidden');
+    panel.style.display='none';
+    return;
+  }
+  panel.hidden=false;
+  panel.classList.remove('is-hidden');
+  panel.style.display='block';
+  panel.classList.remove('is-error','is-ok','is-busy','is-cancelled');
+  const cancelled=state.status==='cancelled'||!!state.cancelled;
+  const failed=!!(state.error||state.status==='error');
+  const done=!!state.done||state.status==='ready';
+  // Terminal statuses must never keep the spinner / indeterminate bar alive.
+  const terminal=done||failed||cancelled||state.status==='ready'||state.status==='error'||state.status==='cancelled';
+  const busy=!terminal;
+  if(cancelled) panel.classList.add('is-cancelled');
+  else if(failed) panel.classList.add('is-error');
+  else if(done||state.status==='ready') panel.classList.add('is-ok');
+  else panel.classList.add('is-busy');
+  const titleText=document.getElementById('contentFetchTitleText');
+  const spinner=document.getElementById('contentFetchSpinner');
+  const check=document.getElementById('contentFetchCheck');
+  const fill=document.getElementById('contentFetchFill');
+  const stats=document.getElementById('contentFetchStats');
+  const msg=document.getElementById('contentFetchMsg');
+  const actions=document.getElementById('contentFetchActions');
+  if(titleText) titleText.textContent=state.label||'Download progress';
+  if(spinner){
+    spinner.hidden=!busy;
+    spinner.classList.toggle('hidden',!busy);
+    spinner.setAttribute('aria-hidden',busy?'false':'true');
+  }
+  const showOk=terminal&&!failed&&!cancelled&&(done||state.status==='ready');
+  if(check){
+    check.hidden=!showOk;
+    check.classList.toggle('hidden',!showOk);
+    check.setAttribute('aria-hidden',showOk?'false':'true');
+  }
+  const dl=Number(state.downloaded||0), tot=Number(state.total||0);
+  let pct=state.percent!=null?Number(state.percent):NaN;
+  if(!Number.isFinite(pct)) pct=tot>0&&dl>0?Math.round(100*Math.min(dl,tot)/tot):NaN;
+  if(showOk&&!Number.isFinite(pct)) pct=100;
+  // Empty 0% bars look broken — use indeterminate while preparing / before bytes move.
+  const indeterminate=busy&&(!!state.indeterminate||!Number.isFinite(pct)||dl<=0);
+  if(fill){
+    fill.classList.toggle('is-indeterminate', indeterminate);
+    if(indeterminate){
+      fill.style.width='42%';
+      fill.style.animation='';
+    }else{
+      fill.classList.remove('is-indeterminate');
+      fill.style.animation='none';
+      fill.style.width=Math.max(0,Math.min(100,Number.isFinite(pct)?pct:(showOk?100:0)))+'%';
+    }
+  }
+  const pctLabel=indeterminate
+    ?(state.status||'working')+'…'
+    :(Number.isFinite(pct)?(Math.round(pct)+'%'):(state.status||'…'));
+  const bytesLabel=tot>0?(formatContentBytes(dl)+' / '+formatContentBytes(tot))
+    :(dl>0?formatContentBytes(dl)+' downloaded':'');
+  const rateLabel=busy&&state.bytes_per_sec>0?(formatContentBytes(state.bytes_per_sec)+'/s'):'';
+  // Never show ETA when stalled, idle rate, or missing — avoids "~1s left" on null/0.
+  const etaLabel=(!busy||state.stalled||!(state.bytes_per_sec>0))?'' : formatEta(state.eta_seconds);
+  const stallLabel=busy&&state.stalled
+    ?('no progress for '+Math.max(1,Number(state.stall_seconds)||0)+'s')
+    :(busy&&Number(state.stall_seconds)>=8&&!(state.bytes_per_sec>0)
+      ?('quiet '+Math.round(Number(state.stall_seconds))+'s')
+      :'');
+  const ageLabel=busy?formatFetchAge(state):'';
+  if(stats) stats.textContent=[pctLabel, bytesLabel, rateLabel, etaLabel, stallLabel, ageLabel, busy&&state.phase?String(state.phase):'']
+    .filter(Boolean).join(' · ');
+  if(msg) msg.textContent=state.message||state.error||(cancelled?'Download cancelled':'');
+  if(actions){
+    const retry=contentFetchRetryButtons(state);
+    if(retry){
+      actions.innerHTML=retry;
+    }else if(busy&&state.retryKind&&state.retryKind!=='expand'){
+      actions.innerHTML=`<button class="btn secondary" type="button" onclick="cancelContentFetch()">Cancel</button>`;
+    }else if(showOk&&state.retryKind==='maps'&&(state.country||state.packId)){
+      actions.innerHTML=`<button class="btn" type="button" onclick="openAtlasMap('${escapeHtml(state.country||'')}')">Open map</button>`;
+    }else{
+      actions.innerHTML='';
+    }
+  }
+}
+async function cancelContentFetch(){
+  const st=_contentFetchState;
+  if(!st||!st.retryKind||st.retryKind==='expand') return;
+  _contentFetchPoll++;
+  _contentFetchActive=false;
+  let url='', body={};
+  if(st.retryKind==='maps'){
+    url='/api/content/cancel-maps-fetch';
+    body={id:st.packId||'',country:st.country||''};
+  }else if(st.retryKind==='zim'){
+    url='/api/content/cancel-zim-fetch';
+    body={id:st.packId||'',pack:st.packSlug||''};
+  }else{
+    return;
+  }
+  const r=await api(url,{method:'POST',body:JSON.stringify(body)});
+  const cancelled=r.ok!==false&&r.status==='cancelled';
+  paintContentFetchPanel({
+    ...st,
+    done:true,
+    status:cancelled?'cancelled':(st.status||'error'),
+    cancelled:cancelled,
+    message:cancelled?(r.message||'Download cancelled.'):(r.error||'Could not cancel download'),
+    error:cancelled?'':(r.error||'cancel_failed'),
+    indeterminate:false,
+  });
+  showMsg('contentMsg',cancelled?'Download cancelled — use Retry to start again.':(r.error||'Cancel failed'),cancelled?'info':'err');
+  await refreshContentPage();
+}
+function restoreContentFetchPanel(){
+  if(_contentFetchState) paintContentFetchPanel(_contentFetchState);
+  if(_contentFetchState&&_contentFetchState.banner){
+    showMsg('contentMsg',_contentFetchState.banner.text,_contentFetchState.banner.kind||'info');
+  }
+}
+async function pollContentFetch(opts){
+  const label=opts.label||'Download';
+  const statusUrl=opts.statusUrl;
+  const retryKind=opts.retryKind||'';
+  const packId=opts.packId||'';
+  const country=opts.country||'';
+  const packSlug=opts.packSlug||'';
+  const pollId=++_contentFetchPoll;
+  _contentFetchActive=true;
+  paintContentFetchPanel({
+    label, status:'starting', phase:'starting', done:false, downloaded:0, total:opts.totalHint||0,
+    indeterminate:true, message:opts.startMessage||'Starting download…', packId, country, packSlug, retryKind,
+  });
+  try{
+    for(let i=0;i<900;i++){
+      if(pollId!==_contentFetchPoll) return null;
+      if(i) await new Promise(r=>setTimeout(r,1500));
+      const st=await api(statusUrl);
+      if(pollId!==_contentFetchPoll) return null;
+      if(!st||st.status==='idle'){
+        paintContentFetchPanel({
+          label, status:'waiting', phase:'waiting', done:false, downloaded:0, total:opts.totalHint||0,
+          indeterminate:true, message:'Waiting for download to start…', packId, country, packSlug, retryKind,
+        });
+        continue;
+      }
+      const cancelled=st.status==='cancelled';
+      const failed=!!(st.error||st.status==='error');
+      const tot=Number(st.total||opts.totalHint||0);
+      const dl=Number(st.downloaded||0);
+      // Only treat as finished when backend sets done — never when size_hint is merely reached.
+      const reallyDone=!!st.done&&(st.status==='ready'||cancelled||failed);
+      paintContentFetchPanel({
+        label,
+        status:st.status,
+        phase:st.phase||st.status,
+        done:reallyDone,
+        downloaded:dl,
+        total:tot,
+        percent:reallyDone&&st.status==='ready'?100:st.percent,
+        indeterminate:!reallyDone&&(!!st.indeterminate||(!st.done&&dl<=0&&!cancelled)),
+        message:cancelled?(st.message||'Download cancelled'):(failed?(st.error||st.message||'Download failed'):(st.message||'')),
+        error:st.error,
+        cancelled,
+        path:st.path,
+        bytes_per_sec:reallyDone?0:st.bytes_per_sec,
+        eta_seconds:reallyDone?null:st.eta_seconds,
+        stalled:!!st.stalled&&!reallyDone,
+        stall_seconds:st.stall_seconds,
+        updated_at:st.updated_at,
+        packId, country, packSlug, retryKind,
+      });
+      if(reallyDone){
+        let banner;
+        if(cancelled){
+          banner={text:'Download cancelled. Use Retry to start again.',kind:'info'};
+        }else if(failed){
+          banner={text:(opts.failPrefix||'Download failed')+': '+(st.error||'unknown')+'. Use Retry.',kind:'err'};
+        }else{
+          banner={text:(opts.okMessage||'Ready')+(st.path?' ('+st.path+')':''),kind:'ok'};
+        }
+        showMsg('contentMsg',banner.text,banner.kind);
+        if(_contentFetchState) _contentFetchState.banner=banner;
+        // Ensure Maps registry matches filesystem before user opens the viewer.
+        if(retryKind==='maps'&&!cancelled&&!failed){
+          try{ await api('/api/content/maps-repair'); }catch(_e){}
+        }
+        return st;
+      }
+    }
+    paintContentFetchPanel({
+      label, status:'running', phase:'running', done:false, downloaded:0, total:opts.totalHint||0,
+      indeterminate:true,
+      message:'Still running in the background — leave this page open or check Content later.',
+      packId, country, retryKind,
+    });
+    const banner={text:'Download still running in the background — check Content later.',kind:'info'};
+    showMsg('contentMsg',banner.text,banner.kind);
+    if(_contentFetchState) _contentFetchState.banner=banner;
+    return null;
+  }finally{
+    if(pollId===_contentFetchPoll) _contentFetchActive=false;
+  }
+}
+function resumeContentFetchesFromCatalogue(packs){
+  if(_contentFetchActive) return;
+  const list=packs||[];
+  for(const p of list){
+    if(p.tiles_status==='fetching'&&(p.country||p.id)){
+      const cc=String(p.country||'').toLowerCase()||String(p.id||'').split('.').pop();
+      pollMapsFetch({
+        id:p.id,
+        country:cc,
+        target:'/srv/atlas/maps/'+cc,
+        tiles_size_hint_bytes:p.size_hint_bytes||((p.tiles_fetch&&p.tiles_fetch.size_hint_bytes)||0),
+      });
+      return;
+    }
+    if(p.zim_status==='fetching'||(p.category==='knowledge'&&p.download_on_install&&p.installed&&p.zim_status==='pending')){
+      // Only auto-resume explicit fetching ZIM status.
+      if(p.zim_status==='fetching'){
+        pollZimFetch({id:p.id, zim_pack_slug:(p.id||'').split('.').pop(), zim_size_hint_bytes:p.size_hint_bytes||0});
+        return;
+      }
+    }
+  }
+}
 async function renderContent(){
   const cat=await api('/api/content/catalogue');
   const inst=await api('/api/content/installed');
   const browse=await api('/api/content/browse');
   const packs=cat.packs||[];
-  const rows=packs.map(p=>{
-    const st=p.installed?`<span class="pill-sm ok">installed ${escapeHtml(p.installed_version||'')}</span>`
-      :`<span class="pill-sm wait">not installed</span>`;
-    const btn=p.installed
-      ?`<button class="btn danger" onclick="uninstallPack('${escapeHtml(p.id)}')">Remove</button>`
-      :`<button class="btn" onclick="installCataloguePack('${escapeHtml(p.id)}')">Install</button>`;
-    return `<tr>
-      <td><strong>${escapeHtml(p.name||p.id)}</strong><br/><span style="color:var(--muted);font-size:.85rem">${escapeHtml(p.description||p.type||'')}</span></td>
-      <td>${escapeHtml(p.version||'?')}</td>
-      <td>${st}</td>
-      <td>${btn}</td>
-    </tr>`;
+  const groups=[
+    {key:'maps',title:'Offline maps by country',hint:'Install downloads Protomaps/OSM PMTiles online (ODbL), then works offline. When tiles are ready, open Maps (country picker; UK is default when installed).'},
+    {key:'knowledge',title:'Library ZIMs (Kiwix)',hint:'Wikipedia, medical, how-to, and Gutenberg packs download ZIMs on install and register with Atlas Library (Kiwix Serve on 127.0.0.1:8080). Large packs ask for confirm.'},
+    {key:'education',title:'Education packs',hint:'Kids Home Learning installs offline Markdown for tutors. Kolibri video channels land here when locked channel packs ship.'},
+    {key:'models',title:'Models',hint:'Offline model import packs.'},
+    {key:'other',title:'Other packs',hint:''},
+  ];
+  function packCategory(p){
+    if(p.category) return p.category;
+    if((p.type||'').includes('map')) return 'maps';
+    if((p.type||'').includes('education')) return 'education';
+    if((p.type||'').includes('model')) return 'models';
+    if((p.type||'').includes('knowledge')) return 'knowledge';
+    return 'other';
+  }
+  function packRows(list){
+    if(!list.length) return '';
+    return `<table class="data-table">
+      <thead><tr><th>Pack</th><th>Version</th><th>Status</th><th></th></tr></thead>
+      <tbody>${list.map(p=>{
+        const avail=!!p.bundle_file||p.installed;
+        let st;
+        if(p.installed&&p.category==='maps'){
+          const ts=p.tiles_status||'stub';
+          if(ts==='ready') st=`<span class="pill-sm ok">tiles ready</span>`;
+          else if(ts==='fetching') st=`<span class="pill-sm wait">downloading tiles…</span>`;
+          else if(ts==='error') st=`<span class="pill-sm bad">tiles failed</span>`;
+          else st=`<span class="pill-sm wait">stub — wait for tiles</span>`;
+        }else if(p.installed){
+          st=`<span class="pill-sm ok">installed ${escapeHtml(p.installed_version||'')}</span>`;
+        }else if(avail){
+          st=`<span class="pill-sm wait">available</span>`;
+        }else{
+          st=`<span class="pill-sm wait">listed — pack not on device</span>`;
+        }
+        let btn='';
+        if(p.installed){
+          const retries=[];
+          if(p.category==='maps'){
+            if(p.tiles_status!=='ready'){
+              retries.push(`<button class="btn" onclick="retryFetchTiles('${escapeHtml(p.id)}','${escapeHtml(p.country||'')}')">Download tiles</button>`);
+            }else{
+              retries.push(`<button class="btn secondary" onclick="retryFetchTiles('${escapeHtml(p.id)}','${escapeHtml(p.country||'')}')">Retry tiles</button>`);
+            }
+            const cc=escapeHtml(String(p.country||'').toLowerCase());
+            if(p.tiles_status==='ready'){
+              retries.push(`<button class="btn" onclick="openAtlasMap('${cc}')">Open map</button>`);
+            }else{
+              retries.push(`<button class="btn secondary" onclick="openAtlasMap('${cc}')" title="Tiles must finish downloading first">Maps</button>`);
+            }
+          }
+          if(p.category==='knowledge'&&(p.zim_fetch||p.download_on_install)){
+            retries.push(`<button class="btn secondary" onclick="retryFetchZim('${escapeHtml(p.id)}')">Retry ZIM</button>`);
+            retries.push(`<button class="btn" onclick="window.open(KIWIX_URL,'_blank','noopener')">Open Library</button>`);
+          }
+          if(p.category==='education'&&p.expand_fetch){
+            retries.push(`<button class="btn secondary" onclick="retryFetchExpand('${escapeHtml(p.id)}')">Retry expand</button>`);
+          }
+          if(p.category==='education'){
+            retries.push(`<button class="btn" onclick="location.hash='#/education'">Education</button>`);
+          }
+          btn=`<div class="btn-group">${retries.join('')}<button class="btn danger" onclick="uninstallPack('${escapeHtml(p.id)}')">Remove</button></div>`;
+        }else if(avail){
+          btn=`<button class="btn" onclick="installCataloguePack('${escapeHtml(p.id)}')">Install</button>`;
+        }else{
+          btn=`<button class="btn secondary" disabled title="Build with ./scripts/build-content-packs.sh">Unavailable</button>`;
+        }
+        const country=p.country?` · ${escapeHtml(String(p.country).toUpperCase())}`:'';
+        let sizeBits='';
+        if(p.category==='maps'&&p.size_hint_bytes){
+          sizeBits=` · ~${formatContentBytes(p.size_hint_bytes)} tiles${p.size_class==='large'?' (large)':''}`;
+        }else if((p.category==='knowledge'||p.category==='education')&&p.size_hint_bytes){
+          sizeBits=` · ~${formatContentBytes(p.size_hint_bytes)}${p.download_on_install?' download':''}${p.size_class==='large'?' (large)':''}`;
+        }
+        const warn=p.size_warning?`<br/><span style="color:var(--warn,#b45309);font-size:.8rem">${escapeHtml(p.size_warning)}</span>`:'';
+        const lic=p.licence_note?`<br/><span style="color:var(--muted);font-size:.75rem">${escapeHtml(p.licence_note)}</span>`:'';
+        return `<tr>
+          <td><strong>${escapeHtml(p.name||p.id)}</strong>${country}${sizeBits}<br/><span style="color:var(--muted);font-size:.85rem">${escapeHtml(p.description||p.type||'')}</span>${warn}${lic}</td>
+          <td>${escapeHtml(p.version||'?')}</td>
+          <td>${st}</td>
+          <td>${btn}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  }
+  const sections=groups.map(g=>{
+    const list=packs.filter(p=>packCategory(p)===g.key);
+    if(!list.length) return '';
+    return `<div class="section-block">${sectionHead(g.title,g.hint)}${packRows(list)}</div>`;
   }).join('');
   const local=(browse.local||[]).map(p=>
     `<div class="file-row" onclick="previewPack(decodeURIComponent('${jsQuote(p.path)}'))">
@@ -1148,14 +1618,9 @@ async function renderContent(){
       <span><strong>${escapeHtml(p.name||p.id)}</strong></span>
       <span class="meta">USB · v${escapeHtml(p.version||'?')}</span>
     </div>`).join('');
-  view.innerHTML=`<p class="page-intro">Install offline maps, knowledge, and model packs. Licences are shown before you confirm an install.</p>
-    <div class="card">
-      <h3>Catalogue</h3>
-      ${packs.length?`<table class="data-table">
-        <thead><tr><th>Pack</th><th>Version</th><th>Status</th><th></th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`:emptyState('Catalogue is empty','Bundled packs appear here when catalogue.json is installed.')}
-    </div>
+  view.innerHTML=`<p class="page-intro">Install offline maps, Library ZIMs (Wikipedia / medical / how-to / books), models, and education packs. Licences are shown before you confirm. After map tiles are <strong>ready</strong>, open <a href="/maps/?country=uk">Maps</a> (or use <strong>Open map</strong> on an installed country). Browse ZIMs in <a href="#/library">Library</a>; open courses in <a href="#/education">Education</a>.</p>
+    ${contentFetchPanelHtml()}
+    ${sections||emptyState('Catalogue is empty','Bundled packs appear here when catalogue.json is installed.')}
     <div class="grid-2">
       <div>
         <h2 class="section-title">Local / bundled packs</h2>
@@ -1169,11 +1634,146 @@ async function renderContent(){
       </div>
     </div>
     <div id=contentPreview class="card" style="margin-top:1rem;display:none"></div>
-    <div id=contentMsg style="margin-top:.75rem"></div>
     <h2 class="section-title">Installed</h2>
     <div class="card">${(inst.packs||[]).map(p=>
       `<div class="stat-row"><span>${escapeHtml(p.name||p.id)}</span><span>${escapeHtml(p.version||'')}</span></div>`).join('')||emptyState('No packs installed yet','Install from the catalogue or import a pack from USB.')}
     </div>`;
+  restoreContentFetchPanel();
+  resumeContentFetchesFromCatalogue(packs);
+}
+function serviceByName(services,name){
+  return (services||[]).find(s=>s.name===name)||{name,ok:false,url:''};
+}
+function packInstalled(catPacks,id){
+  const p=(catPacks||[]).find(x=>x.id===id);
+  return !!(p&&p.installed);
+}
+async function renderLibrary(){
+  renderTopbar('library');
+  const [sv,cat]=await Promise.all([
+    api('/api/system/services'),
+    api('/api/content/catalogue'),
+  ]);
+  const kiwix=serviceByName(sv.services,'kiwix');
+  const packs=cat.packs||[];
+  const features=[
+    {id:'atlas.knowledge.wikipedia-en',title:'Wikipedia (starter)',desc:'Curated articles + top-100 English ZIM for offline browsing.',size:'~13 MB',status:'live'},
+    {id:'atlas.knowledge.wikipedia-en-mini',title:'Complete Wikipedia (mini)',desc:'Full English Wikipedia mini dump for Kiwix.',size:'~12 GB',status:'live'},
+    {id:'atlas.knowledge.medicine-en',title:'Medical / first aid',desc:'English Wikipedia medicine mini — offline clinical & first-aid reference.',size:'~155 MB',status:'live'},
+    {id:'atlas.knowledge.howto-ifixit-en',title:'DIY repair / how-to',desc:'iFixit English repair guides offline via Kiwix.',size:'~3.3 GB',status:'live'},
+    {id:'atlas.knowledge.gutenberg-en',title:'Project Gutenberg books',desc:'English literature slice (LCC PN). Full Gutenberg is OEM/external only.',size:'~3 GB',status:'live'},
+  ];
+  const cards=features.map(f=>{
+    const installed=packInstalled(packs,f.id);
+    const listed=packs.some(p=>p.id===f.id);
+    const st=installed?chip('Installed','ok'):(listed?chip('Available','neutral'):chip('Pending pack','warn'));
+    const action=installed
+      ?`<button class="btn" type="button" onclick="window.open(KIWIX_URL,'_blank','noopener')">Open in Library</button>`
+      :(listed
+        ?`<button class="btn" type="button" onclick="installCataloguePack('${escapeHtml(f.id)}')">Install</button>`
+        :`<button class="btn secondary" type="button" disabled>Not on device</button>`);
+    return `<div class="feature-card">
+      <h3>${escapeHtml(f.title)}</h3>
+      <p>${escapeHtml(f.desc)}</p>
+      <div class="meta">${escapeHtml(f.size)} · ${st}</div>
+      ${action}
+    </div>`;
+  }).join('');
+  const statusCard=kiwix.ok
+    ?`<div class="callout"><strong>Library is online</strong>
+        <p>Kiwix Serve is answering on <code>127.0.0.1:8080</code>. Install ZIM packs below, then browse here or in a new tab.</p>
+        <p class="powered-by">Atlas Library is powered by Kiwix — content stays on this device.</p>
+      </div>`
+    :`<div class="callout warn"><strong>Library service offline</strong>
+        <p>Atlas starts Kiwix with the core compose stack after first boot. If it stays down, from a terminal on this device:</p>
+        <p><code>sudo docker compose -f /srv/atlas/compose/atlas-core.yml up -d kiwix</code></p>
+        <p class="powered-by">ZIMs live under <code>/srv/atlas/kiwix</code> once installed from Content.</p>
+      </div>`;
+  view.innerHTML=`<p class="page-intro">Browse offline encyclopedias, medical refs, DIY guides, and books on this device. Install packs download ZIMs at install time (not shipped in the ISO).</p>
+    ${statusCard}
+    <div class="btn-group" style="margin:.75rem 0">
+      <a class="btn" href="${KIWIX_URL}" target="_blank" rel="noopener">Open Library viewer</a>
+      <button class="btn secondary" type="button" onclick="location.hash='#/content'">Browse Content catalogue</button>
+      <button class="btn ghost" type="button" onclick="page()">Refresh status</button>
+    </div>
+    ${sectionHead('Install library content','Wikipedia starter is small; full dumps, iFixit, and Gutenberg need free disk and confirm.')}
+    <div class="feature-grid">${cards}</div>
+    ${contentFetchPanelHtml()}
+    <div class="card">
+      <h3>Viewer</h3>
+      <p style="font-size:.85rem;color:var(--text-2)">Embedded when the service is up. If the frame stays blank (browser frame policy), use <strong>Open Library viewer</strong>.</p>
+      ${kiwix.ok
+        ?`<div class="viewer-frame-wrap"><iframe class="viewer-frame" title="Atlas Library (Kiwix)" src="${KIWIX_URL}" referrerpolicy="no-referrer"></iframe></div>`
+        :emptyState('Viewer unavailable','Start Kiwix, then refresh this page.')}
+    </div>`;
+  restoreContentFetchPanel();
+}
+async function renderEducation(){
+  renderTopbar('education');
+  const [sv,cat]=await Promise.all([
+    api('/api/system/services'),
+    api('/api/content/catalogue'),
+  ]);
+  const kolibri=serviceByName(sv.services,'kolibri');
+  const packs=cat.packs||[];
+  const kidsId='atlas.education.kids-home';
+  const kidsInstalled=packInstalled(packs,kidsId);
+  const kidsListed=packs.some(p=>p.id===kidsId);
+  const statusCard=kolibri.ok
+    ?`<div class="callout"><strong>Education platform is online</strong>
+        <p>Kolibri is answering on <code>127.0.0.1:8083</code>. Open the viewer for courses, exercises, and progress tracking.</p>
+        <p class="powered-by">Atlas Education is powered by Kolibri — Learning Equality. Not NOMAD setup.</p>
+      </div>`
+    :`<div class="callout warn"><strong>Education service offline</strong>
+        <p>Kolibri is part of the Atlas core compose stack. Start it on this device with:</p>
+        <p><code>sudo docker compose -f /srv/atlas/compose/atlas-core.yml up -d kolibri</code></p>
+        <p>Data directory: <code>/srv/atlas/kolibri</code>. Command Centre cannot start Docker itself (security boundary).</p>
+      </div>`;
+  const kidsBtn=kidsInstalled
+    ?`<button class="btn secondary" type="button" onclick="location.hash='#/knowledge'">Open in Knowledge</button>`
+    :(kidsListed
+      ?`<button class="btn" type="button" onclick="installCataloguePack('${kidsId}')">Install Kids Home Learning</button>`
+      :`<button class="btn secondary" type="button" disabled>Pack unavailable</button>`);
+  const channelRows=[
+    {title:'Khan Academy math / science',state:'pending',note:'Channel IDs and licences not locked for alpha — import via Kolibri when online, or ship as a future atlas.education.kolibri-* pack.'},
+    {title:'K-12 curriculum channels',state:'pending',note:'Same lock process as product.md §52.10 — exact channel versions required before ISO inclusion.'},
+    {title:'Interactive exercises / quizzes',state:'live',note:'Available inside Kolibri once a channel is imported on this device.'},
+    {title:'Progress tracking',state:'live',note:'Built into Kolibri learner accounts on 127.0.0.1:8083.'},
+    {title:'Kids Home Learning (AI tutors)',state:kidsInstalled?'live':'available',note:'Markdown curriculum indexed for local agents — works offline without Kolibri channels.'},
+  ].map(r=>{
+    const chipKind=r.state==='live'?'ok':(r.state==='available'?'neutral':'warn');
+    const label=r.state==='live'?'Live':(r.state==='available'?'Install':'Pending');
+    return `<div class="stat-row"><span><strong>${escapeHtml(r.title)}</strong><br/><span style="font-size:.8rem;color:var(--muted)">${escapeHtml(r.note)}</span></span><span>${chip(label,chipKind)}</span></div>`;
+  }).join('');
+  view.innerHTML=`<p class="page-intro">Interactive offline learning with video courses and exercises on this device. Atlas runs Kolibri locally — you do not need NOMAD’s admin UI.</p>
+    ${statusCard}
+    <div class="btn-group" style="margin:.75rem 0">
+      <a class="btn" href="${KOLIBRI_URL}" target="_blank" rel="noopener">Open Education viewer</a>
+      <button class="btn secondary" type="button" onclick="location.hash='#/content'">Browse Content catalogue</button>
+      <button class="btn ghost" type="button" onclick="page()">Refresh status</button>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Kids Home Learning</h3>
+        <p>Starter maths, reading, science, and geography lessons for local AI tutors. Ships as a small offline pack.</p>
+        <div class="btn-group" style="margin-top:.75rem">${kidsBtn}</div>
+      </div>
+      <div class="card">
+        <h3>Kolibri channels</h3>
+        <p>Large video channels (e.g. Khan Academy) are <strong>not</strong> in the core ISO. When the Education viewer is up: use Kolibri’s <em>Import channel</em> (online) or load a channel export from USB into <code>/srv/atlas/kolibri</code>.</p>
+      </div>
+    </div>
+    ${sectionHead('Capability status','Honest alpha status for planned education features.')}
+    <div class="card">${channelRows}</div>
+    ${contentFetchPanelHtml()}
+    <div class="card">
+      <h3>Viewer</h3>
+      <p style="font-size:.85rem;color:var(--text-2)">Embedded when Kolibri is up. Prefer a new tab if the frame is blocked.</p>
+      ${kolibri.ok
+        ?`<div class="viewer-frame-wrap"><iframe class="viewer-frame" title="Atlas Education (Kolibri)" src="${KOLIBRI_URL}" referrerpolicy="no-referrer"></iframe></div>`
+        :emptyState('Viewer unavailable','Start Kolibri with the compose command above, then refresh.')}
+    </div>`;
+  restoreContentFetchPanel();
 }
 async function previewPack(path){
   const r=await api('/api/content/preview?path='+encodeURIComponent(path));
@@ -1202,24 +1802,242 @@ async function previewPack(path){
     </div>`;
 }
 async function installPackPath(path){
+  _contentFetchState=null; paintContentFetchPanel(null);
   showMsg('contentMsg','Installing…','info');
-  const r=await api('/api/content/install',{method:'POST',body:JSON.stringify({path})});
+  const r=await api('/api/content/install',{method:'POST',body:JSON.stringify({path,confirm_large:true})});
   if(r.error||!r.ok){
     showMsg('contentMsg',r.error||'Install failed','err');
     return;
   }
-  showMsg('contentMsg','Installed '+r.name+' to '+r.target,'ok');
-  renderContent();
+  await followInstallFetch(r, {refreshDuring:true});
+}
+async function pollMapsFetch(installResult){
+  const country=(installResult.target||'').split('/').filter(Boolean).pop()
+    ||installResult.country||'';
+  return pollContentFetch({
+    label:'Map tiles',
+    statusUrl:'/api/content/maps-fetch-status?country='+encodeURIComponent(country),
+    retryKind:'maps',
+    packId:installResult.id||'',
+    country,
+    totalHint:installResult.tiles_size_hint_bytes||installResult.size_hint_bytes||0,
+    startMessage:'Downloading map tiles — progress updates as the extract grows…',
+    failPrefix:'Pack installed, but tile download failed',
+    okMessage:'Tiles ready offline — open Maps to view',
+  });
+}
+async function pollZimFetch(installResult){
+  const slug=installResult.zim_pack_slug||installResult.pack_slug||(installResult.id||'').split('.').pop()||'';
+  return pollContentFetch({
+    label:'Library ZIM',
+    statusUrl:'/api/content/zim-fetch-status?pack='+encodeURIComponent(slug),
+    retryKind:'zim',
+    packId:installResult.id||'',
+    packSlug:slug,
+    totalHint:installResult.zim_size_hint_bytes||0,
+    startMessage:'Downloading Library ZIM…',
+    failPrefix:'Pack installed, but ZIM download failed',
+    okMessage:'ZIM ready for Atlas Library (Kiwix)',
+  });
+}
+async function pollExpandFetch(installResult){
+  const slug=installResult.expand_pack_slug||(installResult.id||'').split('.').pop()||'';
+  return pollContentFetch({
+    label:'Curriculum expand',
+    statusUrl:'/api/content/expand-fetch-status?pack='+encodeURIComponent(slug),
+    retryKind:'expand',
+    packId:installResult.id||'',
+    startMessage:'Downloading expand bundle…',
+    failPrefix:'Starter lessons installed, but expand download failed',
+    okMessage:'Expand bundle indexed',
+  });
+}
+async function followInstallFetch(r, opts){
+  opts=opts||{};
+  const refreshDuring=!!opts.refreshDuring;
+  if(r.tiles_status==='fetching'){
+    showMsg('contentMsg','Installed '+r.name+' — downloading map tiles…','info');
+    // Seed sticky panel immediately, refresh catalogue chip, keep polling.
+    paintContentFetchPanel({
+      label:'Map tiles', status:'starting', phase:'starting', done:false,
+      downloaded:0, total:r.tiles_size_hint_bytes||r.size_hint_bytes||0,
+      indeterminate:true, message:'Starting map tile download…',
+      packId:r.id||'', country:(r.target||'').split('/').filter(Boolean).pop()||r.country||'',
+      retryKind:'maps',
+    });
+    const pollPromise=pollMapsFetch(r);
+    if(refreshDuring) await refreshContentPage();
+    await pollPromise;
+    await refreshContentPage();
+  }else if(r.zim_status==='fetching'){
+    showMsg('contentMsg','Installed '+r.name+' — downloading Library ZIM…','info');
+    const pollPromise=pollZimFetch(r);
+    if(refreshDuring) await refreshContentPage();
+    await pollPromise;
+    await refreshContentPage();
+  }else if(r.expand_status==='fetching'){
+    showMsg('contentMsg','Installed '+r.name+' — downloading expand bundle…','info');
+    const pollPromise=pollExpandFetch(r);
+    if(refreshDuring) await refreshContentPage();
+    await pollPromise;
+    await refreshContentPage();
+  }else{
+    showMsg('contentMsg','Installed '+r.name+(r.tiles_status==='ready'?' (tiles ready)':(r.zim_status==='ready'?' (ZIM ready)':(' to '+(r.target||'')))),'ok');
+    if(refreshDuring) await refreshContentPage();
+  }
+}
+function currentContentPage(){
+  const id=(location.hash.replace('#/','')||'home');
+  if(id==='library') return renderLibrary;
+  if(id==='education') return renderEducation;
+  return renderContent;
+}
+async function refreshContentPage(){
+  const fn=currentContentPage();
+  await fn();
+  restoreContentFetchPanel();
 }
 async function installCataloguePack(id){
+  _contentFetchState=null; paintContentFetchPanel(null);
   showMsg('contentMsg','Installing bundled pack…','info');
-  const r=await api('/api/content/install',{method:'POST',body:JSON.stringify({catalogue_id:id})});
+  let r=await api('/api/content/install',{method:'POST',body:JSON.stringify({catalogue_id:id})});
+  if(r.error==='large_pack_confirm_required'||r.error==='large_map_confirm_required'){
+    const warn=r.size_warning||('This pack may download ~'+Math.round((r.size_hint_bytes||0)/1e9)+' GB.');
+    const lic=r.licence_note?('\n\nLicence: '+r.licence_note):'';
+    if(!confirm(warn+lic+'\n\nContinue install and download?')){
+      showMsg('contentMsg','Install cancelled','info');
+      return;
+    }
+    r=await api('/api/content/install',{method:'POST',body:JSON.stringify({catalogue_id:id,confirm_large:true})});
+  }
   if(r.error||!r.ok){
     showMsg('contentMsg',r.error||'Install failed','err');
     return;
   }
-  showMsg('contentMsg','Installed '+r.name,'ok');
-  renderContent();
+  await followInstallFetch(r, {refreshDuring:true});
+}
+async function retryFetchTiles(id,country){
+  showMsg('contentMsg','Retrying map tile download…','info');
+  const r=await api('/api/content/fetch-tiles',{method:'POST',body:JSON.stringify({id,country})});
+  if(r.error==='bad_response'){
+    showMsg('contentMsg','Tile download failed to start (empty/invalid server response). Check atlas-command-centre logs and retry.','err');
+    return;
+  }
+  if(r.error){ showMsg('contentMsg',r.error,'err'); return; }
+  paintContentFetchPanel({
+    label:'Map tiles', status:'starting', phase:'starting', done:false,
+    downloaded:0, total:r.tiles_size_hint_bytes||0, indeterminate:true,
+    message:'Retrying map tile download…', packId:id, country:r.country||country, retryKind:'maps',
+  });
+  const pollPromise=pollMapsFetch({
+    id,
+    target:r.target||('/srv/atlas/maps/'+(country||'')),
+    country:r.country||country,
+    tiles_size_hint_bytes:r.tiles_size_hint_bytes||0,
+  });
+  await refreshContentPage();
+  await pollPromise;
+  await refreshContentPage();
+}
+function mapsFullUrl(country){
+  const cc=(country||'uk').toLowerCase();
+  return '/maps/?country='+encodeURIComponent(cc);
+}
+function openAtlasMap(country){
+  // Full-page viewer — avoids CC #/maps embed races (page() wipe / collapsed flex canvas).
+  location.assign(mapsFullUrl(country||'uk'));
+}
+async function ensureAtlasMapsApp(){
+  if(window.AtlasMaps && typeof AtlasMaps.mount==='function') return;
+  await new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='/maps/lib/atlas-maps-app.js?v='+Date.now();
+    s.onload=()=>resolve();
+    s.onerror=()=>reject(new Error('Failed to load /maps/lib/atlas-maps-app.js'));
+    document.head.appendChild(s);
+  });
+}
+let _mapsEmbedGen=0;
+async function renderMaps(params){
+  const cc=((params&&params.get('country'))||'uk').toLowerCase();
+  const fullUrl=mapsFullUrl(cc);
+  // Always leave the SPA shell for the standalone viewer (html/body 100% → reliable WebGL).
+  // Do not leave users on an empty #/maps landing with “Open Maps” buttons.
+  try{
+    location.replace(fullUrl);
+  }catch(_e){
+    try{ location.href=fullUrl; }catch(__e){}
+  }
+  // Fallback only if navigation somehow stays on this document (rare / hash-only hosts).
+  view.innerHTML=`<div class="maps-page-shell">
+    <div class="maps-toolbar">
+      <a class="btn" href="${fullUrl}">Open Maps (full page)</a>
+      <button type="button" class="btn secondary" onclick="location.hash='#/content'">Install packs</button>
+      <button type="button" class="btn secondary" id="atlasMapsRefreshBtn">Retry embed</button>
+      <p class="maps-hint">Redirecting to <code>${fullUrl}</code>… If this page stays, click Open Maps or open <code>/maps/diag</code>.</p>
+    </div>
+    <div id="atlasMapsHost" class="maps-frame-wrap" role="region" aria-label="Atlas Maps">
+      <div style="padding:1.25rem;color:var(--text-3)">Opening <a href="${fullUrl}">${fullUrl}</a>…</div>
+    </div>
+  </div>`;
+  const host=document.getElementById('atlasMapsHost');
+  const refreshBtn=document.getElementById('atlasMapsRefreshBtn');
+  const gen=++_mapsEmbedGen;
+  const boot=async()=>{
+    const my=++_mapsEmbedGen;
+    try{
+      if(host) host.innerHTML='<div style="padding:1rem;color:var(--text-3)">Loading map libraries…</div>';
+      await ensureAtlasMapsApp();
+      if(my!==_mapsEmbedGen || !host || !host.isConnected) return;
+      host.innerHTML='';
+      const h=Math.max(560, Math.floor(window.innerHeight*0.65));
+      host.style.cssText='position:relative;display:block;width:100%;height:'+h+'px;min-height:560px;border:1px solid var(--border-strong);border-radius:var(--radius);background:#0f1419;overflow:hidden';
+      await AtlasMaps.mount(host,{
+        country:cc||undefined,
+        contentUrl:location.origin+'/#/content',
+        catalogueUrl:location.origin+'/api/content/catalogue',
+      });
+      if(my!==_mapsEmbedGen) return;
+      requestAnimationFrame(()=>{
+        try{ AtlasMaps.resize(); }catch(_e){}
+        setTimeout(()=>{ try{ AtlasMaps.resize(); }catch(_e){} },120);
+        setTimeout(()=>{ try{ AtlasMaps.resize(); }catch(_e){} },400);
+      });
+    }catch(e){
+      if(my!==_mapsEmbedGen || !host) return;
+      host.innerHTML='<div style="padding:1.25rem;color:var(--danger)"><strong>Maps failed to start</strong><p style="color:var(--text-3)">'+(e&&e.message?e.message:e)+'</p><p style="color:var(--text-3)">Open <a href="'+fullUrl+'">'+fullUrl+'</a> on port 8787.</p></div>';
+    }
+  };
+  if(refreshBtn){
+    refreshBtn.addEventListener('click',(ev)=>{ ev.preventDefault(); boot(); });
+  }
+  await new Promise(r=>setTimeout(r,80));
+  if(location.hash.replace(/^#\/?/,'').split('?')[0]==='maps' && gen===_mapsEmbedGen){
+    await boot();
+  }
+}
+async function retryFetchZim(id){
+  showMsg('contentMsg','Retrying Library ZIM download…','info');
+  const r=await api('/api/content/fetch-zim',{method:'POST',body:JSON.stringify({id})});
+  if(r.error){ showMsg('contentMsg',r.error,'err'); return; }
+  const slug=r.pack_slug||r.zim_pack_slug||(id||'').split('.').pop()||'';
+  paintContentFetchPanel({
+    label:'Library ZIM', status:'starting', phase:'starting', done:false,
+    downloaded:0, total:r.zim_size_hint_bytes||0, indeterminate:true,
+    message:'Retrying ZIM download…', packId:id, packSlug:slug, retryKind:'zim',
+  });
+  const pollPromise=pollZimFetch({id,zim_pack_slug:slug,zim_size_hint_bytes:r.zim_size_hint_bytes||0});
+  await refreshContentPage();
+  await pollPromise;
+  await refreshContentPage();
+}
+async function retryFetchExpand(id){
+  showMsg('contentMsg','Retrying curriculum expand download…','info');
+  const r=await api('/api/content/fetch-expand',{method:'POST',body:JSON.stringify({id})});
+  if(r.error){ showMsg('contentMsg',r.error,'err'); return; }
+  await pollExpandFetch({id,expand_pack_slug:r.pack_slug});
+  await renderContent();
+  restoreContentFetchPanel();
 }
 async function uninstallPack(id){
   if(!confirm('Remove pack “'+id+'”? Installed files will be rolled back.')) return;
@@ -1499,7 +2317,11 @@ let _pullTimer=null;
 let _activePullJobs=[];
 let _pullRefreshPending=false;
 function onModelsHash(){
-  return (location.hash.replace('#/','')||'home')==='models';
+  const id=location.hash.replace('#/','')||'home';
+  return id==='models'||id==='setup';
+}
+function onSetupHash(){
+  return (location.hash.replace('#/','')||'home')==='setup';
 }
 function setPullJobs(jobs){
   _activePullJobs=(jobs||[]).slice();
@@ -1593,7 +2415,8 @@ async function pollPulls(immediate){
         _pullRefreshPending=true;
         setTimeout(()=>{
           _pullRefreshPending=false;
-          if(onModelsHash()) renderModels();
+          if(onSetupHash()) renderSetupWizard();
+          else if(onModelsHash()) renderModels();
         },800);
       }
     }
@@ -1791,9 +2614,322 @@ async function applyUpdateConfirmed(path){
   }
   showMsg('updMsg','Applied '+ (r.version||r.detail),'ok');
 }
-async function nextStep(){
-  await api('/api/setup/advance',{method:'POST',body:'{}'});
+async function applyDefaultAgentFromSetup(){
+  try{
+    const st=await api('/api/setup/state');
+    const id=(st.choices&&st.choices.default_agent)||'';
+    const s=document.getElementById('agent');
+    if(s&&id){
+      const opt=[...s.options].find(o=>o.value===id);
+      if(opt) s.value=id;
+    }
+  }catch(_){}
+}
+
+const WIZARD_LABELS={
+  welcome:'Welcome',
+  device:'Device',
+  ai:'AI model',
+  content:'Content',
+  sharing:'Sharing',
+  agents:'Agents',
+  recovery:'Recovery',
+};
+
+let _wizardDraft={network_mode:null,default_agent:null,model_tag:null,content_ids:[]};
+
+async function renderSetupWizard(){
+  const st=await api('/api/setup/state');
+  const steps=st.steps||['welcome','device','ai','content','sharing','agents','recovery'];
+  const step=Math.max(1,Math.min(steps.length,Number(st.step)||1));
+  const current=steps[step-1]||'welcome';
+  const choices=st.choices||{};
+  const live=st.live||{};
+  const pct=Math.round((step/steps.length)*100);
+  _wizardDraft={
+    network_mode:choices.network_mode||_wizardDraft.network_mode||'private_device',
+    default_agent:choices.default_agent||_wizardDraft.default_agent||'atlas.guide',
+    model_tag:choices.model_tag||_wizardDraft.model_tag||null,
+    content_ids:Array.isArray(choices.content_ids)?choices.content_ids.slice():(_wizardDraft.content_ids||[]),
+  };
+  const dots=steps.map((s,i)=>{
+    const n=i+1;
+    const cls=n<step?'done':(n===step?'current':'');
+    return `<li class="${cls}">${n}. ${escapeHtml(WIZARD_LABELS[s]||s)}</li>`;
+  }).join('');
+  const body=wizardStepHtml(current,st,live);
+  const canSkip=(current==='ai'&&live.model&&live.model.ready)
+    ||['content','agents','recovery','sharing'].includes(current);
+  const isLast=step>=steps.length;
+  const backBtn=step>1?`<button type="button" class="btn secondary" onclick="wizardBack()">Back</button>`:'';
+  const skipBtn=canSkip&&!isLast?`<button type="button" class="btn secondary" onclick="wizardSkip()">Skip</button>`:'';
+  const nextBtn=isLast
+    ?`<button type="button" class="btn" id="wizFinishBtn" onclick="wizardFinish(false)">Finish setup</button>`
+    :`<button type="button" class="btn" id="wizNextBtn" onclick="wizardNext()">Next</button>`;
+  const doneNote=st.completed?`<div class="msg ok" style="margin-bottom:1rem">Setup already completed. You can revisit any step.</div>`:'';
+  view.innerHTML=`<div class="wizard-wrap">
+    ${doneNote}
+    <p class="page-intro">Step ${step} of ${steps.length}: <strong>${escapeHtml(WIZARD_LABELS[current]||current)}</strong></p>
+    <ul class="wizard-steps">${dots}</ul>
+    <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="wizard-panel">${body}</div>
+    <div id="wizMsg"></div>
+    <div class="wizard-nav">${backBtn}<span class="spacer"></span>${skipBtn}${nextBtn}</div>
+  </div>`;
+  if(current==='ai'){
+    const jobs=(live.model&&live.model.pull_jobs)||[];
+    setPullJobs(jobs);
+    if(jobs.some(j=>j.status==='queued'||j.status==='running')) pollPulls(true);
+  }
+  if(current==='content') restoreContentFetchPanel();
+}
+
+function wizardStepHtml(current,st,live){
+  if(current==='welcome'){
+    return `<h2>Welcome to Atlas</h2>
+      <p>Atlas is local-first: AI, knowledge, and agents run on this device. Internet is only needed when you choose to download models or packs.</p>
+      <p>This short wizard configures your device, AI model, optional content, network sharing, default agent, and a recovery backup.</p>`;
+  }
+  if(current==='device'){
+    const rec=live.recommend||{};
+    const hw=rec.hardware||{};
+    const gpu=live.gpu||{};
+    const ram=rec.ram_gb||hw.ram_gb||'?';
+    const vram=rec.vram_gb||hw.vram_gb;
+    const profile=rec.profile||hw.profile||'?';
+    const gpuName=(gpu.gpus&&gpu.gpus[0]&&gpu.gpus[0].name)||gpu.name||rec.gpu||'none detected';
+    return `<h2>Your device</h2>
+      <p>Atlas probed this machine so recommendations stay realistic.</p>
+      <div class="stat-row"><span>RAM</span><span><strong>${escapeHtml(String(ram))} GB</strong></span></div>
+      <div class="stat-row"><span>GPU</span><span><strong>${escapeHtml(String(gpuName))}</strong></span></div>
+      ${vram!=null?`<div class="stat-row"><span>VRAM</span><span><strong>${escapeHtml(String(vram))} GB</strong></span></div>`:''}
+      <div class="stat-row"><span>Model profile</span><span><strong>${escapeHtml(String(profile))}</strong></span></div>`;
+  }
+  if(current==='ai'){
+    const m=live.model||{};
+    const rec=m.recommended||(live.recommend&&live.recommend.recommended)||null;
+    const ready=!!m.ready;
+    const tag=rec&&rec.tag;
+    if(tag) _wizardDraft.model_tag=tag;
+    return `<h2>AI model</h2>
+      <p>Download a local model once. Chat and agents stay offline afterwards.</p>
+      ${ready?`<div class="msg ok">A model is ready${m.profile?' ('+escapeHtml(m.profile)+')':''}.</div>`:''}
+      ${rec?`<div class="callout" style="margin-top:.75rem">
+        <strong>${escapeHtml(rec.title||rec.tag)}</strong>
+        <p>${escapeHtml(rec.blurb||'')} · ~${escapeHtml(String(rec.size_gb||'?'))} GB · <code>${escapeHtml(rec.tag)}</code>
+          ${rec.installed?' · installed':''}</p>
+        ${rec.installed||ready?'':`<button type="button" class="btn dl-btn" data-tag="${escapeHtml(rec.tag)}" onclick="wizardPullModel('${escapeHtml(rec.tag)}')">Download recommended</button>`}
+      </div>`:`<p class="msg info">No beginner recommendation for this hardware — visit Models after setup.</p>`}
+      <div class="download-panel" id="downloadPanel" style="margin-top:1rem">
+        <h2>Download progress</h2>
+        <div id="pullJobs"><p class="download-msg">No download in progress.</p></div>
+      </div>
+      ${!m.ollama_reachable?'<p class="msg err" style="margin-top:.75rem">Ollama is not running. Start it before downloading.</p>':''}`;
+  }
+  if(current==='content'){
+    const packs=((live.catalogue&&live.catalogue.packs)||[]);
+    if(!packs.length){
+      return `<h2>Content packs</h2>
+        <p>Optional maps and knowledge packs. The catalogue is empty on this device — you can skip and install later from Content.</p>`;
+    }
+    const rows=packs.map(p=>{
+      const id=p.id;
+      return `<div class="wiz-pack-row">
+        <div>
+          <strong>${escapeHtml(p.name||id)}</strong>
+          <div style="font-size:.8125rem;color:var(--text-3)">${escapeHtml(p.description||p.type||'')}</div>
+        </div>
+        <div>
+          ${p.installed?`<span class="chip chip-ok">Installed</span>`
+            :`<button type="button" class="btn secondary" id="wizPack_${escapeHtml(id)}" onclick="wizardInstallPack('${escapeHtml(id)}')">Install</button>`}
+        </div>
+      </div>`;
+    }).join('');
+    return `<h2>Content packs</h2>
+      <p>Install optional offline packs now, or skip and add them later. Large map/Wikipedia downloads show progress below.</p>
+      ${contentFetchPanelHtml()}
+      <div class="card panel">${rows}</div>
+      <div id="wizContentMsg" style="margin-top:.5rem"></div>`;
+  }
+  if(current==='sharing'){
+    const cur=_wizardDraft.network_mode||'private_device';
+    const liveMode=(live.network&&live.network.mode)||'private_device';
+    const opts=[
+      ['private_device','This device only','Loopback / private — strongest default.'],
+      ['trusted_lan','Trusted LAN','Share on your local network when you trust it.'],
+      ['private_hotspot','Private hotspot','Expose Atlas via a controlled hotspot profile.'],
+      ['later','Decide later','Keep the firstboot default; change anytime in System.'],
+    ];
+    return `<h2>Network sharing</h2>
+      <p>Current mode: <strong>${escapeHtml(liveMode)}</strong>. Pick how Atlas should be reachable.</p>
+      ${opts.map(([id,title,desc])=>
+        `<button type="button" class="wiz-choice ${cur===id?'selected':''}" onclick="wizardPickNetwork('${id}',this)">
+          <strong>${escapeHtml(title)}</strong><span>${escapeHtml(desc)}</span>
+        </button>`).join('')}`;
+  }
+  if(current==='agents'){
+    const agents=live.agents||[];
+    const cur=_wizardDraft.default_agent||'atlas.guide';
+    if(!agents.length){
+      return `<h2>Default agent</h2><p>No agents loaded yet — Atlas Guide will be used by default.</p>`;
+    }
+    return `<h2>Default agent</h2>
+      <p>Choose which assistant opens first in Chat.</p>
+      ${agents.map(a=>
+        `<button type="button" class="wiz-choice ${cur===a.id?'selected':''}" onclick="wizardPickAgent('${escapeHtml(a.id)}',this)">
+          <strong>${escapeHtml(a.name||a.id)}</strong><span>${escapeHtml(a.purpose||'')}</span>
+        </button>`).join('')}`;
+  }
+  if(current==='recovery'){
+    return `<h2>Recovery backup</h2>
+      <p>Create an encrypted backup of Atlas data before you finish. You can skip and back up later from System.</p>
+      <div class="inline-form">
+        <input id="wizBakPass" type="password" placeholder="Backup passphrase" autocomplete="new-password" />
+        <button type="button" class="btn secondary" onclick="wizardCreateBackup()">Create backup</button>
+      </div>
+      <div id="wizBakMsg" style="margin-top:.5rem"></div>
+      <p style="margin-top:1rem;font-size:.85rem;color:var(--text-3)">Finish marks setup complete and returns you to Home.</p>
+      <button type="button" class="btn secondary" style="margin-top:.5rem" onclick="wizardFinish(true)">Skip backup &amp; finish</button>`;
+  }
+  return `<h2>${escapeHtml(current)}</h2><p>Continue to the next step.</p>`;
+}
+
+function wizardPickNetwork(mode,el){
+  _wizardDraft.network_mode=mode;
+  document.querySelectorAll('.wiz-choice').forEach(n=>n.classList.remove('selected'));
+  if(el) el.classList.add('selected');
+}
+function wizardPickAgent(id,el){
+  _wizardDraft.default_agent=id;
+  document.querySelectorAll('.wiz-choice').forEach(n=>n.classList.remove('selected'));
+  if(el) el.classList.add('selected');
+}
+async function wizardPullModel(tag){
+  await pullModel(tag,null);
+  _wizardDraft.model_tag=tag;
+}
+async function wizardInstallPack(id){
+  showMsg('wizContentMsg','Installing '+id+'…','info');
+  let r=await api('/api/content/install',{method:'POST',body:JSON.stringify({catalogue_id:id})});
+  if(r.error==='large_pack_confirm_required'||r.error==='large_map_confirm_required'){
+    const warn=r.size_warning||'This map pack may download a large tile archive.';
+    if(!confirm(warn+'\n\nContinue?')){
+      showMsg('wizContentMsg','Install cancelled','info');
+      return;
+    }
+    r=await api('/api/content/install',{method:'POST',body:JSON.stringify({catalogue_id:id,confirm_large:true})});
+  }
+  if(r.error||r._status>=400){
+    showMsg('wizContentMsg',r.error||'Install failed','err');
+    return;
+  }
+  if(!_wizardDraft.content_ids.includes(id)) _wizardDraft.content_ids.push(id);
+  if(r.tiles_status==='fetching'){
+    showMsg('wizContentMsg','Installed '+id+' — downloading tiles…','info');
+    await pollMapsFetch(r);
+  }else if(r.zim_status==='fetching'){
+    showMsg('wizContentMsg','Installed '+id+' — downloading Wikipedia ZIM…','info');
+    await pollZimFetch(r);
+  }else if(r.expand_status==='fetching'){
+    showMsg('wizContentMsg','Installed '+id+' — downloading expand bundle…','info');
+    await pollExpandFetch(r);
+  }else{
+    showMsg('wizContentMsg','Installed '+id,'ok');
+  }
+  const btn=document.getElementById('wizPack_'+id);
+  if(btn) btn.outerHTML='<span class="chip chip-ok">Installed</span>';
+  await api('/api/setup/save',{method:'POST',body:JSON.stringify({choices:{content_ids:_wizardDraft.content_ids}})});
+}
+async function wizardCreateBackup(){
+  const pass=(document.getElementById('wizBakPass')||{}).value||'';
+  if(!pass){showMsg('wizBakMsg','Enter a passphrase.','err');return;}
+  showMsg('wizBakMsg','Creating encrypted backup…','info');
+  const r=await api('/api/backup/create',{method:'POST',body:JSON.stringify({passphrase:pass})});
+  if(r.error||!r.ok){showMsg('wizBakMsg',r.error||'Backup failed','err');return;}
+  showMsg('wizBakMsg','Saved '+(r.path||'backup'),'ok');
+}
+async function wizardPersist(step,extraChoices,completed){
+  const choices={
+    network_mode:_wizardDraft.network_mode,
+    default_agent:_wizardDraft.default_agent,
+    model_tag:_wizardDraft.model_tag,
+    content_ids:_wizardDraft.content_ids||[],
+    ...(extraChoices||{}),
+  };
+  const body={step,choices};
+  if(completed!=null) body.completed=!!completed;
+  return api('/api/setup/save',{method:'POST',body:JSON.stringify(body)});
+}
+async function wizardApplySharing(){
+  const mode=_wizardDraft.network_mode||'later';
+  if(mode==='later'||mode==null){
+    return api('/api/network/mode',{method:'POST',body:JSON.stringify({mode:'later'})});
+  }
+  const r=await api('/api/network/mode',{method:'POST',body:JSON.stringify({mode})});
+  if(r.deferred){
+    showMsg('wizMsg','Network daemon unavailable — mode saved for later apply.','info');
+    return r;
+  }
+  if(r.error||r._status>=400){
+    showMsg('wizMsg',r.error||r.detail||'Could not apply network mode','err');
+    return r;
+  }
+  return r;
+}
+async function wizardNext(){
+  const st=await api('/api/setup/state');
+  const steps=st.steps||[];
+  const step=Number(st.step)||1;
+  const current=steps[step-1];
+  if(current==='sharing'){
+    const r=await wizardApplySharing();
+    if(r&&!r.deferred&&(r.error||r._status>=400)&&!r.skipped) return;
+  }
+  if(current==='ai'&&_wizardDraft.model_tag){
+    /* choice already in draft */
+  }
+  const next=Math.min(steps.length,step+1);
+  await wizardPersist(next);
   page();
+}
+async function wizardBack(){
+  const st=await api('/api/setup/state');
+  const step=Math.max(1,(Number(st.step)||1)-1);
+  await wizardPersist(step);
+  page();
+}
+async function wizardSkip(){
+  const st=await api('/api/setup/state');
+  const steps=st.steps||[];
+  const step=Number(st.step)||1;
+  const current=steps[step-1];
+  if(current==='sharing'){
+    _wizardDraft.network_mode='later';
+    await wizardApplySharing();
+  }
+  const next=Math.min(steps.length,step+1);
+  await wizardPersist(next);
+  page();
+}
+async function wizardFinish(skipBackup){
+  if(!skipBackup){
+    const pass=(document.getElementById('wizBakPass')||{}).value||'';
+    if(pass){
+      showMsg('wizMsg','Creating backup…','info');
+      const r=await api('/api/backup/create',{method:'POST',body:JSON.stringify({passphrase:pass})});
+      if(r.error||!r.ok){
+        showMsg('wizMsg',r.error||'Backup failed — fix or use Skip backup','err');
+        return;
+      }
+    }
+  }
+  const st=await api('/api/setup/state');
+  const n=(st.steps&&st.steps.length)||7;
+  await wizardPersist(n,{ },true);
+  location.hash='#/home';
+}
+async function nextStep(){
+  await wizardNext();
 }
 async function reauth(){
   const r=await api('/api/auth/reauth',{method:'POST',body:JSON.stringify({password:rp.value})});

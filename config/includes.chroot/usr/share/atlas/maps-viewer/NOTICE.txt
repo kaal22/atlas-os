@@ -1,0 +1,13 @@
+Atlas Maps viewer (offline MapLibre)
+
+Vendored browser libraries were extracted from the pinned Project NOMAD v1.33.0
+container image (already in Atlas build-cache), not fetched at runtime:
+
+- maplibre-gl (BSD) — maplibre-gl.js / maplibre-gl.css
+- pmtiles (BSD) — pmtiles.js
+- @protomaps/basemaps (BSD) — basemaps.js
+
+NOMAD MapLibre fonts/sprites/styles (base-assets.tar.gz) come from:
+https://github.com/Crosstalk-Solutions/project-nomad-maps (Apache-2.0 / ODbL attributions apply to basemap data)
+
+Tiles under /srv/atlas/maps are © OpenStreetMap contributors (ODbL) via Protomaps.

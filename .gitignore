@@ -92,3 +92,9 @@ config/package-lists/live.list.chroot
 config/includes.chroot/usr/share/atlas/payload/*.tar.zst
 config/includes.chroot/usr/bin/ollama
 dist/atlas-core-oci-payload.tar.zst
+
+# Large offline content fetched by operators (do not commit)
+content/packs/maps/**/*.pmtiles
+content/packs/maps/**/*.mbtiles
+content/packs/maps/**/.fetch-progress*
+content/packs/knowledge/**/*.zim

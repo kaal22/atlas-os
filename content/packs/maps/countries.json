@@ -1,0 +1,33 @@
+{
+  "schema": "atlas.maps.countries/v1",
+  "default_iso_set": ["uk", "us", "de", "fr", "za", "in"],
+  "tiles_defaults": {
+    "source": "protomaps",
+    "mode": "protomaps_extract",
+    "maxzoom": 11,
+    "licence": "ODbL-1.0",
+    "attribution": "© OpenStreetMap contributors (Protomaps basemap)",
+    "planet_url_docs": "https://docs.protomaps.com/basemaps/downloads",
+    "notes": "Extracts use HTTP range requests against daily builds at build.protomaps.com. Max zoom 11 keeps country packs practical; raise ATLAS_PMTILES_MAXZOOM for street detail (roughly 2x size per level)."
+  },
+  "countries": [
+    {"code": "uk", "name": "United Kingdom", "bbox": [-8.2, 49.8, 1.8, 60.9], "center": [-2.5, 54.5], "size_hint_bytes": 160000000, "size_class": "medium"},
+    {"code": "us", "name": "United States", "bbox": [-125.0, 24.0, -66.0, 50.0], "center": [-98.0, 39.0], "size_hint_bytes": 3500000000, "size_class": "large"},
+    {"code": "ca", "name": "Canada", "bbox": [-141.0, 41.0, -52.0, 84.0], "center": [-96.0, 60.0], "size_hint_bytes": 2500000000, "size_class": "large"},
+    {"code": "ie", "name": "Ireland", "bbox": [-10.7, 51.4, -5.9, 55.4], "center": [-8.0, 53.4], "size_hint_bytes": 80000000, "size_class": "small"},
+    {"code": "au", "name": "Australia", "bbox": [112.0, -44.0, 154.0, -10.0], "center": [134.0, -25.0], "size_hint_bytes": 1800000000, "size_class": "large"},
+    {"code": "nz", "name": "New Zealand", "bbox": [166.0, -48.0, 179.0, -34.0], "center": [174.0, -41.0], "size_hint_bytes": 150000000, "size_class": "small"},
+    {"code": "de", "name": "Germany", "bbox": [5.8, 47.2, 15.1, 55.1], "center": [10.4, 51.1], "size_hint_bytes": 350000000, "size_class": "medium"},
+    {"code": "fr", "name": "France", "bbox": [-5.2, 41.3, 9.6, 51.1], "center": [2.5, 46.5], "size_hint_bytes": 400000000, "size_class": "medium"},
+    {"code": "es", "name": "Spain", "bbox": [-9.4, 35.9, 4.4, 43.8], "center": [-3.7, 40.4], "size_hint_bytes": 350000000, "size_class": "medium"},
+    {"code": "it", "name": "Italy", "bbox": [6.6, 36.6, 18.6, 47.1], "center": [12.5, 42.5], "size_hint_bytes": 300000000, "size_class": "medium"},
+    {"code": "nl", "name": "Netherlands", "bbox": [3.3, 50.7, 7.3, 53.6], "center": [5.3, 52.1], "size_hint_bytes": 100000000, "size_class": "small"},
+    {"code": "in", "name": "India", "bbox": [68.1, 6.7, 97.4, 35.5], "center": [78.9, 22.0], "size_hint_bytes": 2200000000, "size_class": "large"},
+    {"code": "za", "name": "South Africa", "bbox": [16.3, -35.0, 33.0, -22.0], "center": [25.0, -29.0], "size_hint_bytes": 400000000, "size_class": "medium"},
+    {"code": "ng", "name": "Nigeria", "bbox": [2.6, 4.2, 14.7, 13.9], "center": [8.0, 9.0], "size_hint_bytes": 250000000, "size_class": "medium"},
+    {"code": "ke", "name": "Kenya", "bbox": [33.9, -4.7, 42.0, 5.0], "center": [37.9, 0.0], "size_hint_bytes": 150000000, "size_class": "small"},
+    {"code": "br", "name": "Brazil", "bbox": [-74.0, -34.0, -34.0, 5.5], "center": [-51.0, -14.0], "size_hint_bytes": 2800000000, "size_class": "large"},
+    {"code": "mx", "name": "Mexico", "bbox": [-118.5, 14.5, -86.5, 32.8], "center": [-102.0, 23.0], "size_hint_bytes": 800000000, "size_class": "medium"},
+    {"code": "jp", "name": "Japan", "bbox": [122.9, 24.0, 153.0, 45.6], "center": [138.0, 36.0], "size_hint_bytes": 400000000, "size_class": "medium"}
+  ]
+}

@@ -26,8 +26,13 @@ if ! grep -q 'def embed_texts' "$ROOT/packages/atlas-knowledge/usr/lib/atlas/kno
   echo "ERROR: knowledge_service.py missing embed_texts (Phase 5 pipeline)" >&2
   exit 1
 fi
-if ! grep -q 'openSource' "$ROOT/packages/atlas-command-centre/usr/lib/atlas/command_centre.py"; then
-  echo "ERROR: command_centre.py missing citation/source viewer hooks" >&2
+if ! grep -q '/api/knowledge/chunk' "$ROOT/packages/atlas-command-centre/usr/lib/atlas/command_centre.py"; then
+  echo "ERROR: command_centre.py missing /api/knowledge/chunk" >&2
+  exit 1
+fi
+UI_HTML="$ROOT/packages/atlas-command-centre/usr/lib/atlas/command_centre_ui.html"
+if [[ ! -f "$UI_HTML" ]] || ! grep -q 'openSource' "$UI_HTML"; then
+  echo "ERROR: command_centre_ui.html missing citation/source viewer hooks" >&2
   exit 1
 fi
 

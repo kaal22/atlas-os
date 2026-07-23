@@ -140,9 +140,102 @@ def test_rollback_on_workflow_failure():
         assert not Path(target).exists()
 
 
+def _stage_knowledge_zim_pack(stage: Path, *, pack_id: str, mount_target: str, size_hint: int) -> Path:
+    (stage / "payload").mkdir(parents=True)
+    (stage / "payload" / "README.md").write_text("Knowledge stub\n", encoding="utf-8")
+    (stage / "licences").mkdir()
+    (stage / "licences" / "CC-BY-SA-4.0.txt").write_text("CC-BY-SA", encoding="utf-8")
+    slug = pack_id.rsplit(".", 1)[-1]
+    manifest = {
+        "schema": "atlas.pack/v1",
+        "id": pack_id,
+        "version": "1.0.0",
+        "type": "atlas.content.knowledge",
+        "name": "Test Wikipedia",
+        "description": "Unit test knowledge pack",
+        "size_bytes": 4096,
+        "minimum_os_version": "0.1.0",
+        "architectures": ["all"],
+        "mount_target": mount_target,
+        "licences": ["CC-BY-SA-4.0"],
+        "sources": [],
+        "dependencies": [],
+        "conflicts": [],
+        "post_install_workflow": "",
+        "meta": {
+            "language": "eng",
+            "zim_fetch": {
+                "enabled": True,
+                "default_url": "https://example.test/wiki.zim",
+                "filename": f"{slug}.zim",
+                "size_hint_bytes": size_hint,
+            },
+        },
+        "digest": "sha256:" + "0" * 64,
+    }
+    (stage / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    out = stage.parent / f"{slug}.atlas-pack"
+    os.environ["ATLAS_ALLOW_UNSIGNED"] = "1"
+    digest = build_pack(stage, out)
+    manifest["digest"] = digest
+    (stage / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    build_pack(stage, out)
+    return out
+
+
+def test_zim_fetch_progress_fields_and_async_install_flag():
+    from content_manager import (
+        _pack_slug,
+        read_zim_fetch_progress,
+        should_auto_fetch_zim,
+        write_zim_fetch_progress,
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        atlas = Path(td) / "srv"
+        write_zim_fetch_progress(
+            atlas,
+            {
+                "pack_slug": "wikipedia-en-mini",
+                "status": "downloading",
+                "done": False,
+                "downloaded": 50,
+                "total": 200,
+                "message": "Downloading…",
+            },
+            "wikipedia-en-mini",
+        )
+        st = read_zim_fetch_progress(atlas, "wikipedia-en-mini")
+        assert st["status"] == "downloading"
+        assert st["downloaded"] == 50
+        assert st["total"] == 200
+        assert st["percent"] == 25.0
+        assert st["done"] is False
+        assert "updated_at" in st
+
+        stage = Path(td) / "stage"
+        stage.mkdir()
+        target = str(atlas / "knowledge" / "packs" / "wikipedia-en-mini")
+        pack = _stage_knowledge_zim_pack(
+            stage,
+            pack_id="atlas.knowledge.wikipedia-en-mini",
+            mount_target=target,
+            size_hint=12_000_000_000,
+        )
+        # Skip network fetch during install; Command Centre starts async itself.
+        result = install_pack(pack, atlas, fetch_tiles=False)
+        assert result["ok"]
+        manifest = json.loads((Path(target) / "manifest.json").read_text(encoding="utf-8"))
+        assert should_auto_fetch_zim(manifest, Path(target)) is True
+        assert _pack_slug(manifest, Path(target)) == "wikipedia-en-mini"
+        # Pending until async worker runs (CC path).
+        assert result.get("zim_status") in {None, "pending"}
+
+
 if __name__ == "__main__":
     test_install_and_uninstall()
     test_compat_rejects_high_os_version()
     test_checksum_mismatch_raises()
     test_rollback_on_workflow_failure()
+    test_zim_fetch_progress_fields_and_async_install_flag()
     print("OK test_content_install")

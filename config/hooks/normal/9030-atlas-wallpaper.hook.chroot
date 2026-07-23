@@ -18,6 +18,10 @@ if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-1440p.png ]; then
   cp -f /usr/share/backgrounds/atlas/atlas-wallpaper-1440p.png \
     /usr/share/wallpapers/Atlas/contents/images/2560x1440.png
 fi
+if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-4k.png ]; then
+  cp -f /usr/share/backgrounds/atlas/atlas-wallpaper-4k.png \
+    /usr/share/wallpapers/Atlas/contents/images/3840x2160.png
+fi
 
 # SDDM: point Breeze theme at Atlas wallpaper when possible
 if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png ]; then

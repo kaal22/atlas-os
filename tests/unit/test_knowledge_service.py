@@ -85,6 +85,18 @@ def test_html_extract():
         assert "evil" not in text
 
 
+def test_shared_system_pack_visible():
+    with tempfile.TemporaryDirectory() as td:
+        ks = KnowledgeService(Path(td), keyword_only=True)
+        p = Path(td) / "lesson.md"
+        p.write_text("Photosynthesis makes sugar from sunlight.", encoding="utf-8")
+        ks.ingest_file("system", p, trust="pack")
+        assert ks.search("alice", "Photosynthesis sugar")
+        assert ks.search("bob", "Photosynthesis")
+        assert ks.get_chunk("alice", next(iter(ks.docs.values())).doc_id, 0)
+        assert any(d["trust"] == "pack" for d in ks.library("alice"))
+
+
 if __name__ == "__main__":
     test_chunk_and_scrub()
     test_cross_user_isolation()
@@ -92,4 +104,5 @@ if __name__ == "__main__":
     test_get_chunk_and_delete()
     test_backup_restore_roundtrip()
     test_html_extract()
+    test_shared_system_pack_visible()
     print("OK test_knowledge_service")

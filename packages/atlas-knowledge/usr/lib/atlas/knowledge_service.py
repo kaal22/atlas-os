@@ -22,6 +22,8 @@ COLLECTION = os.environ.get("ATLAS_QDRANT_COLLECTION", "atlas_knowledge")
 VECTOR_SIZE = int(os.environ.get("ATLAS_EMBED_DIM", "768"))
 QDRANT_URL = os.environ.get("ATLAS_QDRANT_URL", "http://127.0.0.1:6333").rstrip("/")
 OLLAMA_URL = os.environ.get("ATLAS_OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
+# Pack-installed corpus is ingested as user_id "system" and is readable by every account.
+SHARED_KNOWLEDGE_USERS = frozenset({"system"})
 
 TEXT_EXTENSIONS = {".md", ".txt", ".markdown", ".rst", ".csv", ".json", ".org", ".html", ".htm"}
 PDF_EXTENSIONS = {".pdf"}
@@ -291,7 +293,11 @@ class KnowledgeService:
                 timeout=120,
             )
 
-    def ingest_file(self, user_id: str, path: Path) -> DocumentRecord:
+    @staticmethod
+    def _doc_visible(user_id: str, doc_user_id: str) -> bool:
+        return doc_user_id == user_id or doc_user_id in SHARED_KNOWLEDGE_USERS
+
+    def ingest_file(self, user_id: str, path: Path, *, trust: str = "user_document") -> DocumentRecord:
         path = Path(path)
         text = extract_text(path)
         if not text.strip():
@@ -306,7 +312,7 @@ class KnowledgeService:
             path=str(path.resolve()) if path.exists() else str(path),
             chunks=chunk_text(text),
             name=path.name,
-            trust="user_document",
+            trust=trust or "user_document",
             vectorized=False,
             created_at=time.time(),
         )
@@ -337,7 +343,7 @@ class KnowledgeService:
 
     def get_chunk(self, user_id: str, doc_id: str, chunk_index: int) -> dict[str, Any] | None:
         rec = self.docs.get(doc_id)
-        if not rec or rec.user_id != user_id:
+        if not rec or not self._doc_visible(user_id, rec.user_id):
             return None
         if chunk_index < 0 or chunk_index >= len(rec.chunks):
             return None
@@ -352,7 +358,7 @@ class KnowledgeService:
         }
 
     def library(self, user_id: str) -> list[dict[str, Any]]:
-        docs = [d for d in self.docs.values() if d.user_id == user_id]
+        docs = [d for d in self.docs.values() if self._doc_visible(user_id, d.user_id)]
         docs.sort(key=lambda d: d.name.lower())
         return [
             {
@@ -362,6 +368,7 @@ class KnowledgeService:
                 "chunks": len(d.chunks),
                 "vectorized": d.vectorized,
                 "trust": d.trust,
+                "user_id": d.user_id,
             }
             for d in docs
         ]
@@ -370,7 +377,7 @@ class KnowledgeService:
         q = [t for t in query.lower().split() if t]
         hits: list[dict[str, Any]] = []
         for doc in self.docs.values():
-            if doc.user_id != user_id:
+            if not self._doc_visible(user_id, doc.user_id):
                 continue
             for idx, chunk in enumerate(doc.chunks):
                 score = sum(1 for t in q if t in chunk.lower()) if q else 0
@@ -392,6 +399,9 @@ class KnowledgeService:
 
     def _vector_search(self, user_id: str, query: str, limit: int) -> list[dict[str, Any]]:
         vectors = embed_texts([query], host=self.ollama_url)
+        should = [{"key": "user_id", "match": {"value": user_id}}]
+        for shared in SHARED_KNOWLEDGE_USERS:
+            should.append({"key": "user_id", "match": {"value": shared}})
         data = _http_json(
             "POST",
             f"{self.qdrant_url}/collections/{COLLECTION}/points/search",
@@ -399,14 +409,14 @@ class KnowledgeService:
                 "vector": vectors[0],
                 "limit": limit,
                 "with_payload": True,
-                "filter": {"must": [{"key": "user_id", "match": {"value": user_id}}]},
+                "filter": {"should": should},
             },
             timeout=60,
         )
         hits: list[dict[str, Any]] = []
         for row in data.get("result") or []:
             payload = row.get("payload") or {}
-            if payload.get("user_id") != user_id:
+            if not self._doc_visible(user_id, str(payload.get("user_id") or "")):
                 continue
             hits.append(
                 {

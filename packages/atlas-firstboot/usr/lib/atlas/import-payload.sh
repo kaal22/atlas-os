@@ -127,8 +127,8 @@ Atlas maps volume
 Country PMTiles live at /srv/atlas/maps/<cc>/<cc>.pmtiles after Content Install.
 maps.reindex writes index.json + countries.json. View maps in Command Centre:
 
-  http://127.0.0.1:8787/#/maps
-  http://127.0.0.1:8787/#/maps?country=uk
+  http://127.0.0.1:8787/maps/?country=uk
+  (hash #/maps redirects to the full-page viewer on the same origin)
 
 (Optional) sync-nomad-maps.sh can still publish tiles for a NOMAD backend.
 EOF

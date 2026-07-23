@@ -44,7 +44,8 @@ def _load_atlas_conf() -> dict[str, str]:
 _CONF = _load_atlas_conf()
 CC_URL = os.environ.get(
     "ATLAS_COMMAND_CENTRE_URL",
-    _CONF.get("ATLAS_COMMAND_CENTRE_URL", "http://127.0.0.1/"),
+    # Direct CC port — never default to :80 (atlas-proxy may be absent).
+    _CONF.get("ATLAS_COMMAND_CENTRE_URL", "http://127.0.0.1:8787/"),
 )
 
 

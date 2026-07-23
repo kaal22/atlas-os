@@ -7,8 +7,12 @@
  * 2. Bright-red archive bbox outline always until vector tiles paint (or forever with ?debug=1).
  *    Red box ⇒ MapLibre works, PMTiles path broken. Nothing ⇒ container/WebGL broken.
  * 3. Optional ?pretty=1 uses @protomaps/basemaps layers when the archive looks like v4.
+ *    Pretty mode enables place/road/POI labels via basemaps {lang} (default en; ?lang=xx;
+ *    ?labels=0 disables). Paint-first stays paint-only (no glyphs required).
  * 4. After idle, if tile features empty → auto-switch to paint-first once + dump diagnostics.
  * 5. ?debug=1 always shows the diagnostics panel.
+ * 6. Offline place search indexes loaded places/pois (+ country registry). Optional
+ *    Nominatim only when ?online=1 (or opts.onlineSearch).
  *
  * Protomaps basemap v4 source-layers: earth, landcover, landuse, water, roads,
  * buildings, boundaries, places, pois (+ transit reserved).
@@ -35,6 +39,12 @@
   var DIAG_SOURCE = "atlas-diag-bbox";
   var DIAG_FILL = "atlas-diag-bbox-fill";
   var DIAG_LINE = "atlas-diag-bbox-line";
+
+  var SEARCH_SOURCE = "atlas-search-hit";
+  var SEARCH_LAYER = "atlas-search-hit-circle";
+  var SEARCH_LAYER_RING = "atlas-search-hit-ring";
+  var PLACE_INDEX_LAYERS = ["places", "pois"];
+  var SEARCH_RESULT_LIMIT = 12;
 
   var PAINT_FILLS = [
     "#f4e04d",
@@ -69,6 +79,11 @@
     paintFallbackTried: false,
     tilesPainted: false,
     debug: false,
+    placeIndex: Object.create(null),
+    placeIndexCount: 0,
+    searchTimer: null,
+    searchSeq: 0,
+    searchMarker: null,
   };
 
   function mapsRoot() {
@@ -99,6 +114,39 @@
     } catch (_) {}
     // Default: pretty Protomaps when archive is v4; paint-first is fallback / ?paint=1.
     return true;
+  }
+
+  /** Label language for @protomaps/basemaps — never use country code ("uk" = Ukrainian). */
+  function labelLang() {
+    try {
+      var q = new URLSearchParams(global.location.search);
+      var lang = q.get("lang");
+      if (lang && /^[a-z]{2}(-[a-z]{2})?$/i.test(lang)) {
+        lang = String(lang).toLowerCase().slice(0, 2);
+        // Basemaps treats "uk" as Ukrainian; Atlas country UK must stay English labels.
+        if (lang === "uk") return "en";
+        return lang;
+      }
+    } catch (_) {}
+    return "en";
+  }
+
+  function wantLabels() {
+    try {
+      var q = new URLSearchParams(global.location.search);
+      if (q.get("labels") === "0") return false;
+      if (q.get("labels") === "1") return true;
+    } catch (_) {}
+    return true;
+  }
+
+  /** Nominatim is opt-in only — default search is offline from loaded tiles + registry. */
+  function wantOnlineSearch() {
+    try {
+      var q = new URLSearchParams(global.location.search);
+      if (q.get("online") === "1") return true;
+    } catch (_) {}
+    return !!(state.opts && state.opts.onlineSearch);
   }
 
   /** Stable vector source id — never use country code (collides with lang "uk" = Ukrainian). */
@@ -307,6 +355,16 @@
       'border-radius:8px;padding:8px 12px;font-size:.95rem"></select>' +
       '<button type="button" id="atlasMapsFit" style="cursor:pointer;background:#1b2430;color:#e8eef4;' +
       "border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px\">Fit</button>" +
+      '<div class="atlas-maps-search" style="position:relative;flex:1 1 14rem;min-width:11rem;max-width:24rem">' +
+      '<label for="atlasMapsSearch" class="visually-hidden" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Search places</label>' +
+      '<input id="atlasMapsSearch" type="search" placeholder="Search places…" autocomplete="off" spellcheck="false" ' +
+      'aria-autocomplete="list" aria-controls="atlasMapsSearchResults" ' +
+      'style="width:100%;box-sizing:border-box;background:#1b2430;color:#e8eef4;border:1px solid rgba(255,255,255,.12);' +
+      'border-radius:8px;padding:8px 12px;font-size:.95rem" />' +
+      '<ul id="atlasMapsSearchResults" role="listbox" hidden ' +
+      'style="position:absolute;z-index:8;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px 0;list-style:none;' +
+      "max-height:16rem;overflow:auto;background:#121820;border:1px solid rgba(255,255,255,.14);border-radius:8px;" +
+      'box-shadow:0 10px 28px rgba(0,0,0,.45)"></ul></div>' +
       '<span id="atlasMapsStatus" style="font-size:.8rem;color:#9aa8b5;margin-left:auto"></span>';
     setPanelVisible(bar, false);
 
@@ -359,6 +417,8 @@
       bar: bar,
       select: bar.querySelector("#atlasMapsCountry"),
       fitBtn: bar.querySelector("#atlasMapsFit"),
+      searchInput: bar.querySelector("#atlasMapsSearch"),
+      searchResults: bar.querySelector("#atlasMapsSearchResults"),
       statusEl: bar.querySelector("#atlasMapsStatus"),
       banner: banner,
       mapEl: mapEl,
@@ -537,7 +597,7 @@
         header: state.lastHeader,
         bounds: state.lastBounds,
         hint:
-          "Red bbox outline = MapLibre OK. ?paint=1 = bright diagnostic. ?pretty=0 forces paint-first. /maps/diag for server.",
+          "Red bbox outline = MapLibre OK. ?paint=1 = bright diagnostic. ?pretty=0 forces paint-first. ?labels=0 disables labels. Search is offline (loaded places/pois); ?online=1 enables Nominatim. /maps/diag for server.",
       },
       extra || {}
     );
@@ -965,9 +1025,10 @@
         throw new Error("basemaps.namedFlavor missing");
       }
       flavor = global.basemaps.namedFlavor("light");
-      // Third arg is options {lang, labelsOnly} — null/undefined = no labels.
-      // Never pass country code as lang ("uk" = Ukrainian).
-      layers = global.basemaps.layers(TILE_SOURCE, flavor, null);
+      // Third arg is options {lang, labelsOnly}. lang enables place/road/POI symbol layers.
+      // Never pass country code as lang ("uk" = Ukrainian in basemaps).
+      var labelOpts = wantLabels() ? { lang: labelLang() } : null;
+      layers = global.basemaps.layers(TILE_SOURCE, flavor, labelOpts);
     } catch (e) {
       throw new Error(
         "basemaps.layers failed: " + (e && e.message ? e.message : e)
@@ -1008,7 +1069,7 @@
       try {
         return {
           style: buildProtomapsStyle(code, tileHttpUrl, header, assetsBase, spriteVer, b),
-          mode: "protomaps-v4",
+          mode: wantLabels() ? "protomaps-v4+labels" : "protomaps-v4",
           layers: archiveLayers,
         };
       } catch (e) {
@@ -1089,6 +1150,524 @@
     }
   }
 
+  function resetPlaceIndex() {
+    state.placeIndex = Object.create(null);
+    state.placeIndexCount = 0;
+    // Seed with installed country registry entries (always offline).
+    (state.countries || []).forEach(function (c) {
+      if (!c || !c.name) return;
+      var lng = null;
+      var lat = null;
+      if (Array.isArray(c.center) && c.center.length >= 2) {
+        lng = Number(c.center[0]);
+        lat = Number(c.center[1]);
+      } else if (Array.isArray(c.bbox) && c.bbox.length === 4) {
+        lng = (Number(c.bbox[0]) + Number(c.bbox[2])) / 2;
+        lat = (Number(c.bbox[1]) + Number(c.bbox[3])) / 2;
+      }
+      if (!(isFinite(lng) && isFinite(lat))) return;
+      rememberPlace({
+        name: c.name,
+        kind: "country",
+        layer: "registry",
+        lng: lng,
+        lat: lat,
+        zoom: 5.5,
+        rank: 0,
+      });
+    });
+  }
+
+  function featureName(props) {
+    if (!props) return "";
+    var n =
+      props["name:en"] ||
+      props.name ||
+      props["pgf:name"] ||
+      props["name:latin"] ||
+      props.name2 ||
+      props["pgf:name2"] ||
+      "";
+    return String(n || "").trim();
+  }
+
+  function featureKind(props) {
+    if (!props) return "";
+    return String(props.kind || props.kind_detail || props["pmap:kind"] || "").trim();
+  }
+
+  function featureRank(props) {
+    if (!props) return 99;
+    var z = props.min_zoom != null ? Number(props.min_zoom) : NaN;
+    if (isFinite(z)) return z;
+    var r = props.rank != null ? Number(props.rank) : NaN;
+    if (isFinite(r)) return r;
+    return 50;
+  }
+
+  function coordsBBoxCenter(coords, acc) {
+    acc = acc || { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity, n: 0 };
+    if (!coords) return acc;
+    if (typeof coords[0] === "number") {
+      var x = coords[0];
+      var y = coords[1];
+      if (isFinite(x) && isFinite(y)) {
+        if (x < acc.minX) acc.minX = x;
+        if (y < acc.minY) acc.minY = y;
+        if (x > acc.maxX) acc.maxX = x;
+        if (y > acc.maxY) acc.maxY = y;
+        acc.n += 1;
+      }
+      return acc;
+    }
+    for (var i = 0; i < coords.length; i++) coordsBBoxCenter(coords[i], acc);
+    return acc;
+  }
+
+  function featureCenter(feat) {
+    if (!feat || !feat.geometry) return null;
+    var g = feat.geometry;
+    if (g.type === "Point" && Array.isArray(g.coordinates)) {
+      var p = g.coordinates;
+      if (isFinite(p[0]) && isFinite(p[1])) return [p[0], p[1]];
+      return null;
+    }
+    var acc = coordsBBoxCenter(g.coordinates);
+    if (!acc.n) return null;
+    return [(acc.minX + acc.maxX) / 2, (acc.minY + acc.maxY) / 2];
+  }
+
+  function rememberPlace(hit) {
+    if (!hit || !hit.name || !isFinite(hit.lng) || !isFinite(hit.lat)) return;
+    var key =
+      hit.name.toLowerCase() +
+      "|" +
+      hit.lng.toFixed(3) +
+      "|" +
+      hit.lat.toFixed(3);
+    var prev = state.placeIndex[key];
+    if (prev) {
+      if ((hit.rank || 99) < (prev.rank || 99)) state.placeIndex[key] = hit;
+      return;
+    }
+    state.placeIndex[key] = hit;
+    state.placeIndexCount += 1;
+  }
+
+  function ingestMapFeatures(feats, layerHint) {
+    if (!feats || !feats.length) return;
+    for (var i = 0; i < feats.length; i++) {
+      var f = feats[i];
+      var props = (f && f.properties) || {};
+      var name = featureName(props);
+      if (!name || name.length < 2) continue;
+      var center = featureCenter(f);
+      if (!center) continue;
+      var kind = featureKind(props);
+      var layer =
+        layerHint ||
+        (f.layer && f.layer["source-layer"]) ||
+        (f.sourceLayer) ||
+        "places";
+      var rank = featureRank(props);
+      var zoom = 11;
+      if (layer === "places") {
+        if (rank <= 4) zoom = 8;
+        else if (rank <= 8) zoom = 10;
+        else zoom = 12;
+      } else if (layer === "pois") {
+        zoom = 14;
+      }
+      rememberPlace({
+        name: name,
+        kind: kind || layer,
+        layer: layer,
+        lng: center[0],
+        lat: center[1],
+        zoom: zoom,
+        rank: rank,
+      });
+    }
+  }
+
+  /** Grow offline index from tiles already in MapLibre's source cache. */
+  function harvestPlacesFromMap() {
+    if (!state.map) return;
+    try {
+      if (!state.map.getSource || !state.map.getSource(TILE_SOURCE)) return;
+    } catch (_) {
+      return;
+    }
+    for (var i = 0; i < PLACE_INDEX_LAYERS.length; i++) {
+      var sl = PLACE_INDEX_LAYERS[i];
+      try {
+        var feats = state.map.querySourceFeatures(TILE_SOURCE, { sourceLayer: sl }) || [];
+        ingestMapFeatures(feats, sl);
+      } catch (_) {}
+    }
+    try {
+      var rendered = state.map.queryRenderedFeatures({
+        layers: undefined,
+      });
+      // Prefer named features from places/pois source-layers only.
+      var named = [];
+      for (var j = 0; j < (rendered || []).length; j++) {
+        var rf = rendered[j];
+        var srcLayer = rf && rf.layer && rf.layer["source-layer"];
+        if (srcLayer === "places" || srcLayer === "pois") named.push(rf);
+      }
+      ingestMapFeatures(named, null);
+    } catch (_) {}
+  }
+
+  function scorePlace(name, query) {
+    var n = String(name || "").toLowerCase();
+    var q = String(query || "").toLowerCase();
+    if (!q || !n) return 0;
+    if (n === q) return 1000;
+    if (n.indexOf(q) === 0) return 800 - Math.min(n.length, 80);
+    var idx = n.indexOf(q);
+    if (idx > 0) return 500 - idx;
+    // Token match (e.g. "york" in "New York")
+    var tokens = n.split(/[\s,./-]+/);
+    for (var i = 0; i < tokens.length; i++) {
+      if (tokens[i] === q) return 700;
+      if (tokens[i].indexOf(q) === 0) return 600;
+    }
+    return 0;
+  }
+
+  function searchOffline(query) {
+    harvestPlacesFromMap();
+    var q = String(query || "").trim();
+    if (q.length < 2) return [];
+    var hits = [];
+    var keys = Object.keys(state.placeIndex);
+    for (var i = 0; i < keys.length; i++) {
+      var hit = state.placeIndex[keys[i]];
+      var sc = scorePlace(hit.name, q);
+      if (sc <= 0) continue;
+      hits.push({
+        name: hit.name,
+        kind: hit.kind,
+        layer: hit.layer,
+        lng: hit.lng,
+        lat: hit.lat,
+        zoom: hit.zoom,
+        rank: hit.rank,
+        score: sc,
+        source: "offline",
+      });
+    }
+    hits.sort(function (a, b) {
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.rank || 99) - (b.rank || 99);
+    });
+    // Dedupe by lowercase name keeping best score/rank.
+    var seen = Object.create(null);
+    var out = [];
+    for (var j = 0; j < hits.length; j++) {
+      var k = hits[j].name.toLowerCase();
+      if (seen[k]) continue;
+      seen[k] = true;
+      out.push(hits[j]);
+      if (out.length >= SEARCH_RESULT_LIMIT) break;
+    }
+    return out;
+  }
+
+  function searchOnlineNominatim(query) {
+    if (!wantOnlineSearch()) return Promise.resolve([]);
+    var q = String(query || "").trim();
+    if (q.length < 2) return Promise.resolve([]);
+    var url =
+      "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=" +
+      encodeURIComponent(q);
+    return fetch(url, {
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("Nominatim HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (rows) {
+        if (!Array.isArray(rows)) return [];
+        return rows
+          .map(function (row) {
+            var lng = Number(row.lon);
+            var lat = Number(row.lat);
+            if (!(isFinite(lng) && isFinite(lat))) return null;
+            return {
+              name: row.display_name || row.name || q,
+              kind: row.type || row.class || "online",
+              layer: "nominatim",
+              lng: lng,
+              lat: lat,
+              zoom: 12,
+              rank: 40,
+              score: 400,
+              source: "online",
+            };
+          })
+          .filter(Boolean);
+      })
+      .catch(function () {
+        return [];
+      });
+  }
+
+  function clearSearchResults() {
+    if (!state.ui || !state.ui.searchResults) return;
+    state.ui.searchResults.innerHTML = "";
+    state.ui.searchResults.hidden = true;
+    state.ui.searchResults.style.display = "none";
+  }
+
+  function renderSearchResults(hits, query) {
+    if (!state.ui || !state.ui.searchResults) return;
+    var el = state.ui.searchResults;
+    if (!hits || !hits.length) {
+      el.innerHTML =
+        '<li style="padding:10px 12px;color:#9aa8b5;font-size:.85rem">No offline matches for “' +
+        escapeHtml(query) +
+        '”' +
+        (wantOnlineSearch() ? "" : " (add ?online=1 for Nominatim)") +
+        "</li>";
+      el.hidden = false;
+      el.style.display = "block";
+      return;
+    }
+    el.innerHTML = hits
+      .map(function (h, idx) {
+        var meta =
+          (h.kind ? escapeHtml(h.kind) : escapeHtml(h.layer || "place")) +
+          (h.source === "online" ? " · online" : "");
+        return (
+          '<li role="option" data-idx="' +
+          idx +
+          '" tabindex="-1" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.06)">' +
+          '<div style="font-size:.92rem;color:#e8eef4">' +
+          escapeHtml(h.name) +
+          "</div>" +
+          '<div style="font-size:.75rem;color:#9aa8b5;margin-top:2px">' +
+          meta +
+          "</div></li>"
+        );
+      })
+      .join("");
+    el.hidden = false;
+    el.style.display = "block";
+    el._hits = hits;
+    Array.prototype.forEach.call(el.querySelectorAll("li[data-idx]"), function (li) {
+      li.addEventListener("mousedown", function (ev) {
+        ev.preventDefault();
+      });
+      li.addEventListener("click", function () {
+        var hit = hits[Number(li.getAttribute("data-idx"))];
+        if (hit) selectSearchHit(hit);
+      });
+      li.addEventListener("mouseenter", function () {
+        li.style.background = "rgba(61,139,253,.18)";
+      });
+      li.addEventListener("mouseleave", function () {
+        li.style.background = "transparent";
+      });
+    });
+  }
+
+  function ensureSearchOverlay() {
+    if (!state.map || !state.map.getStyle) return;
+    try {
+      if (!state.map.getSource(SEARCH_SOURCE)) {
+        state.map.addSource(SEARCH_SOURCE, {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+      }
+      if (!state.map.getLayer(SEARCH_LAYER_RING)) {
+        state.map.addLayer({
+          id: SEARCH_LAYER_RING,
+          type: "circle",
+          source: SEARCH_SOURCE,
+          paint: {
+            "circle-radius": 18,
+            "circle-color": "#3d8bfd",
+            "circle-opacity": 0.22,
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#3d8bfd",
+            "circle-stroke-opacity": 0.85,
+          },
+        });
+      }
+      if (!state.map.getLayer(SEARCH_LAYER)) {
+        state.map.addLayer({
+          id: SEARCH_LAYER,
+          type: "circle",
+          source: SEARCH_SOURCE,
+          paint: {
+            "circle-radius": 7,
+            "circle-color": "#fbbf24",
+            "circle-stroke-width": 2,
+            "circle-stroke-color": "#111827",
+          },
+        });
+      }
+    } catch (_) {}
+  }
+
+  function setSearchMarker(lng, lat) {
+    if (!state.map) return;
+    ensureSearchOverlay();
+    try {
+      var src = state.map.getSource(SEARCH_SOURCE);
+      if (src && src.setData) {
+        src.setData({
+          type: "FeatureCollection",
+          features: [
+            {
+              type: "Feature",
+              properties: {},
+              geometry: { type: "Point", coordinates: [lng, lat] },
+            },
+          ],
+        });
+      }
+    } catch (_) {}
+    // Also keep a DOM marker for visibility in paint-first / over labels.
+    try {
+      if (state.searchMarker) {
+        state.searchMarker.setLngLat([lng, lat]);
+      } else if (global.maplibregl && global.maplibregl.Marker) {
+        var el = document.createElement("div");
+        el.style.cssText =
+          "width:14px;height:14px;border-radius:50%;background:#fbbf24;border:2px solid #111;" +
+          "box-shadow:0 0 0 6px rgba(61,139,253,.35);pointer-events:none;";
+        state.searchMarker = new global.maplibregl.Marker({ element: el })
+          .setLngLat([lng, lat])
+          .addTo(state.map);
+      }
+    } catch (_) {}
+  }
+
+  function clearSearchMarker() {
+    try {
+      if (state.searchMarker) {
+        state.searchMarker.remove();
+        state.searchMarker = null;
+      }
+    } catch (_) {}
+    if (!state.map) return;
+    try {
+      var src = state.map.getSource(SEARCH_SOURCE);
+      if (src && src.setData) {
+        src.setData({ type: "FeatureCollection", features: [] });
+      }
+    } catch (_) {}
+  }
+
+  function selectSearchHit(hit) {
+    if (!hit || !state.map) return;
+    clearSearchResults();
+    if (state.ui && state.ui.searchInput) {
+      state.ui.searchInput.value = hit.name;
+      state.ui.searchInput.blur();
+    }
+    setSearchMarker(hit.lng, hit.lat);
+    var z = hit.zoom || 11;
+    try {
+      state.map.flyTo({
+        center: [hit.lng, hit.lat],
+        zoom: z,
+        bearing: 0,
+        pitch: 0,
+        duration: 900,
+        essential: true,
+      });
+    } catch (_) {
+      try {
+        state.map.fitBounds(
+          [
+            [hit.lng - 0.08, hit.lat - 0.06],
+            [hit.lng + 0.08, hit.lat + 0.06],
+          ],
+          { padding: 60, duration: 900, maxZoom: z }
+        );
+      } catch (_) {}
+    }
+    setStatus(
+      "→ " + hit.name + (hit.source === "online" ? " (online)" : " (offline)"),
+      false
+    );
+  }
+
+  function runPlaceSearch(query) {
+    var q = String(query || "").trim();
+    var seq = ++state.searchSeq;
+    if (q.length < 2) {
+      clearSearchResults();
+      return;
+    }
+    var offline = searchOffline(q);
+    renderSearchResults(offline, q);
+    if (!wantOnlineSearch()) return;
+    searchOnlineNominatim(q).then(function (onlineHits) {
+      if (seq !== state.searchSeq) return;
+      if (!onlineHits.length) return;
+      var merged = offline.slice();
+      var seen = Object.create(null);
+      offline.forEach(function (h) {
+        seen[h.name.toLowerCase()] = true;
+      });
+      onlineHits.forEach(function (h) {
+        var k = h.name.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        merged.push(h);
+      });
+      renderSearchResults(merged.slice(0, SEARCH_RESULT_LIMIT), q);
+    });
+  }
+
+  function wireSearchUi() {
+    if (!state.ui || !state.ui.searchInput) return;
+    var input = state.ui.searchInput;
+    var results = state.ui.searchResults;
+    input.placeholder = wantOnlineSearch()
+      ? "Search places (offline + online)…"
+      : "Search places (offline)…";
+    input.addEventListener("input", function () {
+      var q = input.value;
+      if (state.searchTimer) clearTimeout(state.searchTimer);
+      state.searchTimer = setTimeout(function () {
+        runPlaceSearch(q);
+      }, 180);
+    });
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") {
+        clearSearchResults();
+        input.blur();
+        return;
+      }
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        var hits = (results && results._hits) || searchOffline(input.value);
+        if (hits && hits[0]) selectSearchHit(hits[0]);
+      }
+    });
+    input.addEventListener("focus", function () {
+      if (input.value.trim().length >= 2) runPlaceSearch(input.value);
+    });
+    if (state.host) {
+      state.host.addEventListener("mousedown", function (ev) {
+        if (!state.ui) return;
+        var t = ev.target;
+        if (input.contains(t) || (results && results.contains(t))) return;
+        clearSearchResults();
+      });
+    }
+  }
+
   function applyStyle(built, c, gen) {
     state.lastStyleMode = built.mode;
     state.lastArchiveLayers = built.layers || [];
@@ -1138,8 +1717,11 @@
       });
       forceResizeLoop();
     } else {
+      clearSearchMarker();
       state.map.once("idle", function () {
         if (gen !== state.mountGen) return;
+        ensureSearchOverlay();
+        harvestPlacesFromMap();
         setStatus(c.name || c.code);
         ensureMapSize();
         flyToCountry(c);
@@ -1316,6 +1898,7 @@
       setStatus("Map loaded — fetching tiles for " + (c.name || c.code) + "…");
       ensureMapSize();
       forceResizeLoop();
+      ensureSearchOverlay();
       // Reset camera attitude — pitched/bearing maps can look "empty".
       try {
         state.map.setBearing(0);
@@ -1326,9 +1909,15 @@
     state.map.on("idle", function onIdle() {
       state.map.off("idle", onIdle);
       ensureMapSize();
+      ensureSearchOverlay();
+      harvestPlacesFromMap();
       setTimeout(function () {
         verifyPaint(c, mode, layerNames);
+        harvestPlacesFromMap();
       }, 800);
+    });
+    state.map.on("moveend", function () {
+      harvestPlacesFromMap();
     });
     state.map.on("error", function (e) {
       var msg = (e && e.error && e.error.message) || (e && e.message) || "Map error";
@@ -1364,6 +1953,9 @@
           isSourceLoaded: e.isSourceLoaded,
         });
         if (state.dataEvents.length > 30) state.dataEvents.shift();
+        if (e.sourceId === TILE_SOURCE && e.isSourceLoaded) {
+          harvestPlacesFromMap();
+        }
       }
       if (e.error || (e.tile && e.tile.aborted === false && e.tile.state && String(e.tile.state).indexOf("errored") >= 0)) {
         state.tileErrors.push({
@@ -1497,6 +2089,9 @@
     state.tileErrors = [];
     state.dataEvents = [];
     state.paintFallbackTried = false;
+    clearSearchMarker();
+    clearSearchResults();
+    resetPlaceIndex();
     setStatus("Loading " + (c.name || code) + "…");
 
     return assertRangeSupport(tileUrl)
@@ -1572,6 +2167,11 @@
       clearTimeout(state.resizeTimer);
       state.resizeTimer = null;
     }
+    if (state.searchTimer) {
+      clearTimeout(state.searchTimer);
+      state.searchTimer = null;
+    }
+    clearSearchMarker();
     if (state.resizeObserver) {
       try {
         state.resizeObserver.disconnect();
@@ -1593,6 +2193,8 @@
     state.ui = null;
     state.countries = [];
     state.opts = null;
+    state.placeIndex = Object.create(null);
+    state.placeIndexCount = 0;
   }
 
   function mount(host, opts) {
@@ -1686,6 +2288,8 @@
           });
           flyToCountry(c);
         });
+        wireSearchUi();
+        resetPlaceIndex();
         setStatus("Starting map for " + (initial.name || initial.code) + "…");
         return showCountry(initial.code, gen);
       })
@@ -1722,6 +2326,12 @@
       assertStyleSources: assertStyleSources,
       safeSourceLoaded: safeSourceLoaded,
       wantPretty: wantPretty,
+      wantLabels: wantLabels,
+      labelLang: labelLang,
+      wantOnlineSearch: wantOnlineSearch,
+      featureName: featureName,
+      scorePlace: scorePlace,
+      searchOffline: searchOffline,
     },
   };
 })(typeof window !== "undefined" ? window : globalThis);

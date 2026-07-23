@@ -123,10 +123,14 @@ progress "Atlas payload import starting"
 # Empty-but-healthy maps volume (no planet PMTiles in Phase 2).
 if [[ ! -f /srv/atlas/maps/README.txt ]]; then
   cat > /srv/atlas/maps/README.txt <<'EOF'
-Atlas maps volume — Phase 2
-This directory is intentionally empty. Offline map tiles (PMTiles) are
-provisioned later via content packs. Stack readiness does not require
-planet data for core developer ISO exit criteria.
+Atlas maps volume
+Country PMTiles live at /srv/atlas/maps/<cc>/<cc>.pmtiles after Content Install.
+maps.reindex writes index.json + countries.json. View maps in Command Centre:
+
+  http://127.0.0.1:8787/#/maps
+  http://127.0.0.1:8787/#/maps?country=uk
+
+(Optional) sync-nomad-maps.sh can still publish tiles for a NOMAD backend.
 EOF
 fi
 
@@ -253,7 +257,7 @@ EOF
 chmod 600 "$ENV_FILE"
 
 # Empty Kiwix library must be world-readable (container runs as non-root "user")
-mkdir -p /srv/atlas/kiwix /srv/atlas/nomad-storage
+mkdir -p /srv/atlas/kiwix /srv/atlas/nomad-storage/maps/pmtiles /srv/atlas/maps
 if [[ ! -f /srv/atlas/kiwix/library.xml ]]; then
   cat > /srv/atlas/kiwix/library.xml <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -262,7 +266,14 @@ if [[ ! -f /srv/atlas/kiwix/library.xml ]]; then
 EOF
 fi
 chmod -R a+rX /srv/atlas/kiwix
-chmod 755 /srv/atlas/nomad-storage
+chmod 755 /srv/atlas/nomad-storage /srv/atlas/maps
+
+# Seed MapLibre fonts/sprites + publish any ready country PMTiles.
+# Command Centre serves /maps from /srv/atlas/maps; sync also keeps NOMAD storage optional.
+if [[ -x /usr/lib/atlas/sync-nomad-maps.sh ]]; then
+  progress "Syncing Atlas map assets..."
+  ATLAS_ROOT=/srv/atlas /usr/lib/atlas/sync-nomad-maps.sh || progress "WARN: sync-nomad-maps.sh failed (non-fatal)"
+fi
 
 [[ -f "$COMPOSE_DST" ]] || fail "Missing compose file $COMPOSE_DST"
 

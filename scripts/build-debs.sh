@@ -28,6 +28,10 @@ build_simple_deb() {
     mkdir -p "$stage/etc"
     cp -a "$pkgdir/etc/." "$stage/etc/"
   fi
+  # Never ship bytecode caches or a conflicting hicolor theme index
+  find "$stage" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+  find "$stage" -type f -name '*.pyc' -delete 2>/dev/null || true
+  rm -f "$stage/usr/share/icons/hicolor/index.theme" 2>/dev/null || true
 
   # Python libs without usr/ tree yet — skip empty packages
   if [[ ! -d "$stage/usr" && ! -d "$stage/lib" && "$name" != "atlas-branding" ]]; then
@@ -58,8 +62,9 @@ build_simple_deb() {
     atlas-model-manager) depends="python3" ;;
     atlas-knowledge) depends="python3, poppler-utils" ;;
     atlas-agent-runtime) depends="python3, atlas-policy-gateway, atlas-model-manager, atlas-knowledge" ;;
-    atlas-command-centre) depends="python3, atlas-auth, atlas-agent-runtime, atlas-policy-gateway, atlas-model-manager, atlas-knowledge, atlas-content-manager, atlas-backup, atlas-updater" ;;
+    atlas-command-centre) depends="python3, atlas-auth, atlas-agent-runtime, atlas-policy-gateway, atlas-model-manager, atlas-knowledge, atlas-content-manager, atlas-maps-viewer, atlas-backup, atlas-updater" ;;
     atlas-content-manager) depends="python3" ;;
+    atlas-maps-viewer) depends="" ;;
     atlas-backup) depends="python3, openssl" ;;
     atlas-updater) depends="python3" ;;
     atlas-system-daemon) depends="python3, ufw" ;;
@@ -116,6 +121,7 @@ PACKAGES=(
   atlas-model-manager
   atlas-knowledge
   atlas-content-manager
+  atlas-maps-viewer
   atlas-backup
   atlas-updater
   atlas-command-centre

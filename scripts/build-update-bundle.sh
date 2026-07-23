@@ -25,32 +25,34 @@ PKG = ROOT / "packages" / "atlas-updater" / "usr" / "share" / "atlas" / "updates
 os.environ["ATLAS_ALLOW_UNSIGNED"] = "1"
 
 
+import tempfile
+
 def make(name: str, *, force_fail: bool, version: str, content: str) -> Path:
-    stage = OUT / f"staging-{name}"
-    if stage.exists():
-        shutil.rmtree(stage)
-    payload = stage / "payload" / "srv" / "atlas" / "update-demo"
-    payload.mkdir(parents=True)
-    (payload / "update-marker.txt").write_text(content, encoding="utf-8")
-    if force_fail:
-        (stage / "payload" / ".force-health-fail").write_text("1", encoding="utf-8")
-    manifest = {
-        "schema": "atlas.update/v1",
-        "from_version": "0.1.0",
-        "to_version": version,
-        "publisher": "atlas-os",
-        "digest": "sha256:" + "0" * 64,
-        "reboot_required": False,
-        "health_urls": ["http://127.0.0.1:8787/"],
-        "force_health_fail": force_fail,
-    }
-    (stage / "update.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    notes = "Broken update for rollback demo.\n" if force_fail else "Good stub update (marker only).\n"
-    (stage / "RELEASE_NOTES.txt").write_text(notes, encoding="utf-8")
-    out = OUT / f"{name}.atlas-update"
-    digest = build_update_bundle(stage, out)
-    print("Wrote", out, digest)
-    return out
+    # Use a private temp dir so leftover root-owned staging from sudo builds can't block us.
+    with tempfile.TemporaryDirectory(prefix=f"atlas-upd-{name}-") as td:
+        stage = Path(td)
+        payload = stage / "payload" / "srv" / "atlas" / "update-demo"
+        payload.mkdir(parents=True)
+        (payload / "update-marker.txt").write_text(content, encoding="utf-8")
+        if force_fail:
+            (stage / "payload" / ".force-health-fail").write_text("1", encoding="utf-8")
+        manifest = {
+            "schema": "atlas.update/v1",
+            "from_version": "0.1.0",
+            "to_version": version,
+            "publisher": "atlas-os",
+            "digest": "sha256:" + "0" * 64,
+            "reboot_required": False,
+            "health_urls": ["http://127.0.0.1:8787/"],
+            "force_health_fail": force_fail,
+        }
+        (stage / "update.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        notes = "Broken update for rollback demo.\n" if force_fail else "Good stub update (marker only).\n"
+        (stage / "RELEASE_NOTES.txt").write_text(notes, encoding="utf-8")
+        out = OUT / f"{name}.atlas-update"
+        digest = build_update_bundle(stage, out)
+        print("Wrote", out, digest)
+        return out
 
 
 good = make("atlas-update-0.1.0-to-0.1.1", force_fail=False, version="0.1.1", content="update-ok")

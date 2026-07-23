@@ -18,6 +18,21 @@ provisioning.
 Open **Atlas** from the desktop (or http://127.0.0.1:8787/ on the device).
 Sign in with the account created at install / first run.
 
+## Offline maps
+
+1. In Command Centre open **Content**.
+2. Install a country map pack (for example **United Kingdom**). Confirm the large download if prompted.
+3. Wait until the progress panel shows tiles **ready** (this can take a while on first fetch).
+4. Open **Maps** in the sidebar, or click **Open map** on the installed pack.
+
+Direct links after sign-in:
+
+- Maps (full page): http://127.0.0.1:8787/maps/?country=uk
+- Command Centre Maps sidebar redirects to that URL when tiles are ready
+- Debug: http://127.0.0.1:8787/maps/?country=uk&debug=1 or http://127.0.0.1:8787/maps/diag
+
+Maps are viewed inside Atlas (MapLibre + PMTiles from `/srv/atlas/maps`). You do not need to open NOMAD separately.
+
 ## Backup and recovery
 
 Use Command Centre → Backups. Keep recovery keys offline.

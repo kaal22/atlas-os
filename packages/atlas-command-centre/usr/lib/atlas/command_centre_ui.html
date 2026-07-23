@@ -843,7 +843,7 @@ async function page(){
         actionTile('#/library','Library','Wikipedia & offline refs','📚'),
         actionTile('#/education','Education','Courses & home learning','🎓'),
         actionTile('#/knowledge','Search Knowledge','Your indexed documents','📄'),
-        actionTile('/maps/?country=uk','Open Maps','View offline country maps','🗺'),
+        actionTile(mapsFullUrl('uk'),'Open Maps','View offline country maps','🗺'),
         actionTile('#/content','Install Content','Maps, packs, models','▣'),
         actionTile('#/system','System','Updates, backup, hardware','⚙'),
       ].join('');
@@ -1618,7 +1618,7 @@ async function renderContent(){
       <span><strong>${escapeHtml(p.name||p.id)}</strong></span>
       <span class="meta">USB · v${escapeHtml(p.version||'?')}</span>
     </div>`).join('');
-  view.innerHTML=`<p class="page-intro">Install offline maps, Library ZIMs (Wikipedia / medical / how-to / books), models, and education packs. Licences are shown before you confirm. After map tiles are <strong>ready</strong>, open <a href="/maps/?country=uk">Maps</a> (or use <strong>Open map</strong> on an installed country). Browse ZIMs in <a href="#/library">Library</a>; open courses in <a href="#/education">Education</a>.</p>
+  view.innerHTML=`<p class="page-intro">Install offline maps, Library ZIMs (Wikipedia / medical / how-to / books), models, and education packs. Licences are shown before you confirm. After map tiles are <strong>ready</strong>, open <a href="${mapsFullUrl('uk')}">Maps</a> (or use <strong>Open map</strong> on an installed country). Browse ZIMs in <a href="#/library">Library</a>; open courses in <a href="#/education">Education</a>.</p>
     ${contentFetchPanelHtml()}
     ${sections||emptyState('Catalogue is empty','Bundled packs appear here when catalogue.json is installed.')}
     <div class="grid-2">
@@ -1941,7 +1941,22 @@ async function retryFetchTiles(id,country){
 }
 function mapsFullUrl(country){
   const cc=(country||'uk').toLowerCase();
-  return '/maps/?country='+encodeURIComponent(cc);
+  const path='/maps/?country='+encodeURIComponent(cc);
+  // Prefer relative paths so the browser keeps the current origin (incl. :8787).
+  // If we must leave loopback :80 (broken/missing atlas-proxy), go to CC :8787 —
+  // never hardcode http://127.0.0.1/maps (port 80) without a port.
+  try{
+    const host=String(location.hostname||'');
+    const port=String(location.port||'');
+    const onLoopback=host==='127.0.0.1'||host==='localhost'||host==='[::1]';
+    const onDefaultHttp=!port||port==='80';
+    if(onLoopback && onDefaultHttp){
+      return 'http://127.0.0.1:8787'+path;
+    }
+    return path;
+  }catch(_e){
+    return 'http://127.0.0.1:8787'+path;
+  }
 }
 function openAtlasMap(country){
   // Full-page viewer — avoids CC #/maps embed races (page() wipe / collapsed flex canvas).

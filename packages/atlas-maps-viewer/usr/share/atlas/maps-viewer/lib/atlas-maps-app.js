@@ -9,6 +9,9 @@
  * 3. Optional ?pretty=1 uses @protomaps/basemaps layers when the archive looks like v4.
  *    Pretty mode enables place/road/POI labels via basemaps {lang} (default en; ?lang=xx;
  *    ?labels=0 disables). Paint-first stays paint-only (no glyphs required).
+ *    Offline extracts (maxzoom ≤12): Protomaps "light" paints white roads on beige earth
+ *    and keeps minor widths ~0 until z12.5 — we retint + bring road widths forward so
+ *    highways/majors/minors are visible across typical UK zooms (z6–11).
  * 4. After idle, if tile features empty → auto-switch to paint-first once + dump diagnostics.
  * 5. ?debug=1 always shows the diagnostics panel.
  * 6. Offline place search indexes loaded places/pois (+ country registry). Optional
@@ -57,6 +60,157 @@
     "#adff2f",
   ];
   var PAINT_LINES = ["#ff1493", "#1e90ff", "#ff4500", "#8a2be2", "#00ced1"];
+
+  /**
+   * Protomaps namedFlavor("light") uses highway/major #ffffff on earth #e2dfda —
+   * invisible at country zoom. Darker fills + casings keep the same layer graph.
+   */
+  var ATLAS_ROAD_TINT = {
+    highway: "#4b5563",
+    major: "#6b7280",
+    minor_a: "#9ca3af",
+    minor_b: "#a1a1aa",
+    link: "#78716c",
+    other: "#a8a29e",
+    railway: "#64748b",
+    minor_service: "#d4d4d8",
+    pier: "#94a3b8",
+    runway: "#94a3b8",
+    highway_casing_early: "#374151",
+    highway_casing_late: "#374151",
+    major_casing_early: "#4b5563",
+    major_casing_late: "#4b5563",
+    minor_casing: "#6b7280",
+    minor_service_casing: "#9ca3af",
+    link_casing: "#57534e",
+    tunnel_highway: "#6b7280",
+    tunnel_major: "#9ca3af",
+    tunnel_minor: "#a1a1aa",
+    tunnel_link: "#a8a29e",
+    tunnel_other: "#a8a29e",
+    tunnel_highway_casing: "#4b5563",
+    tunnel_major_casing: "#6b7280",
+    tunnel_minor_casing: "#9ca3af",
+    tunnel_link_casing: "#a1a1aa",
+    tunnel_other_casing: "#a1a1aa",
+    bridges_highway: "#4b5563",
+    bridges_major: "#6b7280",
+    bridges_minor: "#9ca3af",
+    bridges_other: "#a8a29e",
+    bridges_highway_casing: "#374151",
+    bridges_major_casing: "#4b5563",
+    bridges_minor_casing: "#6b7280",
+    bridges_other_casing: "#78716c",
+    bridges_link_casing: "#57534e",
+  };
+
+  var ROAD_WIDTH_HIGHWAY = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    3,
+    0.6,
+    5,
+    1.1,
+    7,
+    1.7,
+    9,
+    2.3,
+    11,
+    3.2,
+  ];
+  var ROAD_WIDTH_MAJOR = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    5,
+    0.5,
+    6,
+    0.9,
+    8,
+    1.4,
+    10,
+    1.9,
+    11,
+    2.4,
+  ];
+  var ROAD_WIDTH_MINOR = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    7,
+    0,
+    8,
+    0.45,
+    9,
+    0.75,
+    11,
+    1.25,
+  ];
+  var ROAD_WIDTH_LINK = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    8,
+    0,
+    9,
+    0.6,
+    11,
+    1.4,
+  ];
+  var ROAD_WIDTH_OTHER = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    9,
+    0,
+    10,
+    0.4,
+    11,
+    0.9,
+  ];
+  var ROAD_WIDTH_RAIL = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    5,
+    0.3,
+    8,
+    0.7,
+    11,
+    1.4,
+  ];
+  var ROAD_GAP_HIGHWAY = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    4,
+    0.4,
+    7,
+    1.2,
+    11,
+    2.8,
+  ];
+  var ROAD_GAP_MAJOR = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    5,
+    0.3,
+    7,
+    0.9,
+    11,
+    2.2,
+  ];
+  var ROAD_GAP_MINOR = [
+    "interpolate",
+    ["exponential", 1.6],
+    ["zoom"],
+    8,
+    0.25,
+    11,
+    1.1,
+  ];
 
   var state = {
     map: null,
@@ -944,14 +1098,179 @@
     return out;
   }
 
+  /** Clone Protomaps light flavor with road colors that contrast on beige earth. */
+  function atlasBasemapFlavor() {
+    var base =
+      global.basemaps && typeof global.basemaps.namedFlavor === "function"
+        ? global.basemaps.namedFlavor("light")
+        : {};
+    return Object.assign({}, base, ATLAS_ROAD_TINT);
+  }
+
+  /**
+   * Offline country extracts often stop at maxzoom 11. Stock basemaps keeps
+   * minor/link widths at 0 until z12–13 and many bridge layers at minzoom 12+.
+   * Bring road line visibility into the extract's usable zoom range.
+   */
+  function adaptRoadLayersForOfflineMaxzoom(layers, maxZoom) {
+    if (!layers || !layers.length) return layers;
+    var mz = typeof maxZoom === "number" ? maxZoom : 14;
+    // Full-planet tiles (z14+) keep stock Protomaps widths; only adapt extracts.
+    if (mz > 12) return layers;
+    var minFloor = Math.max(0, mz - 4);
+
+    for (var i = 0; i < layers.length; i++) {
+      var layer = layers[i];
+      if (!layer || layer["source-layer"] !== "roads" || layer.type !== "line") {
+        continue;
+      }
+      if (typeof layer.minzoom === "number" && layer.minzoom >= mz) {
+        layer.minzoom = minFloor;
+      }
+      var id = String(layer.id || "");
+      var paint = layer.paint || (layer.paint = {});
+      var isCasing = id.indexOf("casing") !== -1;
+      var isHighway = id.indexOf("highway") !== -1;
+      var isMajor = id.indexOf("major") !== -1;
+      var isMinor = id.indexOf("minor") !== -1;
+      var isLink = id.indexOf("link") !== -1;
+      var isRail = id.indexOf("rail") !== -1;
+      var isOther =
+        id.indexOf("other") !== -1 ||
+        id.indexOf("path") !== -1 ||
+        id.indexOf("pier") !== -1 ||
+        id.indexOf("runway") !== -1 ||
+        id.indexOf("taxiway") !== -1;
+
+      if (isCasing) {
+        if (isHighway && paint["line-gap-width"]) {
+          paint["line-gap-width"] = ROAD_GAP_HIGHWAY.slice();
+        } else if (isMajor && paint["line-gap-width"]) {
+          paint["line-gap-width"] = ROAD_GAP_MAJOR.slice();
+        } else if ((isMinor || isLink) && paint["line-gap-width"]) {
+          paint["line-gap-width"] = ROAD_GAP_MINOR.slice();
+        }
+        if (paint["line-width"] && (isHighway || isMajor || isMinor || isLink)) {
+          // Keep casing stroke thin; gap carries the visible road body.
+          paint["line-width"] = [
+            "interpolate",
+            ["exponential", 1.6],
+            ["zoom"],
+            6,
+            0.4,
+            11,
+            1.1,
+          ];
+        }
+        continue;
+      }
+
+      if (isHighway) {
+        paint["line-width"] = ROAD_WIDTH_HIGHWAY.slice();
+      } else if (isMajor) {
+        paint["line-width"] = ROAD_WIDTH_MAJOR.slice();
+      } else if (isLink) {
+        paint["line-width"] = ROAD_WIDTH_LINK.slice();
+      } else if (isMinor) {
+        paint["line-width"] = ROAD_WIDTH_MINOR.slice();
+      } else if (isRail) {
+        paint["line-width"] = ROAD_WIDTH_RAIL.slice();
+        if (paint["line-opacity"] == null || paint["line-opacity"] < 0.7) {
+          paint["line-opacity"] = 0.75;
+        }
+      } else if (isOther) {
+        paint["line-width"] = ROAD_WIDTH_OTHER.slice();
+      }
+    }
+    return layers;
+  }
+
+  /**
+   * Explicit roads overlay — belt-and-suspenders when basemaps still hides lines
+   * (wrong kind filters / casing-only). Drawn above basemap road paints, under labels.
+   */
+  function atlasExplicitRoadLayers(maxZoom) {
+    var mz = typeof maxZoom === "number" ? maxZoom : 11;
+    return [
+      {
+        id: "atlas-roads-highway",
+        type: "line",
+        source: TILE_SOURCE,
+        "source-layer": "roads",
+        filter: ["all", ["==", "kind", "highway"], ["!has", "is_link"]],
+        paint: {
+          "line-color": ATLAS_ROAD_TINT.highway,
+          "line-width": ROAD_WIDTH_HIGHWAY.slice(),
+          "line-opacity": 0.95,
+        },
+      },
+      {
+        id: "atlas-roads-major",
+        type: "line",
+        source: TILE_SOURCE,
+        "source-layer": "roads",
+        filter: ["==", "kind", "major_road"],
+        paint: {
+          "line-color": ATLAS_ROAD_TINT.major,
+          "line-width": ROAD_WIDTH_MAJOR.slice(),
+          "line-opacity": 0.92,
+        },
+      },
+      {
+        id: "atlas-roads-minor",
+        type: "line",
+        source: TILE_SOURCE,
+        "source-layer": "roads",
+        minzoom: Math.min(8, Math.max(0, mz - 3)),
+        filter: ["all", ["==", "kind", "minor_road"], ["!=", "kind_detail", "service"]],
+        paint: {
+          "line-color": ATLAS_ROAD_TINT.minor_a,
+          "line-width": ROAD_WIDTH_MINOR.slice(),
+          "line-opacity": 0.88,
+        },
+      },
+      {
+        id: "atlas-roads-rail",
+        type: "line",
+        source: TILE_SOURCE,
+        "source-layer": "roads",
+        filter: ["==", "kind", "rail"],
+        paint: {
+          "line-color": ATLAS_ROAD_TINT.railway,
+          "line-width": ROAD_WIDTH_RAIL.slice(),
+          "line-opacity": 0.7,
+          "line-dasharray": [0.4, 0.7],
+        },
+      },
+    ];
+  }
+
+  function insertLayersBeforeLabels(layers, extra) {
+    if (!extra || !extra.length) return layers;
+    var out = layers.slice();
+    var insertAt = out.length;
+    for (var i = 0; i < out.length; i++) {
+      if (out[i] && out[i].type === "symbol") {
+        insertAt = i;
+        break;
+      }
+    }
+    for (var j = 0; j < extra.length; j++) {
+      out.splice(insertAt + j, 0, extra[j]);
+    }
+    return out;
+  }
+
   /**
    * Bright diagnostic / reliable paint style — no geometry filters, no labels.
    * Complete style JSON: sources[TILE_SOURCE] + layers in one object (never addLayer first).
    */
   function buildPaintFirstStyle(code, layerNames, tileHttpUrl, header, assetsBase, spriteVer, bounds) {
     var names = layerNames.length ? layerNames.slice() : PROTOMAPS_V4.slice();
-    // Prefer earth first so land fills immediately.
+    // Prefer earth first so land fills immediately; paint roads last as thick lines.
     names.sort(function (a, b) {
+      if (a === "roads") return 1;
+      if (b === "roads") return -1;
       if (a === "earth") return -1;
       if (b === "earth") return 1;
       if (a === "water") return -1;
@@ -959,6 +1278,7 @@
       return a < b ? -1 : a > b ? 1 : 0;
     });
     var b = bounds || boundsForCountry(header, { code: code });
+    var maxZoom = header && typeof header.maxZoom === "number" ? header.maxZoom : 11;
     var layers = [
       {
         id: "background",
@@ -970,6 +1290,33 @@
     layers = layers.concat(diagLayers().slice(0, 1)); // fill under tiles
     for (var i = 0; i < names.length; i++) {
       var name = names[i];
+      if (name === "roads") {
+        // Roads are LineStrings — skip fill/circle; use clear dark strokes.
+        layers.push({
+          id: "atlas-line-roads",
+          type: "line",
+          source: TILE_SOURCE,
+          "source-layer": "roads",
+          paint: {
+            "line-color": "#1f2937",
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              4,
+              0.8,
+              6,
+              1.4,
+              8,
+              2,
+              11,
+              2.8,
+            ],
+            "line-opacity": 0.95,
+          },
+        });
+        continue;
+      }
       layers.push({
         id: "atlas-fill-" + name,
         type: "fill",
@@ -1005,6 +1352,8 @@
         },
       });
     }
+    // Explicit kind-based roads on top of generic paint (still under diag outline).
+    layers = layers.concat(atlasExplicitRoadLayers(maxZoom));
     // Red outline on top — diagnostic independent of PMTiles.
     layers.push(diagLayers()[1]);
     var styleObj = {
@@ -1020,11 +1369,12 @@
   function buildProtomapsStyle(code, tileHttpUrl, header, assetsBase, spriteVer, bounds) {
     var flavor;
     var layers;
+    var maxZoom = header && typeof header.maxZoom === "number" ? header.maxZoom : 11;
     try {
       if (!global.basemaps || typeof global.basemaps.namedFlavor !== "function") {
         throw new Error("basemaps.namedFlavor missing");
       }
-      flavor = global.basemaps.namedFlavor("light");
+      flavor = atlasBasemapFlavor();
       // Third arg is options {lang, labelsOnly}. lang enables place/road/POI symbol layers.
       // Never pass country code as lang ("uk" = Ukrainian in basemaps).
       var labelOpts = wantLabels() ? { lang: labelLang() } : null;
@@ -1036,6 +1386,10 @@
     }
     if (!layers || !layers.length) {
       throw new Error("basemaps.layers returned empty");
+    }
+    layers = adaptRoadLayersForOfflineMaxzoom(layers, maxZoom);
+    if (maxZoom <= 12) {
+      layers = insertLayersBeforeLabels(layers, atlasExplicitRoadLayers(maxZoom));
     }
     for (var i = 0; i < layers.length; i++) {
       if (layers[i].source && layers[i].source !== TILE_SOURCE) {

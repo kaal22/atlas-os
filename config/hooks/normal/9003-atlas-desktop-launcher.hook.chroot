@@ -25,7 +25,7 @@ chmod 755 /etc/skel/Desktop/atlas-launcher.desktop
 cp -f /etc/skel/Desktop/atlas-launcher.desktop /usr/share/applications/atlas-launcher.desktop
 chmod 644 /usr/share/applications/atlas-launcher.desktop
 
-# --- Command Centre (http://127.0.0.1/) ---
+# --- Command Centre (http://127.0.0.1:8787/) ---
 if [ ! -x /usr/bin/atlas-open-command-centre ]; then
   cat > /usr/bin/atlas-open-command-centre <<'EOF'
 #!/bin/sh
@@ -34,7 +34,8 @@ URL="${ATLAS_COMMAND_CENTRE_URL:-}"
 if [ -z "$URL" ] && [ -f /etc/atlas/atlas.conf ]; then
   URL="$(sed -n 's/^ATLAS_COMMAND_CENTRE_URL=//p' /etc/atlas/atlas.conf | head -1 | tr -d '"' | tr -d "'")"
 fi
-URL="${URL:-http://127.0.0.1/}"
+# Direct CC port — never default to :80 (atlas-proxy may be absent).
+URL="${URL:-http://127.0.0.1:8787/}"
 if command -v xdg-open >/dev/null 2>&1; then exec xdg-open "$URL"; fi
 if command -v firefox >/dev/null 2>&1; then exec firefox --new-window "$URL"; fi
 echo "Open Command Centre at: $URL" >&2

@@ -2553,6 +2553,9 @@ function formatUpdateApplyMessage(r, fallbackOk){
     if(String(detail).toLowerCase().includes('signature')){
       return {ok:false,text:'Refused: '+detail+'. Stable/release requires a signed bundle (or ATLAS_ALLOW_UNSIGNED=1 for alpha/dev).'};
     }
+    if(String(detail).toLowerCase().includes('disk space')||String(detail).toLowerCase().includes('insufficient disk')){
+      return {ok:false,text:'Not enough free disk to continue. '+detail};
+    }
     return {ok:false,text:detail};
   }
   const ver=r.version||r.detail||fallbackOk||'ok';
@@ -2609,14 +2612,18 @@ async function downloadOnlineUpdate(){
   if(btn) btn.disabled=true;
   if(prog) prog.style.display='block';
   if(ptxt) ptxt.textContent='Downloading '+fromTo+'…';
-  await api('/api/updates/download',{method:'POST',body:JSON.stringify({url:_updateOffer.bundle_url,sha256:_updateOffer.bundle_sha256})});
+  await api('/api/updates/download',{method:'POST',body:JSON.stringify({url:_updateOffer.bundle_url,sha256:_updateOffer.bundle_sha256,size:_updateOffer.bundle_size||0})});
   const poll=setInterval(async()=>{
     const s=await api('/api/updates/download-status');
     if(s.done){
       clearInterval(poll);
       if(s.error){
         if(fill) fill.style.width='0%';
-        showMsg('updateMsg','Download failed: '+s.error,'err');
+        const err=String(s.error||'');
+        const msg=(err.toLowerCase().includes('disk'))
+          ?('Not enough free disk: '+err)
+          :('Download failed: '+err);
+        showMsg('updateMsg',msg,'err');
         if(btn){btn.disabled=false;btn.textContent='Retry download';btn.onclick=downloadOnlineUpdate;}
         return;
       }

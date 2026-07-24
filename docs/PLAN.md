@@ -32,8 +32,9 @@ Canonical backlog checkboxes: [`docs/BACKLOG.md`](BACKLOG.md).
 - Map zoom > 11 / denser extracts  
 - Plymouth / deeper theme polish  
 - Signed APT / appliance update channel beyond GitHub Releases MVP  
+- Production `atlas-update-metadata` ceremony (dev signing path already ships; see SIGNING_PLAN)  
 - Final ISO cut (`scripts/phase7-iso.sh`) with full boot checklist  
 
 ## Related product phases
 
-Product build order remains in `product.md` (§ Phase 7 updates/backup, Phase 8 OEM). M1 is the near-term engineering slice for signed updates + `:8787` + wallpaper wiring before the final ISO.
+Product build order remains in `product.md` (§ Phase 7 updates/backup, Phase 8 OEM). M1 covered unsigned refusal + CC UX; follow-on is first-class signed bundles (`scripts/sign-update-bundle.sh`, build/publish `--sign`) and download/apply disk preflight — see `docs/signing/SIGNING_PLAN.md` and BACKLOG updates section.

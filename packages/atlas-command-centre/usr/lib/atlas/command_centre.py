@@ -2109,7 +2109,13 @@ class Handler(BaseHTTPRequestHandler):
                     except OSError:
                         pass
                 try:
-                    dest = _dl_bundle(url, sha256, staging, progress_cb=_cb)
+                    dest = _dl_bundle(
+                        url,
+                        sha256,
+                        staging,
+                        progress_cb=_cb,
+                        expected_size=int(data.get("size") or data.get("bundle_size") or 0),
+                    )
                     progress_file.write_text(json.dumps({"downloaded": 1, "total": 1, "done": True, "path": str(dest)}))
                 except (UpdateError, Exception) as e:
                     progress_file.write_text(json.dumps({"done": True, "error": str(e)}))

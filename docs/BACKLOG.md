@@ -63,7 +63,7 @@ On a live or installed Plasma session:
 
 ### Updates (production path)
 
-Phase 7 MVP exists; end-user updates are **closer** after M1 but not fully production-ready.
+Phase 7 MVP exists; signed-bundle path is wired for CI/dev (real production key still ceremony-only).
 
 **Already there**
 
@@ -71,18 +71,22 @@ Phase 7 MVP exists; end-user updates are **closer** after M1 but not fully produ
 - Command Centre System UI: check / download / apply + local bundle browse (`/api/updates/*`) with channel + from→to messaging
 - Online channel default: GitHub Releases `channel.json` (`DEFAULT_UPDATE_ENDPOINT` in `updater.py`; override via `/etc/atlas/update-endpoint`)
 - Bundle builders: `scripts/build-update-bundle.sh`, `scripts/build-release-update.sh`
+- **Signed bundles:** `scripts/sign-update-bundle.sh` + `--sign`/`--key` on build/publish (default auto-sign with dev key when present); operator steps in `docs/signing/SIGNING_PLAN.md`
 - Signing plan: `docs/signing/SIGNING_PLAN.md` (`atlas-update-metadata`); public keys under `/usr/share/atlas/keys/`
 - **M1:** stable/release refuse `DEV-UNSIGNED-PLACEHOLDER` unless `ATLAS_ALLOW_UNSIGNED=1`
+- Disk preflight + atomic `.partial` download with retry/resume in `updater.download_bundle` / apply
 - ISO gate: `scripts/phase7-iso.sh` (backup + updater + CC routes + sample/broken-rollback bundles)
 
 **Gaps for proper OS updates**
 
 - [x] **Refuse unsigned on stable (M1)** — gate + unit tests; production `atlas-update-metadata.pub` still pending release ceremony
-- [x] **Command Centre update UX (M1 thin)** — channel, from/to version, apply/rollback/signature messaging (download resume still later)
+- [x] **Command Centre update UX (M1 thin)** — channel, from/to version, apply/rollback/signature messaging
+- [x] **Dev/CI signed update path** — `sign-update-bundle.sh`, build/publish `--sign`, signing round-trip tests
 - [ ] **Signed production updates** — real release keys at ceremony (not inventing secrets in-tree); publish `atlas-update-metadata.pub`
-- [ ] **Online + offline apply reliability** — robust download/staging, resume, disk-space checks, post-apply health; prove rollback on real hardware
+- [x] **Download/apply reliability (practical slice)** — disk-space preflight, atomic `.partial` + retry/resume; full hardware rollback proof still open
 - [ ] **Beyond GitHub Releases MVP** — signed APT / release channel suitable for appliances (product Phase 7: signed APT repo, app bundles, recovery ISO)
 - [ ] Close V1 criterion #11 (update rollback automated tests) and commercial signing/recovery proof (`docs/user/V1_CRITERIA.md`)
+- [ ] Prove rollback on real hardware / post-apply health under load
 
 ### Final ISO
 

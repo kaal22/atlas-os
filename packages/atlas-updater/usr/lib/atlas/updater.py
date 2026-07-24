@@ -32,6 +32,9 @@ ATLAS_NAMED_PREFIX_DIRS = (
 SCHEMA = "atlas.update/v1"
 VERSION_FILE = Path("/etc/atlas/version.json")
 DEFAULT_UPDATE_ENDPOINT = "https://github.com/kaal22/atlas-os/releases/latest/download/channel.json"
+# Extra free space beyond payload/download size (extract + snapshot headroom).
+DISK_HEADROOM_BYTES = int(os.environ.get("ATLAS_UPDATE_DISK_HEADROOM", str(256 * 1024 * 1024)))
+DOWNLOAD_MAX_ATTEMPTS = int(os.environ.get("ATLAS_UPDATE_DOWNLOAD_ATTEMPTS", "3"))
 
 
 def _update_endpoint() -> str:
@@ -108,6 +111,30 @@ def sha256_file(path: Path) -> str:
     return "sha256:" + h.hexdigest()
 
 
+def disk_free_bytes(path: Path) -> int:
+    """Free bytes on the filesystem containing path (0 if unreadable)."""
+    try:
+        target = path if path.exists() else path.parent
+        if not target.exists():
+            target.mkdir(parents=True, exist_ok=True)
+        return int(shutil.disk_usage(target).free)
+    except OSError:
+        return 0
+
+
+def ensure_disk_space(path: Path, need_bytes: int, *, label: str = "update") -> None:
+    """Raise UpdateError if path's filesystem lacks need_bytes free."""
+    need = max(0, int(need_bytes))
+    if need <= 0:
+        return
+    free = disk_free_bytes(path)
+    if free < need:
+        raise UpdateError(
+            f"insufficient disk space for {label} "
+            f"(need ~{need // (1024 * 1024)} MB free, have ~{free // (1024 * 1024)} MB)"
+        )
+
+
 # Preferred public keys under /usr/share/atlas/keys (see docs/signing/SIGNING_PLAN.md).
 # Production ships atlas-update-metadata.pub; atlas-dev-package.pub is for alpha/dev only.
 UPDATE_PUBKEY_CANDIDATES = (
@@ -139,7 +166,11 @@ def verify_signature(
     allow = _channel_allows_unsigned(channel)
     if not sig.is_file():
         return allow
-    sig_text = sig.read_text(encoding="utf-8").strip()
+    # Placeholder is ASCII text; real openssl signatures are binary.
+    try:
+        sig_text = sig.read_text(encoding="utf-8").strip()
+    except UnicodeDecodeError:
+        sig_text = ""
     if sig_text == "DEV-UNSIGNED-PLACEHOLDER":
         return allow
     if not checksums.is_file():
@@ -421,6 +452,17 @@ def apply_update(
                     version=version,
                 )
 
+            # Preflight free space: payload size + snapshot copies + headroom.
+            payload_bytes = sum(f.stat().st_size for f in payload.rglob("*") if f.is_file())
+            try:
+                ensure_disk_space(
+                    atlas_data,
+                    payload_bytes * 2 + DISK_HEADROOM_BYTES,
+                    label="apply",
+                )
+            except UpdateError as e:
+                return UpdateResult(False, "apply", str(e))
+
             touch = _collect_touch_paths(data, payload, install_root)
             snap = create_dir_snapshot(touch, snapshot_root, label)
             # Track newly created files for rollback removal
@@ -576,49 +618,103 @@ def download_bundle(
     expected_sha256: str,
     dest_dir: Path,
     progress_cb: Any | None = None,
+    *,
+    expected_size: int = 0,
+    max_attempts: int | None = None,
 ) -> Path:
-    """Download bundle with hash verification (always fresh — no resume)."""
+    """Download bundle atomically to .partial, verify hash, then rename.
+
+    Retries on transient failure. Optionally resumes via HTTP Range when a
+    partial already exists. Preflights free disk space before each attempt.
+    """
     dest_dir.mkdir(parents=True, exist_ok=True)
     filename = url.rsplit("/", 1)[-1].split("?", 1)[0] or "update.atlas-update"
     dest = dest_dir / filename
-    partial = dest_dir / f".{filename}.download"
+    partial = dest_dir / f".{filename}.partial"
 
-    # Never reuse partials — release bundles are small and hashes change between uploads.
+    attempts = max(1, int(max_attempts if max_attempts is not None else DOWNLOAD_MAX_ATTEMPTS))
+    size_hint = max(0, int(expected_size or 0))
+    # Need room for the finished file (+ partial) and modest headroom.
+    space_need = (size_hint * 2 if size_hint else DISK_HEADROOM_BYTES) + DISK_HEADROOM_BYTES
+    ensure_disk_space(dest_dir, space_need, label="download")
+
     dest.unlink(missing_ok=True)
-    partial.unlink(missing_ok=True)
-
     fetch_url = url if "?" in url else f"{url}?sha256={expected_sha256[:16]}"
-    headers: dict[str, str] = {
-        "User-Agent": "AtlasUpdater/1",
-        "Cache-Control": "no-cache",
-    }
+    last_err: Exception | None = None
 
-    try:
-        req = urllib.request.Request(fetch_url, headers=headers)
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            total = int(resp.headers.get("Content-Length") or 0)
-            downloaded = 0
-            with partial.open("wb") as f:
-                while True:
-                    chunk = resp.read(256 * 1024)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if progress_cb:
-                        progress_cb(downloaded, total)
-    except (urllib.error.URLError, OSError) as e:
-        partial.unlink(missing_ok=True)
-        raise UpdateError(f"download_failed: {e}") from e
+    for attempt in range(1, attempts + 1):
+        try:
+            resume_from = 0
+            if partial.is_file():
+                resume_from = partial.stat().st_size
+                if size_hint and resume_from > size_hint:
+                    partial.unlink(missing_ok=True)
+                    resume_from = 0
 
-    got = sha256_file(partial).replace("sha256:", "")
-    expected = expected_sha256.replace("sha256:", "")
-    if expected and got != expected:
-        partial.unlink(missing_ok=True)
-        raise UpdateError(f"hash_mismatch: expected {expected[:16]}… got {got[:16]}…")
+            headers: dict[str, str] = {
+                "User-Agent": "AtlasUpdater/1",
+                "Cache-Control": "no-cache",
+            }
+            if resume_from > 0:
+                headers["Range"] = f"bytes={resume_from}-"
 
-    partial.rename(dest)
-    return dest
+            req = urllib.request.Request(fetch_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                status = int(getattr(resp, "status", 200) or 200)
+                # Fresh download if server ignored Range or returned full body.
+                if resume_from > 0 and status != 206:
+                    partial.unlink(missing_ok=True)
+                    resume_from = 0
+                    mode = "wb"
+                    downloaded = 0
+                else:
+                    mode = "ab" if resume_from > 0 else "wb"
+                    downloaded = resume_from
+
+                content_len = int(resp.headers.get("Content-Length") or 0)
+                if status == 206 and resume_from > 0:
+                    total = resume_from + content_len
+                else:
+                    total = content_len or size_hint
+
+                if total:
+                    ensure_disk_space(
+                        dest_dir,
+                        max(0, total - downloaded) + DISK_HEADROOM_BYTES,
+                        label="download",
+                    )
+
+                with partial.open(mode) as f:
+                    while True:
+                        chunk = resp.read(256 * 1024)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if progress_cb:
+                            progress_cb(downloaded, total or downloaded)
+
+            got = sha256_file(partial).replace("sha256:", "")
+            expected = expected_sha256.replace("sha256:", "")
+            if expected and got != expected:
+                partial.unlink(missing_ok=True)
+                raise UpdateError(f"hash_mismatch: expected {expected[:16]}… got {got[:16]}…")
+
+            partial.replace(dest)
+            return dest
+        except UpdateError:
+            raise
+        except (urllib.error.URLError, OSError, TimeoutError) as e:
+            last_err = e
+            # Keep partial for resume on next attempt unless corrupt/empty.
+            if partial.is_file() and partial.stat().st_size == 0:
+                partial.unlink(missing_ok=True)
+            if attempt >= attempts:
+                break
+            time.sleep(min(2 * attempt, 6))
+
+    partial.unlink(missing_ok=True)
+    raise UpdateError(f"download_failed: {last_err}") from last_err
 
 
 def read_bundle_metadata(bundle_path: Path) -> dict[str, Any]:

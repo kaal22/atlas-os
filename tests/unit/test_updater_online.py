@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 from io import BytesIO
 import hashlib
+import urllib.error
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "packages" / "atlas-updater" / "usr" / "lib" / "atlas"))
@@ -85,11 +86,13 @@ def test_download_bundle_verifies_hash():
 
     with tempfile.TemporaryDirectory() as td:
         with patch("urllib.request.urlopen", return_value=resp):
-            dest = updater.download_bundle(
-                "https://example.com/test.atlas-update",
-                expected_hash,
-                Path(td),
-            )
+            with patch.object(updater, "disk_free_bytes", return_value=10 * 1024 * 1024 * 1024):
+                dest = updater.download_bundle(
+                    "https://example.com/test.atlas-update",
+                    expected_hash,
+                    Path(td),
+                    max_attempts=1,
+                )
         assert dest.is_file()
         assert dest.name == "test.atlas-update"
 
@@ -106,15 +109,62 @@ def test_download_bundle_rejects_bad_hash():
 
     with tempfile.TemporaryDirectory() as td:
         with patch("urllib.request.urlopen", return_value=resp):
+            with patch.object(updater, "disk_free_bytes", return_value=10 * 1024 * 1024 * 1024):
+                try:
+                    updater.download_bundle(
+                        "https://example.com/test.atlas-update",
+                        "0000000000000000000000000000000000000000000000000000000000000000",
+                        Path(td),
+                        max_attempts=1,
+                    )
+                    assert False, "Should have raised"
+                except updater.UpdateError as e:
+                    assert "hash_mismatch" in str(e)
+
+
+def test_download_bundle_preflight_disk_space():
+    with tempfile.TemporaryDirectory() as td:
+        with patch.object(updater, "disk_free_bytes", return_value=100):
             try:
                 updater.download_bundle(
                     "https://example.com/test.atlas-update",
-                    "0000000000000000000000000000000000000000000000000000000000000000",
+                    "abc",
                     Path(td),
+                    expected_size=50 * 1024 * 1024,
+                    max_attempts=1,
                 )
                 assert False, "Should have raised"
             except updater.UpdateError as e:
-                assert "hash_mismatch" in str(e)
+                assert "insufficient disk space" in str(e)
+
+
+def test_download_bundle_retries_then_succeeds():
+    content = b"retry-ok-bundle"
+    expected_hash = hashlib.sha256(content).hexdigest()
+
+    fail_resp = MagicMock()
+    fail_resp.__enter__ = MagicMock(side_effect=urllib.error.URLError("boom"))
+    fail_resp.__exit__ = lambda s, *a: None
+
+    ok_resp = MagicMock()
+    ok_resp.status = 200
+    ok_resp.headers = {"Content-Length": str(len(content))}
+    ok_resp.read = MagicMock(side_effect=[content, b""])
+    ok_resp.__enter__ = lambda s: s
+    ok_resp.__exit__ = lambda s, *a: None
+
+    with tempfile.TemporaryDirectory() as td:
+        with patch("urllib.request.urlopen", side_effect=[fail_resp, ok_resp]):
+            with patch.object(updater, "disk_free_bytes", return_value=10 * 1024 * 1024 * 1024):
+                with patch("updater.time.sleep"):
+                    dest = updater.download_bundle(
+                        "https://example.com/test.atlas-update",
+                        expected_hash,
+                        Path(td),
+                        max_attempts=2,
+                    )
+        assert dest.is_file()
+        assert dest.read_bytes() == content
 
 
 def test_path_allowed_atlas_systemd_unit():
@@ -143,6 +193,8 @@ if __name__ == "__main__":
     test_check_online_update_wildcard_passes()
     test_download_bundle_verifies_hash()
     test_download_bundle_rejects_bad_hash()
+    test_download_bundle_preflight_disk_space()
+    test_download_bundle_retries_then_succeeds()
     test_path_allowed_atlas_systemd_unit()
     test_get_installed_version_fallback()
     print("All online update tests passed!")

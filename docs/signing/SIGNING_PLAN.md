@@ -1,17 +1,17 @@
 # Signing Key Plan
 
-Status: Phase 0 foundation  
-Date: 2026-07-11
+Status: Phase 1 — signed update bundles (dev path + ceremony hooks)  
+Date: 2026-07-24
 
 ## Key classes
 
 | Key | Purpose | Storage | Lifetime |
 |-----|---------|---------|----------|
-| `atlas-dev-package` | Sign development `.deb` packages | Developer workstation (encrypted) | Rotating, non-production |
+| `atlas-dev-package` | Sign development `.deb` / `.atlas-update` bundles | Developer workstation (encrypted) | Rotating, non-production |
 | `atlas-release-package` | Sign production APT packages | Offline HSM or air-gapped smartcard | Annual rotation |
 | `atlas-release-iso` | Sign ISO / OEM / recovery artefacts | Offline HSM | Annual rotation |
 | `atlas-content-pack` | Sign `.atlas-pack` catalogues and packs | Release signing ceremony | Annual rotation |
-| `atlas-update-metadata` | Sign update manifests | Same as release package | Tied to channel |
+| `atlas-update-metadata` | Sign update manifests (`checksums.sha256` inside `.atlas-update`) | Same as release package | Tied to channel |
 
 ## Development policy
 
@@ -20,13 +20,74 @@ Date: 2026-07-11
 - Never commit private keys. Public keys may live under `release/keys/dev/`.
 - CI uses ephemeral or injected secrets; no keys in the repository.
 
+## Operator flow (signed OS updates)
+
+### 1. Generate keys (once per workstation / ceremony)
+
+```bash
+./scripts/generate-dev-keys.sh
+# writes release/keys/dev/atlas-dev-package.{key,pub}
+# PRIVATE .key is gitignored — do not commit it
+
+# Ship the public key on appliances (already done for the committed .pub):
+cp release/keys/dev/atlas-dev-package.pub \
+   packages/atlas-updater/usr/share/atlas/keys/atlas-dev-package.pub
+```
+
+Production: generate `atlas-update-metadata` offline (HSM / air-gap). Install only the
+`.pub` as `packages/atlas-updater/usr/share/atlas/keys/atlas-update-metadata.pub`.
+**Never** invent or commit production private keys.
+
+### 2. Build + sign a bundle
+
+```bash
+# Default: auto-sign with dev key when present
+./scripts/build-release-update.sh --from 0.1.0 --to 0.1.1
+
+# Explicit:
+./scripts/build-release-update.sh --from 0.1.0 --to 0.1.1 --sign \
+  --key release/keys/dev/atlas-dev-package.key
+
+# Or sign an existing unsigned bundle:
+./scripts/sign-update-bundle.sh build/release/atlas-update-0.1.0-to-0.1.1.atlas-update
+
+# Production:
+ATLAS_UPDATE_SIGNING_KEY=/secure/atlas-update-metadata.key \
+  ./scripts/build-release-update.sh --from 0.1.0 --to 0.1.1 --sign
+```
+
+`sign-update-bundle.sh` replaces `DEV-UNSIGNED-PLACEHOLDER` with
+`openssl dgst -sha256 -sign` of `checksums.sha256`, verifies against the matching
+`.pub`, then repacks.
+
+### 3. Publish
+
+```bash
+./scripts/publish-release.sh --from 0.1.0 --to 0.1.1 --channel stable
+# passes through --sign / --key / --no-sign
+```
+
+### 4. Apply on appliance (no ALLOW_UNSIGNED)
+
+Stable/release appliances verify against `/usr/share/atlas/keys/` and **refuse**
+`DEV-UNSIGNED-PLACEHOLDER` unless `ATLAS_ALLOW_UNSIGNED=1` (alpha/dev only).
+
+```bash
+# Offline:
+sudo atlas-apply-update /path/to/signed.atlas-update
+# or Command Centre → System → Software updates / Import update file
+```
+
+Do **not** set `ATLAS_ALLOW_UNSIGNED` on production appliances.
+
 ## Release policy
 
 1. Build artefacts on a clean Debian builder from locked cache.
 2. Generate checksums (SHA-256, SHA-512) and SPDX SBOM.
 3. Sign `release.json` and artefacts with `atlas-release-*` keys.
-4. Publish signature files alongside artefacts (`.sig`).
-5. Installed systems verify signatures before applying updates or packs.
+4. Sign `.atlas-update` bundles with `atlas-update-metadata` (or pass `--key`).
+5. Publish signature files alongside artefacts (`.sig`) and the signed bundle + `channel.json`.
+6. Installed systems verify signatures before applying updates or packs.
 
 ## Secure Boot
 
@@ -37,7 +98,7 @@ Date: 2026-07-11
 
 ```bash
 ./scripts/generate-dev-keys.sh
-# writes release/keys/dev/*.gpg and *.pem (public only to git)
+# writes release/keys/dev/*.key (gitignored) and *.pub (public only to git)
 ```
 
 ## Verification

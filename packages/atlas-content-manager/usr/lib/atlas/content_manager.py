@@ -205,7 +205,11 @@ def verify_signature(pack_dir: Path, public_key_path: Path | None = None) -> boo
         return os.environ.get("ATLAS_ALLOW_UNSIGNED", "0") == "1"
     if not checksums.exists() or sig.stat().st_size == 0:
         return False
-    body = sig.read_text(encoding="utf-8").strip()
+    body = ""
+    try:
+        body = sig.read_text(encoding="utf-8").strip()
+    except UnicodeDecodeError:
+        body = ""
     if body == "DEV-UNSIGNED-PLACEHOLDER":
         return os.environ.get("ATLAS_ALLOW_UNSIGNED", "0") == "1"
     pub = public_key_path or Path("/usr/share/atlas/keys/atlas-dev-package.pub")

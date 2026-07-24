@@ -23,11 +23,21 @@ if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-4k.png ]; then
     /usr/share/wallpapers/Atlas/contents/images/3840x2160.png
 fi
 
-# SDDM: point Breeze theme at Atlas wallpaper when possible
+# SDDM: point Breeze theme at Atlas wallpaper (theme.conf defaults to stock Next).
+ATLAS_BG=""
 if [ -f /usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png ]; then
+  ATLAS_BG=/usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png
+elif [ -f /usr/share/backgrounds/atlas/atlas-wallpaper.png ]; then
+  ATLAS_BG=/usr/share/backgrounds/atlas/atlas-wallpaper.png
+fi
+if [ -n "$ATLAS_BG" ]; then
   mkdir -p /usr/share/sddm/themes/breeze
-  ln -sfn /usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png \
-    /usr/share/sddm/themes/breeze/atlas-background.png 2>/dev/null || true
+  ln -sfn "$ATLAS_BG" /usr/share/sddm/themes/breeze/atlas-background.png 2>/dev/null || true
+  # theme.conf.user overrides stock background=…/Next/… without patching package files.
+  cat > /usr/share/sddm/themes/breeze/theme.conf.user <<EOF
+[General]
+background=$ATLAS_BG
+EOF
 fi
 
 # Prefer SDDM over any leftover display managers

@@ -25,4 +25,10 @@ cat > "$OUT/README.md" <<'EOF'
 
 Private `*.key` files are gitignored. Only `*.pub` may be committed.
 Production keys are managed per docs/signing/SIGNING_PLAN.md.
+
+After regenerating, copy the public key into the updater package so images
+install it under `/usr/share/atlas/keys/`:
+
+  cp release/keys/dev/atlas-dev-package.pub \
+     packages/atlas-updater/usr/share/atlas/keys/atlas-dev-package.pub
 EOF

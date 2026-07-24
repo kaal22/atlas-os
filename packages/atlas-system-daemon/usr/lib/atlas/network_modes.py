@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Atlas network mode controller — ufw helpers (product §23)."""
+"""Atlas network mode controller — ufw helpers (product §23).
+
+Canonical Command Centre listen port is 8787 (direct). atlas-proxy on :80 is
+optional; firewall rules open 8787 for trusted LAN / mesh, never assume :80.
+"""
 from __future__ import annotations
 
 import subprocess

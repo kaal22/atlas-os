@@ -24,7 +24,9 @@ def main() -> int:
         body = {"ok": False, "error": "bundle_not_found"}
         _write_result(body)
         return 1
-    os.environ["ATLAS_ALLOW_UNSIGNED"] = "1"
+    # Do not force ATLAS_ALLOW_UNSIGNED — stable/release must refuse unsigned
+    # bundles (see updater.verify_signature). Alpha/dev operators set the env
+    # explicitly when testing placeholder signatures.
     data = Path("/srv/atlas")
     try:
         result = apply_update(bundle, atlas_data=data, dry_run=False)

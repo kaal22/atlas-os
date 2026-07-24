@@ -1237,9 +1237,22 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/updates/check":
             from updater import check_online_update, get_installed_version
             info = get_installed_version()
-            result = check_online_update(info.get("version"), info.get("channel", "stable"))
+            channel = info.get("channel", "stable")
+            current = info.get("version")
+            result = check_online_update(current, channel)
             if result is None:
-                return self._json(200, {"up_to_date": True, "version": info.get("version")})
+                return self._json(
+                    200,
+                    {
+                        "up_to_date": True,
+                        "version": current,
+                        "current_version": current,
+                        "channel": channel,
+                    },
+                )
+            if isinstance(result, dict):
+                result.setdefault("current_version", current)
+                result.setdefault("channel", channel)
             return self._json(200, result)
         if path == "/api/updates/download-status":
             status_file = Path("/srv/atlas/updates/staging/.progress")

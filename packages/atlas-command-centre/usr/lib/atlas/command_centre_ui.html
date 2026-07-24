@@ -1049,6 +1049,7 @@ async function page(){
     const gpu=await api('/api/system/gpu');
     const bak=await api('/api/backup/list');
     const upd=await api('/api/updates/browse');
+    const updCheck=await api('/api/updates/check');
     const warn=hw.warning?`<div class="callout warn"><strong>GPU setup recommended</strong>
       <p>${escapeHtml(hw.warning)}</p>
       <p><code>${escapeHtml(hw.install_command||'sudo atlas-gpu-setup --install-nvidia')}</code></p></div>`:'';
@@ -1065,6 +1066,27 @@ async function page(){
         <span class="meta">${escapeHtml(src)} · ${escapeHtml(u.publisher||'unknown publisher')}</span>
       </div>`;
     }).join('');
+    const curVer=escapeHtml(updCheck.current_version||updCheck.version||'?');
+    const curCh=escapeHtml(updCheck.channel||'stable');
+    let updateStatusHtml=`<div class="stat-row"><span>Channel</span><span><strong>${curCh}</strong></span></div>
+      <div class="stat-row"><span>Installed</span><span>v${curVer}</span></div>
+      <p style="color:var(--muted);margin-top:.75rem">Click below to check for updates from the configured channel endpoint.</p>`;
+    if(updCheck.error&&updCheck.error!=='not_found'){
+      updateStatusHtml=`<div class="stat-row"><span>Channel</span><span><strong>${curCh}</strong></span></div>
+        <div class="stat-row"><span>Installed</span><span>v${curVer}</span></div>
+        <p class="msg err" style="margin-top:.75rem">${escapeHtml(updCheck.detail||updCheck.error)}</p>`;
+    } else if(updCheck.available){
+      _updateOffer=updCheck;
+      const sz=updCheck.bundle_size?(updCheck.bundle_size>=1048576?Math.round(updCheck.bundle_size/(1024*1024))+' MB':Math.round(updCheck.bundle_size/1024)+' KB'):'unknown size';
+      updateStatusHtml=`<div class="stat-row"><span>Channel</span><span><strong>${escapeHtml(updCheck.channel||curCh)}</strong></span></div>
+        <div class="stat-row"><span>Update</span><span><strong>v${escapeHtml(updCheck.current_version||curVer)} → v${escapeHtml(updCheck.version||'?')}</strong></span></div>
+        <p style="font-size:.85rem;color:var(--muted);margin-top:.75rem">${escapeHtml(updCheck.release_notes||'')}</p>
+        <p style="font-size:.85rem;color:var(--muted)">Size: ${sz} · Published ${escapeHtml(updCheck.published_at||'')}</p>`;
+    } else if(updCheck.up_to_date){
+      updateStatusHtml=`<div class="stat-row"><span>Channel</span><span><strong>${curCh}</strong></span></div>
+        <div class="stat-row"><span>Installed</span><span>v${curVer}</span></div>
+        <p style="color:var(--accent);margin-top:.75rem">You're up to date.</p>`;
+    }
     view.innerHTML=`<p class="page-intro">Hardware profile, encrypted backups, and offline updates for this Atlas device.</p>
       ${warn}
       <div class="grid-2">
@@ -1093,9 +1115,9 @@ async function page(){
       </div>
       <div class="card" id="updateCard">
         <h3>Software updates</h3>
-        <div id="updateStatus"><p style="color:var(--muted)">Click below to check for updates from GitHub.</p></div>
+        <div id="updateStatus">${updateStatusHtml}</div>
         <div class="btn-group" style="margin-top:.75rem">
-          <button id="btnCheckUpdate" class="btn" onclick="checkOnlineUpdate()">Check for updates</button>
+          <button id="btnCheckUpdate" class="btn" onclick="${updCheck.available?'downloadOnlineUpdate()':'checkOnlineUpdate()'}">${updCheck.available?'Download and install':'Check for updates'}</button>
         </div>
         <div id="updateProgress" style="display:none;margin-top:1rem">
           <div class="progress-track"><div id="updateProgressFill" class="progress-fill" style="width:0%"></div></div>
@@ -1105,7 +1127,7 @@ async function page(){
       </div>
       <details class="card" style="cursor:pointer">
         <summary style="font-weight:600">Advanced — Import update file</summary>
-        <p style="margin-top:.75rem">Select a signed <code>.atlas-update</code> bundle. Atlas takes a snapshot first; failed health checks roll back automatically.</p>
+        <p style="margin-top:.75rem">Select a signed <code>.atlas-update</code> bundle. Atlas takes a snapshot first; failed health checks roll back automatically. Stable/release channels refuse unsigned placeholders.</p>
         <div class="file-browser" style="max-height:200px">${updRows||emptyState('No update bundles found','Copy bundles to /srv/atlas/updates/incoming or plug in a USB drive.')}</div>
         <div id=updPreview style="margin-top:.75rem;display:none"></div>
         <div id=updMsg style="margin-top:.5rem"></div>
@@ -2519,12 +2541,29 @@ async function confirmRestore(){
   showMsg('bakMsg','Restored: '+(r.restored||[]).join(', '),'ok');
 }
 let _updateOffer=null;
+function formatUpdateApplyMessage(r, fallbackOk){
+  if(!r||r.error==='bad_response'){
+    return {ok:false,text:'Update failed (empty/invalid server response). Check atlas-command-centre logs.'};
+  }
+  if(r.error||r.ok===false){
+    const detail=r.detail||r.error||'Update failed';
+    if(r.rolled_back){
+      return {ok:false,text:'Update failed and rolled back to the previous snapshot. '+detail};
+    }
+    if(String(detail).toLowerCase().includes('signature')){
+      return {ok:false,text:'Refused: '+detail+'. Stable/release requires a signed bundle (or ATLAS_ALLOW_UNSIGNED=1 for alpha/dev).'};
+    }
+    return {ok:false,text:detail};
+  }
+  const ver=r.version||r.detail||fallbackOk||'ok';
+  return {ok:true,text:'Applied '+ver+'. Snapshot kept for rollback if a later health check fails.'};
+}
 async function checkOnlineUpdate(){
   const btn=document.getElementById('btnCheckUpdate');
   const box=document.getElementById('updateStatus');
   const msg=document.getElementById('updateMsg');
   if(btn) btn.disabled=true;
-  if(box) box.innerHTML='<p style="color:var(--muted)">Checking…</p>';
+  if(box) box.innerHTML='<p style="color:var(--muted)">Checking channel…</p>';
   if(msg) msg.innerHTML='';
   const r=await api('/api/updates/check');
   if(r._status===404||r.error==='not_found'){
@@ -2533,20 +2572,27 @@ async function checkOnlineUpdate(){
     return;
   }
   if(r.error){
-    if(box) box.innerHTML=`<p class="msg err">${escapeHtml(r.detail||r.error)}</p>`;
-    if(btn) btn.disabled=false;
+    const ch=escapeHtml(r.channel||'stable');
+    const cur=escapeHtml(r.current_version||'?');
+    if(box) box.innerHTML=`<div class="stat-row"><span>Channel</span><span><strong>${ch}</strong></span></div>
+      <div class="stat-row"><span>Installed</span><span>v${cur}</span></div>
+      <p class="msg err" style="margin-top:.75rem">${escapeHtml(r.detail||r.error)}</p>`;
+    if(btn){btn.disabled=false;btn.textContent='Check for updates';btn.onclick=checkOnlineUpdate;}
     return;
   }
   if(r.up_to_date){
-    if(box) box.innerHTML=`<p style="color:var(--accent)">You're up to date (v${escapeHtml(r.version||'?')})</p>`;
-    if(btn) btn.disabled=false;
+    if(box) box.innerHTML=`<div class="stat-row"><span>Channel</span><span><strong>${escapeHtml(r.channel||'stable')}</strong></span></div>
+      <div class="stat-row"><span>Installed</span><span>v${escapeHtml(r.current_version||r.version||'?')}</span></div>
+      <p style="color:var(--accent);margin-top:.75rem">You're up to date.</p>`;
+    if(btn){btn.disabled=false;btn.textContent='Check for updates';btn.onclick=checkOnlineUpdate;}
     return;
   }
   _updateOffer=r;
   const sz=r.bundle_size?(r.bundle_size>=1048576?Math.round(r.bundle_size/(1024*1024))+' MB':Math.round(r.bundle_size/1024)+' KB'):'unknown size';
   if(box) box.innerHTML=`
-    <p><strong>Update available: v${escapeHtml(r.version)}</strong></p>
-    <p style="font-size:.85rem;color:var(--muted)">${escapeHtml(r.release_notes||'')}</p>
+    <div class="stat-row"><span>Channel</span><span><strong>${escapeHtml(r.channel||'stable')}</strong></span></div>
+    <div class="stat-row"><span>Update</span><span><strong>v${escapeHtml(r.current_version||'?')} → v${escapeHtml(r.version||'?')}</strong></span></div>
+    <p style="font-size:.85rem;color:var(--muted);margin-top:.75rem">${escapeHtml(r.release_notes||'')}</p>
     <p style="font-size:.85rem;color:var(--muted)">Size: ${sz} · Published ${escapeHtml(r.published_at||'')}</p>`;
   if(btn){btn.textContent='Download and install';btn.disabled=false;btn.onclick=downloadOnlineUpdate;}
 }
@@ -2555,12 +2601,14 @@ async function downloadOnlineUpdate(){
   // Refresh offer so we don't apply a stale bundle after channel.json changes.
   const fresh=await api('/api/updates/check');
   if(fresh&&fresh.available) _updateOffer=fresh;
+  const fromTo=`v${_updateOffer.current_version||'?'} → v${_updateOffer.version||'?'}`;
   const btn=document.getElementById('btnCheckUpdate');
   const prog=document.getElementById('updateProgress');
   const fill=document.getElementById('updateProgressFill');
   const ptxt=document.getElementById('updateProgressText');
   if(btn) btn.disabled=true;
   if(prog) prog.style.display='block';
+  if(ptxt) ptxt.textContent='Downloading '+fromTo+'…';
   await api('/api/updates/download',{method:'POST',body:JSON.stringify({url:_updateOffer.bundle_url,sha256:_updateOffer.bundle_sha256})});
   const poll=setInterval(async()=>{
     const s=await api('/api/updates/download-status');
@@ -2568,24 +2616,21 @@ async function downloadOnlineUpdate(){
       clearInterval(poll);
       if(s.error){
         if(fill) fill.style.width='0%';
-        showMsg('updateMsg',s.error,'err');
-        if(btn){btn.disabled=false;btn.textContent='Retry';btn.onclick=downloadOnlineUpdate;}
+        showMsg('updateMsg','Download failed: '+s.error,'err');
+        if(btn){btn.disabled=false;btn.textContent='Retry download';btn.onclick=downloadOnlineUpdate;}
         return;
       }
       if(fill) fill.style.width='100%';
-      if(ptxt) ptxt.textContent='Download complete — applying…';
+      if(ptxt) ptxt.textContent='Download complete — applying '+fromTo+'…';
       const ar=await api('/api/updates/apply',{method:'POST',body:JSON.stringify({path:s.path})});
-      if(ar.ok||ar.success){
-        showMsg('updateMsg','Updated to v'+(_updateOffer.version||'?')+'. Restart services to complete.','ok');
-      } else {
-        showMsg('updateMsg','Apply failed: '+(ar.error||ar.message||'unknown'),'err');
-      }
+      const formatted=formatUpdateApplyMessage(ar,_updateOffer.version);
+      showMsg('updateMsg',formatted.text,formatted.ok?'ok':'err');
       if(btn){btn.disabled=false;btn.textContent='Check for updates';btn.onclick=checkOnlineUpdate;}
       if(prog) prog.style.display='none';
     } else if(s.total>0){
       const pct=Math.round((s.downloaded/s.total)*100);
       if(fill) fill.style.width=pct+'%';
-      if(ptxt) ptxt.textContent=Math.round(s.downloaded/(1024*1024))+' / '+Math.round(s.total/(1024*1024))+' MB';
+      if(ptxt) ptxt.textContent=Math.round(s.downloaded/(1024*1024))+' / '+Math.round(s.total/(1024*1024))+' MB ('+fromTo+')';
     }
   },1000);
 }
@@ -2601,7 +2646,7 @@ async function previewUpdate(path){
   const m=r.manifest||{};
   box.style.display='block';
   box.innerHTML=`<h4>${escapeHtml(m.from_version||'?')} → ${escapeHtml(m.to_version||'?')}</h4>
-    <p style="font-size:.8125rem;color:var(--muted)">${escapeHtml(m.publisher||'')}</p>
+    <p style="font-size:.8125rem;color:var(--muted)">Publisher: ${escapeHtml(m.publisher||'unknown')} · Channel: ${escapeHtml(m.channel||'bundle')}</p>
     <pre class="pre" style="margin:0 0 .75rem">${escapeHtml(r.release_notes||'No release notes.')}</pre>
     <div class="btn-group">
       <button class="btn" onclick="applyUpdateBundle(decodeURIComponent('${jsQuote(path)}'))">Apply update</button>
@@ -2619,15 +2664,8 @@ async function applyUpdateBundle(path){
 async function applyUpdateConfirmed(path){
   showMsg('updMsg','Applying update…','info');
   const r=await api('/api/updates/apply',{method:'POST',body:JSON.stringify({path})});
-  if(r.error==='bad_response'){
-    showMsg('updMsg','Update failed (empty/invalid server response). Check atlas-command-centre logs.','err');
-    return;
-  }
-  if(r.error||r.ok===false){
-    showMsg('updMsg',(r.detail||r.error||'Update failed')+(r.rolled_back?' (rolled back)':''),'err');
-    return;
-  }
-  showMsg('updMsg','Applied '+ (r.version||r.detail),'ok');
+  const formatted=formatUpdateApplyMessage(r);
+  showMsg('updMsg',formatted.text,formatted.ok?'ok':'err');
 }
 async function applyDefaultAgentFromSetup(){
   try{

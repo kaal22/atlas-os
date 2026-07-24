@@ -1,5 +1,7 @@
-# Atlas Command Centre reverse proxy — loopback only (Phase 3).
-# Browser → 127.0.0.1:80 → 127.0.0.1:8787 (CC). No LAN listen.
+# Atlas Command Centre reverse proxy — loopback only (optional compat).
+# Canonical UI URL is http://127.0.0.1:8787/ (direct Command Centre).
+# This nginx site is optional: Browser → 127.0.0.1:80 → 127.0.0.1:8787.
+# Launchers and docs must not assume :80. No LAN listen.
 
 server {
     listen 127.0.0.1:80;

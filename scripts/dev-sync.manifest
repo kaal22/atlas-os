@@ -64,6 +64,8 @@ packages/atlas-content-manager/usr/share/atlas/packs/atlas-maps-za.atlas-pack|/u
 packages/atlas-backup/usr/lib/atlas/backup_service.py|/usr/lib/atlas/backup_service.py|
 packages/atlas-updater/usr/lib/atlas/updater.py|/usr/lib/atlas/updater.py|
 packages/atlas-updater/usr/lib/atlas/atlas-apply-update.py|/usr/lib/atlas/atlas-apply-update.py|
+packages/atlas-updater/usr/share/atlas/keys/atlas-dev-package.pub|/usr/share/atlas/keys/atlas-dev-package.pub|
+packages/atlas-updater/usr/share/atlas/keys/README.md|/usr/share/atlas/keys/README.md|
 packages/atlas-shell/usr/bin/atlas-health|/usr/bin/atlas-health|
 packages/atlas-shell/usr/bin/atlas-launcher|/usr/bin/atlas-launcher|
 packages/atlas-shell/usr/lib/atlas/trust-desktop-launchers.sh|/usr/lib/atlas/trust-desktop-launchers.sh|

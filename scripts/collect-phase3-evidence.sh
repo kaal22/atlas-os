@@ -32,7 +32,7 @@ SOCK="${ATLAS_SYSTEM_SOCK:-/run/atlas/system.sock}"
   echo "=== listen (ss) ==="
   ss -lntp 2>/dev/null || netstat -lntp 2>/dev/null || true
   echo
-  echo "=== expect 127.0.0.1:80 (nginx) and 127.0.0.1:8787 (CC); no *:8787 ==="
+  echo "=== expect 127.0.0.1:8787 (canonical CC); :80 only if atlas-proxy enabled; no *:8787 ==="
   ss -lntp 2>/dev/null | grep -E ':80|:8787' || true
 } | tee "$OUT/listen.txt"
 

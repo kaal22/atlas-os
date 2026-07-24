@@ -15,7 +15,12 @@ provisioning.
 
 ## Daily use
 
-Open **Atlas** from the desktop (or http://127.0.0.1:8787/ on the device).
+Open **Command Centre** from the desktop, or browse to
+**http://127.0.0.1:8787/** on the device (canonical URL).
+
+Do not rely on `http://127.0.0.1/` (port 80): `atlas-proxy` (nginx → 8787) is
+optional compatibility only. Firewall trusted-LAN mode opens **8787**, not 80.
+
 Sign in with the account created at install / first run.
 
 ## Offline maps

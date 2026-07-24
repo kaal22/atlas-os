@@ -23,4 +23,4 @@ if command -v nginx >/dev/null; then
   systemctl restart nginx.service || systemctl start nginx.service || true
 fi
 
-echo "atlas-proxy: loopback site enabled (127.0.0.1:80 -> 127.0.0.1:8787)"
+echo "atlas-proxy: optional loopback compat enabled (127.0.0.1:80 -> 127.0.0.1:8787); canonical CC is :8787"

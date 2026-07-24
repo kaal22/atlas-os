@@ -85,7 +85,19 @@ class UpdateError(Exception):
 
 
 def _allow_unsigned() -> bool:
+    """Alpha/dev escape hatch. Stable/release must never rely on this in production."""
     return os.environ.get("ATLAS_ALLOW_UNSIGNED", "0") == "1"
+
+
+def _channel_allows_unsigned(channel: str | None = None) -> bool:
+    """Unsigned / DEV-UNSIGNED only when ATLAS_ALLOW_UNSIGNED=1 (alpha/dev workflows)."""
+    if _allow_unsigned():
+        return True
+    ch = (channel or get_installed_version().get("channel") or "stable").strip().lower()
+    # Stable/release never auto-trust placeholders; alpha/dev still need the env flag.
+    if ch in {"stable", "release"}:
+        return False
+    return _allow_unsigned()
 
 
 def sha256_file(path: Path) -> str:
@@ -96,7 +108,27 @@ def sha256_file(path: Path) -> str:
     return "sha256:" + h.hexdigest()
 
 
-def verify_signature(manifest_path: Path, allowed_keys_dir: Path | None = None) -> bool:
+# Preferred public keys under /usr/share/atlas/keys (see docs/signing/SIGNING_PLAN.md).
+# Production ships atlas-update-metadata.pub; atlas-dev-package.pub is for alpha/dev only.
+UPDATE_PUBKEY_CANDIDATES = (
+    "atlas-update-metadata.pub",
+    "atlas-release-package.pub",
+    "atlas-dev-package.pub",
+)
+
+
+def verify_signature(
+    manifest_path: Path,
+    allowed_keys_dir: Path | None = None,
+    *,
+    channel: str | None = None,
+) -> bool:
+    """Verify update bundle signature.
+
+    Stable/release: requires a real openssl signature against an installed public key.
+    DEV-UNSIGNED-PLACEHOLDER and missing signatures are refused unless
+    ATLAS_ALLOW_UNSIGNED=1 (alpha/dev).
+    """
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not data.get("publisher"):
         return False
@@ -104,17 +136,21 @@ def verify_signature(manifest_path: Path, allowed_keys_dir: Path | None = None) 
         return False
     sig = manifest_path.parent / "signature"
     checksums = manifest_path.parent / "checksums.sha256"
+    allow = _channel_allows_unsigned(channel)
     if not sig.is_file():
-        return _allow_unsigned()
+        return allow
     sig_text = sig.read_text(encoding="utf-8").strip()
     if sig_text == "DEV-UNSIGNED-PLACEHOLDER":
-        # Alpha/dev bundles ship with an explicit unsigned placeholder.
-        return True
+        return allow
     if not checksums.is_file():
-        return _allow_unsigned()
+        return allow
     keys = allowed_keys_dir or Path("/usr/share/atlas/keys")
-    pub = keys / "atlas-dev-package.pub"
-    if pub.is_file() and shutil.which("openssl"):
+    if not shutil.which("openssl"):
+        return allow
+    for name in UPDATE_PUBKEY_CANDIDATES:
+        pub = keys / name
+        if not pub.is_file():
+            continue
         try:
             proc = subprocess.run(
                 ["openssl", "dgst", "-sha256", "-verify", str(pub), "-signature", str(sig), str(checksums)],
@@ -122,10 +158,11 @@ def verify_signature(manifest_path: Path, allowed_keys_dir: Path | None = None) 
                 text=True,
                 timeout=10,
             )
-            return proc.returncode == 0
+            if proc.returncode == 0:
+                return True
         except (OSError, subprocess.TimeoutExpired):
-            return False
-    return _allow_unsigned()
+            continue
+    return False
 
 
 def verify_checksums(bundle_root: Path) -> None:
@@ -350,8 +387,19 @@ def apply_update(
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
             if data.get("schema") != SCHEMA:
                 return UpdateResult(False, "apply", "bad schema")
-            if not verify_signature(manifest_path):
-                return UpdateResult(False, "apply", "signature verification failed")
+            channel = str(
+                data.get("channel")
+                or get_installed_version().get("channel")
+                or "stable"
+            )
+            if not verify_signature(manifest_path, channel=channel):
+                return UpdateResult(
+                    False,
+                    "apply",
+                    "signature verification failed "
+                    "(unsigned or unknown publisher; stable/release requires a signed "
+                    "bundle, or ATLAS_ALLOW_UNSIGNED=1 for alpha/dev)",
+                )
             try:
                 verify_checksums(root)
             except UpdateError as e:

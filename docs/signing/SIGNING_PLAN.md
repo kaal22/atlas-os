@@ -42,5 +42,18 @@ Date: 2026-07-11
 
 ## Verification
 
-Installed systems store release public keys under `/usr/share/atlas/keys/`.  
-`atlas-updater` and `atlas-content-manager` refuse unsigned or unknown-publisher payloads in stable channel.
+Installed systems store release public keys under `/usr/share/atlas/keys/`
+(shipped from `packages/atlas-updater/usr/share/atlas/keys/`).
+
+Preferred filenames (checked in order by `atlas-updater`):
+
+1. `atlas-update-metadata.pub` — production update manifests  
+2. `atlas-release-package.pub` — optional shared release key  
+3. `atlas-dev-package.pub` — development only (`scripts/generate-dev-keys.sh`)
+
+`atlas-updater` and `atlas-content-manager` refuse unsigned or unknown-publisher
+payloads on **stable/release** unless `ATLAS_ALLOW_UNSIGNED=1` (alpha/dev).
+`DEV-UNSIGNED-PLACEHOLDER` is never accepted on stable without that flag.
+
+Until a release ceremony publishes `atlas-update-metadata.pub`, only the committed
+dev public key is present — do **not** invent fake production secrets in-tree.

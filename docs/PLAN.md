@@ -27,9 +27,10 @@ Canonical backlog checkboxes: [`docs/BACKLOG.md`](BACKLOG.md).
 
 ### Milestone 2+ (out of M1)
 
-- Kolibri / Khan catalogue channels  
-- ZIM HTML → agent RAG  
-- Map zoom > 11 / denser extracts  
+- [x] Kolibri / Khan catalogue channels (operator-import locked IDs; media not in ISO)
+- [x] ZIM HTML → agent RAG (selective / starter; confirm_large for huge ZIMs)
+- [x] Map zoom > 11 / denser extracts (default z12; small z13; large stay z11)
+- [x] Kids expand URL pinned on-device + GitHub raw fallback
 - Plymouth / deeper theme polish  
 - Signed APT / appliance update channel beyond GitHub Releases MVP  
 - Production `atlas-update-metadata` ceremony (dev signing path already ships; see SIGNING_PLAN)  

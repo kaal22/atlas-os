@@ -1,6 +1,6 @@
 schema: atlas.licences.lock/v1
 atlas_version: "0.1.0-alpha"
-updated: "2026-07-11"
+updated: "2026-07-24"
 
 entries:
   - id: debian-base
@@ -63,6 +63,41 @@ entries:
     licence: MIT (software); channel content varies
     redistribution: image_ok_channels_require_per_channel_audit
     decision: channels_locked_individually_before_ship
+
+  - id: kolibri-channel-khan-en
+    component: Khan Academy (English - US curriculum) via Kolibri Studio
+    channel_id: c9d7f950ab6b5a1199e3d6c10d7f0103
+    studio_version: 5
+    published_size_bytes: 67814440813
+    licence: Khan Academy terms via Learning Equality Studio distribution
+    redistribution: operator_may_import_not_bundled
+    decision: catalogue_sku_atlas.education.kolibri-khan-en
+    note: Not shipped in ISO or git; Command Centre Education one-click prepares import metadata
+
+  - id: kolibri-channel-ck12-en
+    component: CK-12 (K-12) via Kolibri Studio
+    channel_id: 1d8f6d84618153c18c695d85074952a7
+    studio_version: 54
+    published_size_bytes: 6662051873
+    licence: CK-12 Foundation terms (review for commercial OEM)
+    redistribution: operator_may_import_not_bundled
+    decision: catalogue_sku_atlas.education.kolibri-ck12-en
+
+  - id: kolibri-channel-home-learning
+    component: Inclusive Home Learning Activities via Kolibri Studio
+    channel_id: 378cf4128c854c2795c100b5aca7a3ed
+    published_size_bytes: 52317616
+    licence: Kolibri Studio public channel (verify curator terms before OEM bundle)
+    redistribution: operator_may_import_not_bundled
+    decision: catalogue_sku_atlas.education.kolibri-home-learning
+    note: ~52 MB — preferred alpha online-import demo channel
+
+  - id: kids-home-learning-expand
+    component: Atlas kids home-learning expand Markdown bundle
+    licence: CC-BY-4.0
+    redistribution: allowed
+    decision: approved_for_alpha_on_device_pin
+    path: content/packs/education/kids-home-learning-expand.tar.gz
 
   - id: mysql
     component: mysql:8.0

@@ -35,6 +35,10 @@ containers/compose/atlas-core.yml|/usr/share/atlas/compose/atlas-core.yml|
 containers/compose/atlas-core.yml|/srv/atlas/compose/atlas-core.yml|
 packages/atlas-content-manager/usr/share/atlas/catalogue.json|/usr/share/atlas/catalogue.json|atlas-command-centre.service
 packages/atlas-content-manager/usr/share/atlas/packs/atlas-education-kids-home.atlas-pack|/usr/share/atlas/packs/atlas-education-kids-home.atlas-pack|
+packages/atlas-content-manager/usr/share/atlas/packs/atlas-education-kolibri-khan-en.atlas-pack|/usr/share/atlas/packs/atlas-education-kolibri-khan-en.atlas-pack|
+packages/atlas-content-manager/usr/share/atlas/packs/atlas-education-kolibri-ck12-en.atlas-pack|/usr/share/atlas/packs/atlas-education-kolibri-ck12-en.atlas-pack|
+packages/atlas-content-manager/usr/share/atlas/packs/atlas-education-kolibri-home-learning.atlas-pack|/usr/share/atlas/packs/atlas-education-kolibri-home-learning.atlas-pack|
+packages/atlas-content-manager/usr/share/atlas/content/kids-home-learning-expand.tar.gz|/usr/share/atlas/content/kids-home-learning-expand.tar.gz|
 packages/atlas-content-manager/usr/share/atlas/packs/atlas-knowledge-wikipedia-en.atlas-pack|/usr/share/atlas/packs/atlas-knowledge-wikipedia-en.atlas-pack|
 packages/atlas-content-manager/usr/share/atlas/packs/atlas-knowledge-wikipedia-en-mini.atlas-pack|/usr/share/atlas/packs/atlas-knowledge-wikipedia-en-mini.atlas-pack|
 packages/atlas-content-manager/usr/share/atlas/packs/atlas-knowledge-wikipedia-en-nopic.atlas-pack|/usr/share/atlas/packs/atlas-knowledge-wikipedia-en-nopic.atlas-pack|

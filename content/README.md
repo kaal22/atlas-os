@@ -53,7 +53,7 @@ the country bounding box (ODbL — © OpenStreetMap contributors) into
 `/srv/atlas/maps/<cc>/<cc>.pmtiles`, then reindexes. After that, tiles work
 fully offline.
 
-- Default max zoom: **11** (`ATLAS_PMTILES_MAXZOOM` to override; each level ~2× size)
+- Default max zoom: **12** (`ATLAS_PMTILES_MAXZOOM` to override; small countries z13, large stay z11; each level ~2× size)
 - Planet source: daily builds at `https://build.protomaps.com/YYYYMMDD.pmtiles`
   (override with `ATLAS_PMTILES_PLANET_URL`, or set `ATLAS_PMTILES_URL` for a
   finished country file)

@@ -37,11 +37,12 @@ Country codes are listed in content/packs/maps/countries.json
 Environment:
   ATLAS_PMTILES_URL         Direct .pmtiles URL (skips Protomaps extract)
   ATLAS_PMTILES_PLANET_URL  Protomaps planet archive for extract
-  ATLAS_PMTILES_MAXZOOM     Max zoom (default 11; each level ~2x size)
+  ATLAS_PMTILES_MAXZOOM     Max zoom (default from countries.json / 12; each level ~2x size)
   ATLAS_MAPS_DEST           Override output directory
 
 Licence: ODbL-1.0 — © OpenStreetMap contributors (Protomaps basemap).
-Large countries (us, ca, br, in, au) may be multi-GB at zoom 11+.
+Large countries (us, ca, br, in, au) stay at maxzoom 11 unless you raise
+ATLAS_PMTILES_MAXZOOM — each level roughly doubles size.
 EOF
   exit 1
 fi
@@ -64,6 +65,7 @@ from content_manager import PackError, fetch_country_pmtiles, resolve_country_me
 cc = "$CC"
 dest = Path(r"$DEST_DIR")
 countries = json.loads(Path(r"$COUNTRIES_JSON").read_text(encoding="utf-8"))
+defaults = countries.get("tiles_defaults") or {}
 meta = resolve_country_meta(cc, countries)
 if not meta:
     print(f"Unknown country code: {cc}", file=sys.stderr)
@@ -74,14 +76,16 @@ if hint >= 1_000_000_000:
     gb = hint / 1_000_000_000
     print(f"WARNING: {meta['name']} tiles may be ~{gb:.1f} GB (zoom-dependent). Ensure free disk.", flush=True)
 
-print(f"Fetching {meta['name']} ({cc}) → {dest / (cc + '.pmtiles')}", flush=True)
+default_zoom = int(meta.get("maxzoom") or defaults.get("maxzoom") or 12)
+zoom = int(os.environ.get("ATLAS_PMTILES_MAXZOOM") or default_zoom)
+print(f"Fetching {meta['name']} ({cc}) → {dest / (cc + '.pmtiles')} (maxzoom={zoom})", flush=True)
 print("Source: Protomaps basemap extract (ODbL / © OpenStreetMap contributors)", flush=True)
 try:
     out = fetch_country_pmtiles(
         dest,
         country=cc,
         bbox=meta["bbox"],
-        maxzoom=int(os.environ.get("ATLAS_PMTILES_MAXZOOM") or meta.get("maxzoom") or 11),
+        maxzoom=zoom,
         direct_url=os.environ.get("ATLAS_PMTILES_URL") or None,
         atlas_root=Path(os.environ.get("ATLAS_ROOT") or "/tmp/atlas-fetch-cache"),
         progress_file=dest / ".fetch-progress",

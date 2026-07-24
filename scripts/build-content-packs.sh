@@ -63,7 +63,7 @@ PY
 }
 
 stage_map_country() {
-  local code="$1" name="$2" bbox="$3" center="$4" size_hint="$5" size_class="$6"
+  local code="$1" name="$2" bbox="$3" center="$4" size_hint="$5" size_class="$6" maxzoom="${7:-12}"
   local stage tiles_src status="stub"
   stage="$(mktemp -d "${TMPDIR:-/tmp}/atlas-map-${code}.XXXXXX")"
   mkdir -p "$stage/payload" "$stage/licences" "$stage/attribution"
@@ -81,7 +81,7 @@ stage_map_country() {
   "version": "2026.07",
   "type": "atlas.content.map",
   "name": "${name} Offline Maps",
-  "description": "Offline map pack for ${name}. Install downloads Protomaps/OSM PMTiles online when needed (ODbL); afterwards tiles work offline.",
+  "description": "Offline map pack for ${name}. Install downloads Protomaps/OSM PMTiles online when needed (ODbL); afterwards tiles work offline. Pack maxzoom ${maxzoom}.",
   "size_bytes": 2048,
   "minimum_os_version": "0.1.0",
   "architectures": ["all"],
@@ -98,11 +98,12 @@ stage_map_country() {
     "format": "pmtiles",
     "size_hint_bytes": ${size_hint},
     "size_class": "${size_class}",
+    "maxzoom": ${maxzoom},
     "tiles_fetch": {
       "enabled": true,
       "mode": "protomaps_extract",
       "source": "protomaps",
-      "maxzoom": 11,
+      "maxzoom": ${maxzoom},
       "size_hint_bytes": ${size_hint},
       "licence": "ODbL-1.0",
       "attribution": "© OpenStreetMap contributors (Protomaps basemap)"
@@ -117,8 +118,8 @@ Atlas offline maps — ${name} (${code})
 On Install (Command Centre / content manager), Atlas downloads a country PMTiles
 extract from the Protomaps daily basemap (HTTP range requests) into:
   /srv/atlas/maps/${code}/${code}.pmtiles
-Default max zoom is 11 (override with ATLAS_PMTILES_MAXZOOM). Large countries
-may be multi-GB — check free disk first.
+Pack max zoom is ${maxzoom} (override with ATLAS_PMTILES_MAXZOOM). Large countries
+may be multi-GB — check free disk first. Each zoom level is roughly 2× size.
 
 Licence: ODbL-1.0 — © OpenStreetMap contributors (Protomaps basemap produced work).
 After download, tiles are fully offline.
@@ -129,7 +130,7 @@ Operator alternatives:
 Then rebuild with ./scripts/build-content-packs.sh --maps-only to embed tiles.
 EOF
   cat > "$stage/payload/meta.json" <<EOF
-{"country":"${code}","name":"${name}","bbox":${bbox},"center":${center},"format":"pmtiles","status":"${status}","size_hint_bytes":${size_hint},"tiles_source":"protomaps"}
+{"country":"${code}","name":"${name}","bbox":${bbox},"center":${center},"format":"pmtiles","status":"${status}","size_hint_bytes":${size_hint},"maxzoom":${maxzoom},"tiles_source":"protomaps"}
 EOF
   echo "Open Database Licence (ODbL) — © OpenStreetMap contributors. Protomaps basemap is an ODbL Produced Work; attribution required." > "$stage/licences/ODbL.txt"
   echo "© OpenStreetMap contributors — https://www.openstreetmap.org/copyright" > "$stage/attribution/OSM.txt"
@@ -140,13 +141,15 @@ EOF
 
 if [[ "$KNOWLEDGE_ONLY" -eq 0 ]]; then
   echo "=== Building country map packs ==="
-  while IFS=$'\t' read -r code name bbox center size_hint size_class; do
+  while IFS=$'\t' read -r code name bbox center size_hint size_class maxzoom; do
     [[ -z "$code" ]] && continue
-    stage_map_country "$code" "$name" "$bbox" "$center" "$size_hint" "$size_class"
+    stage_map_country "$code" "$name" "$bbox" "$center" "$size_hint" "$size_class" "$maxzoom"
   done < <(python3 - <<PY
 import json
 from pathlib import Path
 data = json.loads(Path(r"$COUNTRIES_JSON").read_text(encoding="utf-8"))
+defaults = data.get("tiles_defaults") or {}
+default_zoom = int(defaults.get("maxzoom") or 12)
 want = set(data.get("default_iso_set") or [])
 if int("$ALL_MAPS"):
     want = {c["code"] for c in data["countries"]}
@@ -160,6 +163,7 @@ for c in data["countries"]:
         json.dumps(c["center"]),
         str(int(c.get("size_hint_bytes") or 0)),
         str(c.get("size_class") or "medium"),
+        str(int(c.get("maxzoom") or default_zoom)),
     ]))
 PY
 )
@@ -167,17 +171,27 @@ fi
 
 if [[ "$MAPS_ONLY" -eq 0 ]]; then
   echo "=== Building kids home-learning pack ==="
+  # Ensure expand tarball exists for offline file:// pin + package content dir.
+  EXPAND_TGZ="$ROOT/content/packs/education/kids-home-learning-expand.tar.gz"
+  if [[ ! -f "$EXPAND_TGZ" ]]; then
+    tar -czf "$EXPAND_TGZ" -C "$ROOT/content/packs/education" kids-home-learning-expand
+  fi
+  mkdir -p "$ROOT/packages/atlas-content-manager/usr/share/atlas/content" \
+           "$ROOT/config/includes.chroot/usr/share/atlas/content"
+  cp -f "$EXPAND_TGZ" "$ROOT/packages/atlas-content-manager/usr/share/atlas/content/"
+  cp -f "$EXPAND_TGZ" "$ROOT/config/includes.chroot/usr/share/atlas/content/"
+  EXPAND_SIZE="$(stat -c%s "$EXPAND_TGZ" 2>/dev/null || stat -f%z "$EXPAND_TGZ")"
   STAGE="$(mktemp -d "${TMPDIR:-/tmp}/atlas-kids.XXXXXX")"
   mkdir -p "$STAGE/payload" "$STAGE/licences" "$STAGE/attribution"
   cp -a "$ROOT/content/packs/education/kids-home-learning/." "$STAGE/payload/"
-  cat > "$STAGE/manifest.json" <<'EOF'
+  cat > "$STAGE/manifest.json" <<EOF
 {
   "schema": "atlas.pack/v1",
   "id": "atlas.education.kids-home",
   "version": "2026.07",
   "type": "atlas.content.education",
   "name": "Kids Home Learning",
-  "description": "Offline home-learning curriculum (maths, reading, science, geography, daily routine) ingested into the agent knowledge base. Optional expand bundle via ATLAS_KIDS_EXPAND_URL.",
+  "description": "Offline home-learning curriculum (maths, reading, science, geography, daily routine) ingested into the agent knowledge base. Install also pulls the pinned expand bundle (extra lessons) when available.",
   "size_bytes": 32768,
   "minimum_os_version": "0.1.0",
   "architectures": ["all"],
@@ -193,10 +207,13 @@ if [[ "$MAPS_ONLY" -eq 0 ]]; then
     "expand_fetch": {
       "enabled": true,
       "mode": "curriculum_bundle",
-      "size_hint_bytes": 0,
+      "url": "file:///usr/share/atlas/content/kids-home-learning-expand.tar.gz",
+      "fallback_url": "https://raw.githubusercontent.com/kaal22/atlas-os/main/content/packs/education/kids-home-learning-expand.tar.gz",
+      "filename": "kids-home-learning-expand.tar.gz",
+      "size_hint_bytes": ${EXPAND_SIZE},
       "licence": "CC-BY-4.0",
       "attribution": "Atlas curated education expand bundle",
-      "note": "Set ATLAS_KIDS_EXPAND_URL or meta.expand_fetch.url to a .tar.gz/.zip of extra Markdown lessons. Starter curriculum ships offline without network."
+      "note": "Pinned expand archive ships on-device under /usr/share/atlas/content/. Override with ATLAS_KIDS_EXPAND_URL."
     }
   },
   "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
@@ -206,6 +223,87 @@ EOF
   echo "Atlas OS curated education content (original short lessons)." > "$STAGE/attribution/ATLAS.txt"
   build_one "$STAGE" "$OUT/atlas-education-kids-home.atlas-pack"
   rm -rf "$STAGE"
+
+  echo "=== Building Kolibri channel catalogue packs (locked IDs; content not bundled) ==="
+  stage_kolibri_channel() {
+    local pack_id="$1" slug="$2" title="$3" channel_id="$4" lang="$5" size_hint="$6" size_class="$7" studio_ver="$8" licence_note="$9"
+    local stage
+    stage="$(mktemp -d "${TMPDIR:-/tmp}/atlas-kolibri-${slug}.XXXXXX")"
+    mkdir -p "$stage/payload" "$stage/licences" "$stage/attribution"
+    cat > "$stage/manifest.json" <<EOF
+{
+  "schema": "atlas.pack/v1",
+  "id": "${pack_id}",
+  "version": "2026.07",
+  "type": "atlas.content.education",
+  "name": "${title}",
+  "description": "Locked Kolibri Studio channel for Atlas Education. Channel media is not in the ISO — install prepares import metadata and opens a one-click path in Command Centre (online Kolibri import or USB export).",
+  "size_bytes": 4096,
+  "minimum_os_version": "0.1.0",
+  "architectures": ["all"],
+  "mount_target": "/srv/atlas/kolibri/channels/${slug}",
+  "licences": ["Kolibri-channel-varies"],
+  "sources": ["kolibri-studio", "learning-equality"],
+  "dependencies": [],
+  "conflicts": [],
+  "post_install_workflow": "education.kolibri_prepare",
+  "meta": {
+    "audience": "education",
+    "language": "${lang}",
+    "kolibri_channel": {
+      "channel_id": "${channel_id}",
+      "name": "${title}",
+      "language": "${lang}",
+      "studio_version": ${studio_ver},
+      "published_size_bytes": ${size_hint},
+      "redistribution": "operator_may_import_not_bundled",
+      "licence_note": $(python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$licence_note"),
+      "import_modes": ["kolibri_online", "usb_export"],
+      "kolibri_url": "http://127.0.0.1:8083/"
+    }
+  },
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}
+EOF
+    cat > "$stage/payload/README.txt" <<EOF
+${title}
+
+Locked Kolibri channel_id: ${channel_id}
+Published size (Studio): ~${size_hint} bytes
+
+Atlas does NOT redistribute this channel's video/content blobs in git or the core ISO.
+After installing this pack from Command Centre → Education:
+
+1. Start Kolibri: sudo docker compose -f /srv/atlas/compose/atlas-core.yml up -d kolibri
+2. Online: Device → Channels → Import using channel ID ${channel_id}
+   or: kolibri manage importchannel network ${channel_id}
+3. Offline USB: copy a Kolibri channel export into /srv/atlas/kolibri/ and import from disk.
+
+See content/packs/education/kolibri-channels/CHANNELS.lock.yaml and docs/legal/LICENCE_INVENTORY.md.
+EOF
+    echo "$licence_note" > "$stage/licences/CHANNEL.txt"
+    echo "Learning Equality Kolibri Studio — https://studio.learningequality.org" > "$stage/attribution/KOLIBRI.txt"
+    printf '%s\n' "{\"channel_id\":\"${channel_id}\",\"name\":\"${title}\",\"language\":\"${lang}\"}" \
+      > "$stage/payload/channel.json"
+    build_one "$stage" "$OUT/atlas-education-${slug}.atlas-pack"
+    rm -rf "$stage"
+  }
+  stage_kolibri_channel \
+    "atlas.education.kolibri-khan-en" "kolibri-khan-en" \
+    "Khan Academy (English - US curriculum)" \
+    "c9d7f950ab6b5a1199e3d6c10d7f0103" "en" "67814440813" "large" "5" \
+    "Khan Academy via Learning Equality Kolibri Studio. Operator may import with locked channel ID; Atlas does not ship Khan video in-repo or core ISO."
+  stage_kolibri_channel \
+    "atlas.education.kolibri-ck12-en" "kolibri-ck12-en" \
+    "CK-12 (K-12)" \
+    "1d8f6d84618153c18c695d85074952a7" "en" "6662051873" "large" "54" \
+    "CK-12 Foundation via Kolibri Studio public channel. Operator import only; review CK-12 terms for commercial OEM redistribution."
+  stage_kolibri_channel \
+    "atlas.education.kolibri-home-learning" "kolibri-home-learning" \
+    "Inclusive Home Learning Activities" \
+    "378cf4128c854c2795c100b5aca7a3ed" "mul" "52317616" "small" "null" \
+    "Public Kolibri Studio channel (~52 MB). Suitable alpha one-click online import demo; content still not vendored in Atlas git."
+
 
   echo "=== Building Wikipedia English knowledge packs ==="
   # Shared licence/attribution snippets for all Wikipedia SKUs.
@@ -217,11 +315,14 @@ EOF
     echo "Kiwix ZIM archives — https://kiwix.org / https://download.kiwix.org" > "$stage/attribution/KIWIX.txt"
   }
 
-  # Starter: curated Markdown RAG + small en_100_nopic ZIM (~13 MB).
+  # Starter: curated Markdown RAG + HTML seed + small en_100_nopic ZIM (~13 MB).
   STAGE="$(mktemp -d "${TMPDIR:-/tmp}/atlas-wiki.XXXXXX")"
-  mkdir -p "$STAGE/payload/articles" "$STAGE/licences" "$STAGE/attribution"
+  mkdir -p "$STAGE/payload/articles" "$STAGE/payload/rag-html" "$STAGE/licences" "$STAGE/attribution"
   cp -a "$ROOT/content/packs/knowledge/wikipedia-en-curated/README.md" "$STAGE/payload/"
   cp -a "$ROOT/content/packs/knowledge/wikipedia-en-curated/articles/." "$STAGE/payload/articles/"
+  if [[ -d "$ROOT/content/packs/knowledge/wikipedia-en-curated/rag-html" ]]; then
+    cp -a "$ROOT/content/packs/knowledge/wikipedia-en-curated/rag-html/." "$STAGE/payload/rag-html/"
+  fi
   shopt -s nullglob
   for zim in "$ROOT/content/packs/knowledge/wikipedia-en-curated/"*.zim; do
     cp -a "$zim" "$STAGE/payload/"
@@ -234,7 +335,7 @@ EOF
   "version": "2026.07",
   "type": "atlas.content.knowledge",
   "name": "Wikipedia EN starter (curated + top-100)",
-  "description": "Curated Wikipedia-style articles for agent RAG, plus install-time download of English top-100 nopic ZIM (~13 MB) for Kiwix. For full English dumps use mini / nopic / maxi catalogue packs.",
+  "description": "Curated Wikipedia-style articles for agent RAG, plus install-time download of English top-100 nopic ZIM (~13 MB) for Kiwix. Bounded HTML extract (zimdump/libzim or rag-html seed) feeds the knowledge index — not a full maxi dump.",
   "size_bytes": 32768,
   "minimum_os_version": "0.1.0",
   "architectures": ["all"],
@@ -250,6 +351,11 @@ EOF
     "variant": "starter",
     "size_hint_bytes": 14000000,
     "size_class": "small",
+    "zim_rag": {
+      "enabled": true,
+      "max_articles": 40,
+      "note": "Selective HTML → agent RAG; large mini/nopic/maxi SKUs still require confirm_large"
+    },
     "zim_fetch": {
       "enabled": true,
       "mode": "kiwix_download",
@@ -488,6 +594,7 @@ for c in countries["countries"]:
     bundle = f"atlas-maps-{code}.atlas-pack"
     hint = int(c.get("size_hint_bytes") or 0)
     size_class = c.get("size_class") or "medium"
+    maxzoom = int(c.get("maxzoom") or defaults.get("maxzoom") or 12)
     entry = {
         "id": f"atlas.maps.{code}",
         "version": "2026.07",
@@ -495,7 +602,7 @@ for c in countries["countries"]:
         "name": f"{c['name']} Offline Maps",
         "description": (
             f"Offline maps for {c['name']}. Install pulls a Protomaps/OSM PMTiles extract "
-            f"online (max zoom {defaults.get('maxzoom', 11)}), then works offline. "
+            f"online (max zoom {maxzoom}), then works offline. "
             f"Licence: ODbL — © OpenStreetMap contributors."
         ),
         "size_hint_bytes": hint or 2048,
@@ -508,16 +615,16 @@ for c in countries["countries"]:
         "tiles_source": defaults.get("source") or "protomaps",
         "tiles_fetch": {
             "mode": defaults.get("mode") or "protomaps_extract",
-            "maxzoom": defaults.get("maxzoom") or 11,
+            "maxzoom": maxzoom,
             "size_hint_bytes": hint,
         },
         "licence_note": defaults.get("attribution")
         or "© OpenStreetMap contributors (Protomaps basemap, ODbL-1.0)",
     }
-    if size_class == "large":
-        entry["size_warning"] = (
-            f"{c['name']} tiles may be multi-GB at zoom {defaults.get('maxzoom', 11)}. "
-            "Ensure free disk before installing."
+    if size_class == "large" or hint >= 1_000_000_000:
+        entry["size_warning"] = c.get("size_warning") or (
+            f"{c['name']} tiles may be multi-GB at zoom {maxzoom}. "
+            "Ensure free disk before installing. Raise zoom only via ATLAS_PMTILES_MAXZOOM."
         )
     pkg_pack = root / "packages/atlas-content-manager/usr/share/atlas/packs" / bundle
     if code in built_maps or pkg_pack.is_file():
@@ -538,6 +645,8 @@ packs.append({
 })
 
 kids_bundle = "atlas-education-kids-home.atlas-pack"
+expand_tgz = root / "content/packs/education/kids-home-learning-expand.tar.gz"
+expand_size = expand_tgz.stat().st_size if expand_tgz.is_file() else 2048
 packs.append({
     "id": "atlas.education.kids-home",
     "version": "2026.07",
@@ -545,7 +654,7 @@ packs.append({
     "name": "Kids Home Learning",
     "description": (
         "Starter home-learning curriculum (maths, reading, science, geography, routine) "
-        "indexed for local AI tutors. Works offline on install; optional expand via ATLAS_KIDS_EXPAND_URL."
+        "indexed for local AI tutors. Install also pulls the pinned expand bundle when present."
     ),
     "size_hint_bytes": (out / kids_bundle).stat().st_size if (out / kids_bundle).is_file() else 32768,
     "size_class": "small",
@@ -556,9 +665,89 @@ packs.append({
     "licence_note": "CC BY 4.0 — Atlas curated lessons",
     "expand_fetch": {
         "mode": "curriculum_bundle",
-        "note": "Set ATLAS_KIDS_EXPAND_URL for optional larger curriculum download",
+        "url": "file:///usr/share/atlas/content/kids-home-learning-expand.tar.gz",
+        "fallback_url": (
+            "https://raw.githubusercontent.com/kaal22/atlas-os/main/"
+            "content/packs/education/kids-home-learning-expand.tar.gz"
+        ),
+        "filename": "kids-home-learning-expand.tar.gz",
+        "size_hint_bytes": expand_size,
+        "note": "Pinned expand ships on-device; override with ATLAS_KIDS_EXPAND_URL",
     },
 })
+
+kolibri_skus = [
+    {
+        "id": "atlas.education.kolibri-khan-en",
+        "name": "Khan Academy (English - US curriculum)",
+        "slug": "kolibri-khan-en",
+        "channel_id": "c9d7f950ab6b5a1199e3d6c10d7f0103",
+        "size_hint_bytes": 67_814_440_813,
+        "size_class": "large",
+        "size_warning": (
+            "Khan Academy EN US is ~63 GB of Kolibri channel media. "
+            "Atlas ships only the locked channel ID — import online or from USB."
+        ),
+        "licence_note": (
+            "Khan Academy via Learning Equality Kolibri Studio — operator may import; "
+            "not redistributed in Atlas ISO"
+        ),
+    },
+    {
+        "id": "atlas.education.kolibri-ck12-en",
+        "name": "CK-12 (K-12)",
+        "slug": "kolibri-ck12-en",
+        "channel_id": "1d8f6d84618153c18c695d85074952a7",
+        "size_hint_bytes": 6_662_051_873,
+        "size_class": "large",
+        "size_warning": (
+            "CK-12 is ~6.6 GB. Atlas ships the locked channel ID only — import via Kolibri."
+        ),
+        "licence_note": (
+            "CK-12 Foundation via Kolibri Studio — operator import; "
+            "review CK-12 terms for commercial OEM"
+        ),
+    },
+    {
+        "id": "atlas.education.kolibri-home-learning",
+        "name": "Inclusive Home Learning Activities",
+        "slug": "kolibri-home-learning",
+        "channel_id": "378cf4128c854c2795c100b5aca7a3ed",
+        "size_hint_bytes": 52_317_616,
+        "size_class": "small",
+        "licence_note": (
+            "Public Kolibri Studio channel (~52 MB) — operator import; not vendored in git"
+        ),
+    },
+]
+for k in kolibri_skus:
+    entry = {
+        "id": k["id"],
+        "version": "2026.07",
+        "type": "atlas.content.education",
+        "name": k["name"],
+        "description": (
+            f"Kolibri channel pack with locked Studio ID {k['channel_id']}. "
+            "Install from Education for one-click prepare + open Kolibri / USB import. "
+            "Channel media is not bundled in the core ISO."
+        ),
+        "size_hint_bytes": k["size_hint_bytes"],
+        "size_class": k["size_class"],
+        "signed": False,
+        "channel": "alpha",
+        "bundle_file": f"atlas-education-{k['slug']}.atlas-pack",
+        "category": "education",
+        "licence_note": k["licence_note"],
+        "kolibri_channel": {
+            "channel_id": k["channel_id"],
+            "name": k["name"],
+            "redistribution": "operator_may_import_not_bundled",
+            "kolibri_url": "http://127.0.0.1:8083/",
+        },
+    }
+    if k.get("size_warning"):
+        entry["size_warning"] = k["size_warning"]
+    packs.append(entry)
 
 # Wikipedia catalogue SKUs (locked ZIM URLs from release/sources.catalog.yaml).
 wiki_skus = [
@@ -578,6 +767,7 @@ wiki_skus = [
             "filename": "wikipedia_en_100_nopic.zim",
             "size_hint_bytes": 14_000_000,
         },
+        "zim_rag": {"enabled": True, "max_articles": 40},
     },
     {
         "id": "atlas.knowledge.wikipedia-en-mini",
@@ -719,11 +909,13 @@ for w in wiki_skus:
         "licence_note": w.get("licence_note")
         or "CC BY-SA 4.0 / GFDL — © Wikipedia contributors (Kiwix ZIM)",
     }
+    if w.get("zim_rag"):
+        entry["zim_rag"] = w["zim_rag"]
     if w.get("size_warning"):
         entry["size_warning"] = w["size_warning"]
     packs.append(entry)
 
-catalogue = {"schema": "atlas.pack/v1", "catalogue_version": "0.2.3", "packs": packs}
+catalogue = {"schema": "atlas.pack/v1", "catalogue_version": "0.2.4", "packs": packs}
 for dest in [
     root / "content/catalogues/catalogue.json",
     root / "packages/atlas-content-manager/usr/share/atlas/catalogue.json",

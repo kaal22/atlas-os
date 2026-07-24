@@ -1741,6 +1741,8 @@ async function renderEducation(){
   const kidsId='atlas.education.kids-home';
   const kidsInstalled=packInstalled(packs,kidsId);
   const kidsListed=packs.some(p=>p.id===kidsId);
+  const eduPacks=packs.filter(p=>p.category==='education'||(p.id||'').startsWith('atlas.education.'));
+  const kolibriPacks=eduPacks.filter(p=>(p.id||'').includes('kolibri-')||(p.kolibri_channel&&p.kolibri_channel.channel_id));
   const statusCard=kolibri.ok
     ?`<div class="callout"><strong>Education platform is online</strong>
         <p>Kolibri is answering on <code>127.0.0.1:8083</code>. Open the viewer for courses, exercises, and progress tracking.</p>
@@ -1756,12 +1758,32 @@ async function renderEducation(){
     :(kidsListed
       ?`<button class="btn" type="button" onclick="installCataloguePack('${kidsId}')">Install Kids Home Learning</button>`
       :`<button class="btn secondary" type="button" disabled>Pack unavailable</button>`);
+  const channelCards=kolibriPacks.length?kolibriPacks.map(p=>{
+    const ch=(p.kolibri_channel)||{};
+    const cid=ch.channel_id||'';
+    const installed=packInstalled(packs,p.id);
+    const size=p.size_hint_bytes?('~'+formatContentBytes(p.size_hint_bytes)):'size varies';
+    const lic=escapeHtml(p.licence_note||ch.licence_note||'Operator import — see licence inventory');
+    const actions=installed
+      ?`<a class="btn" href="${KOLIBRI_URL}" target="_blank" rel="noopener">Open in Kolibri</a>
+         <button class="btn secondary" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText('${jsQuote(cid)}')">Copy channel ID</button>`
+      :`<button class="btn" type="button" onclick="installCataloguePack('${jsQuote(p.id)}')">Install / prepare</button>
+         <a class="btn secondary" href="${KOLIBRI_URL}" target="_blank" rel="noopener">Open Kolibri</a>`;
+    return `<div class="card">
+      <h3>${escapeHtml(p.name||p.id)}</h3>
+      <p>${escapeHtml(p.description||'')}</p>
+      <p style="font-size:.8rem;color:var(--muted)">Locked ID <code>${escapeHtml(cid)}</code> · ${escapeHtml(size)} · not bundled in ISO</p>
+      <p style="font-size:.8rem;color:var(--muted)">${lic}</p>
+      <div class="btn-group" style="margin-top:.75rem">${actions}</div>
+    </div>`;
+  }).join(''):`<div class="card"><p>No Kolibri channel packs in catalogue yet.</p></div>`;
   const channelRows=[
-    {title:'Khan Academy math / science',state:'pending',note:'Channel IDs and licences not locked for alpha — import via Kolibri when online, or ship as a future atlas.education.kolibri-* pack.'},
-    {title:'K-12 curriculum channels',state:'pending',note:'Same lock process as product.md §52.10 — exact channel versions required before ISO inclusion.'},
+    {title:'Khan Academy (EN US)',state:packInstalled(packs,'atlas.education.kolibri-khan-en')?'live':(packs.some(p=>p.id==='atlas.education.kolibri-khan-en')?'available':'pending'),note:'Locked channel ID c9d7f950… — ~63 GB operator import (online or USB). Not shipped in ISO.'},
+    {title:'CK-12 (K-12)',state:packInstalled(packs,'atlas.education.kolibri-ck12-en')?'live':(packs.some(p=>p.id==='atlas.education.kolibri-ck12-en')?'available':'pending'),note:'Locked channel ID 1d8f6d84… — ~6.6 GB operator import. Review CK-12 terms for OEM.'},
+    {title:'Inclusive Home Learning',state:packInstalled(packs,'atlas.education.kolibri-home-learning')?'live':(packs.some(p=>p.id==='atlas.education.kolibri-home-learning')?'available':'pending'),note:'~52 MB public Studio channel — best alpha one-click online import demo.'},
     {title:'Interactive exercises / quizzes',state:'live',note:'Available inside Kolibri once a channel is imported on this device.'},
     {title:'Progress tracking',state:'live',note:'Built into Kolibri learner accounts on 127.0.0.1:8083.'},
-    {title:'Kids Home Learning (AI tutors)',state:kidsInstalled?'live':'available',note:'Markdown curriculum indexed for local agents — works offline without Kolibri channels.'},
+    {title:'Kids Home Learning (AI tutors)',state:kidsInstalled?'live':'available',note:'Markdown curriculum indexed for local agents — works offline without Kolibri channels. Expand bundle pinned on-device.'},
   ].map(r=>{
     const chipKind=r.state==='live'?'ok':(r.state==='available'?'neutral':'warn');
     const label=r.state==='live'?'Live':(r.state==='available'?'Install':'Pending');
@@ -1777,15 +1799,17 @@ async function renderEducation(){
     <div class="grid-2">
       <div class="card">
         <h3>Kids Home Learning</h3>
-        <p>Starter maths, reading, science, and geography lessons for local AI tutors. Ships as a small offline pack.</p>
+        <p>Starter maths, reading, science, and geography lessons for local AI tutors. Ships offline; expand archive is pinned under <code>/usr/share/atlas/content/</code>.</p>
         <div class="btn-group" style="margin-top:.75rem">${kidsBtn}</div>
       </div>
       <div class="card">
         <h3>Kolibri channels</h3>
-        <p>Large video channels (e.g. Khan Academy) are <strong>not</strong> in the core ISO. When the Education viewer is up: use Kolibri’s <em>Import channel</em> (online) or load a channel export from USB into <code>/srv/atlas/kolibri</code>.</p>
+        <p>Large video channels are <strong>not</strong> in the core ISO. Install a catalogue pack below to lock the Studio channel ID, then import online in Kolibri or from a USB channel export into <code>/srv/atlas/kolibri</code>.</p>
       </div>
     </div>
-    ${sectionHead('Capability status','Honest alpha status for planned education features.')}
+    ${sectionHead('One-click channel packs','Locked Studio IDs — prepare pack, then open Kolibri to import.')}
+    <div class="grid-2">${channelCards}</div>
+    ${sectionHead('Capability status','Honest alpha status for education features.')}
     <div class="card">${channelRows}</div>
     ${contentFetchPanelHtml()}
     <div class="card">

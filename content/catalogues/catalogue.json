@@ -1,14 +1,14 @@
 {
   "schema": "atlas.pack/v1",
-  "catalogue_version": "0.2.3",
+  "catalogue_version": "0.2.4",
   "packs": [
     {
       "id": "atlas.maps.uk",
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "United Kingdom Offline Maps",
-      "description": "Offline maps for United Kingdom. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 160000000,
+      "description": "Offline maps for United Kingdom. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 320000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -18,8 +18,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 160000000
+        "maxzoom": 12,
+        "size_hint_bytes": 320000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-uk.atlas-pack"
@@ -44,7 +44,7 @@
         "size_hint_bytes": 3500000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
-      "size_warning": "United States tiles may be multi-GB at zoom 11. Ensure free disk before installing.",
+      "size_warning": "US at z11 is multi-GB. Raise ATLAS_PMTILES_MAXZOOM only with free disk (each level ~2\u00d7).",
       "bundle_file": "atlas-maps-us.atlas-pack"
     },
     {
@@ -67,7 +67,7 @@
         "size_hint_bytes": 2500000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
-      "size_warning": "Canada tiles may be multi-GB at zoom 11. Ensure free disk before installing.",
+      "size_warning": "Canada at z11 is multi-GB. Opt-in higher zoom with ATLAS_PMTILES_MAXZOOM.",
       "bundle_file": "atlas-maps-ca.atlas-pack"
     },
     {
@@ -75,8 +75,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Ireland Offline Maps",
-      "description": "Offline maps for Ireland. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 80000000,
+      "description": "Offline maps for Ireland. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 13), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 320000000,
       "size_class": "small",
       "signed": false,
       "channel": "alpha",
@@ -86,8 +86,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 80000000
+        "maxzoom": 13,
+        "size_hint_bytes": 320000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-ie.atlas-pack"
@@ -112,7 +112,7 @@
         "size_hint_bytes": 1800000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
-      "size_warning": "Australia tiles may be multi-GB at zoom 11. Ensure free disk before installing.",
+      "size_warning": "Australia tiles may be multi-GB at zoom 11. Ensure free disk before installing. Raise zoom only via ATLAS_PMTILES_MAXZOOM.",
       "bundle_file": "atlas-maps-au.atlas-pack"
     },
     {
@@ -120,8 +120,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "New Zealand Offline Maps",
-      "description": "Offline maps for New Zealand. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 150000000,
+      "description": "Offline maps for New Zealand. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 13), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 600000000,
       "size_class": "small",
       "signed": false,
       "channel": "alpha",
@@ -131,8 +131,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 150000000
+        "maxzoom": 13,
+        "size_hint_bytes": 600000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-nz.atlas-pack"
@@ -142,8 +142,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Germany Offline Maps",
-      "description": "Offline maps for Germany. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 350000000,
+      "description": "Offline maps for Germany. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 700000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -153,8 +153,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 350000000
+        "maxzoom": 12,
+        "size_hint_bytes": 700000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-de.atlas-pack"
@@ -164,8 +164,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "France Offline Maps",
-      "description": "Offline maps for France. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 400000000,
+      "description": "Offline maps for France. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 800000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -175,8 +175,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 400000000
+        "maxzoom": 12,
+        "size_hint_bytes": 800000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-fr.atlas-pack"
@@ -186,8 +186,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Spain Offline Maps",
-      "description": "Offline maps for Spain. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 350000000,
+      "description": "Offline maps for Spain. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 700000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -197,8 +197,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 350000000
+        "maxzoom": 12,
+        "size_hint_bytes": 700000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-es.atlas-pack"
@@ -208,8 +208,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Italy Offline Maps",
-      "description": "Offline maps for Italy. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 300000000,
+      "description": "Offline maps for Italy. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 600000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -219,8 +219,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 300000000
+        "maxzoom": 12,
+        "size_hint_bytes": 600000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-it.atlas-pack"
@@ -230,8 +230,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Netherlands Offline Maps",
-      "description": "Offline maps for Netherlands. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 100000000,
+      "description": "Offline maps for Netherlands. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 13), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 400000000,
       "size_class": "small",
       "signed": false,
       "channel": "alpha",
@@ -241,8 +241,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 100000000
+        "maxzoom": 13,
+        "size_hint_bytes": 400000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-nl.atlas-pack"
@@ -267,7 +267,7 @@
         "size_hint_bytes": 2200000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
-      "size_warning": "India tiles may be multi-GB at zoom 11. Ensure free disk before installing.",
+      "size_warning": "India tiles may be multi-GB at zoom 11. Ensure free disk before installing. Raise zoom only via ATLAS_PMTILES_MAXZOOM.",
       "bundle_file": "atlas-maps-in.atlas-pack"
     },
     {
@@ -275,8 +275,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "South Africa Offline Maps",
-      "description": "Offline maps for South Africa. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 400000000,
+      "description": "Offline maps for South Africa. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 800000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -286,8 +286,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 400000000
+        "maxzoom": 12,
+        "size_hint_bytes": 800000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-za.atlas-pack"
@@ -297,8 +297,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Nigeria Offline Maps",
-      "description": "Offline maps for Nigeria. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 250000000,
+      "description": "Offline maps for Nigeria. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 500000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -308,8 +308,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 250000000
+        "maxzoom": 12,
+        "size_hint_bytes": 500000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-ng.atlas-pack"
@@ -319,8 +319,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Kenya Offline Maps",
-      "description": "Offline maps for Kenya. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 150000000,
+      "description": "Offline maps for Kenya. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 13), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 600000000,
       "size_class": "small",
       "signed": false,
       "channel": "alpha",
@@ -330,8 +330,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 150000000
+        "maxzoom": 13,
+        "size_hint_bytes": 600000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-ke.atlas-pack"
@@ -356,7 +356,7 @@
         "size_hint_bytes": 2800000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
-      "size_warning": "Brazil tiles may be multi-GB at zoom 11. Ensure free disk before installing.",
+      "size_warning": "Brazil tiles may be multi-GB at zoom 11. Ensure free disk before installing. Raise zoom only via ATLAS_PMTILES_MAXZOOM.",
       "bundle_file": "atlas-maps-br.atlas-pack"
     },
     {
@@ -364,8 +364,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Mexico Offline Maps",
-      "description": "Offline maps for Mexico. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 800000000,
+      "description": "Offline maps for Mexico. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 1600000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -375,10 +375,11 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 800000000
+        "maxzoom": 12,
+        "size_hint_bytes": 1600000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
+      "size_warning": "Mexico tiles may be multi-GB at zoom 12. Ensure free disk before installing. Raise zoom only via ATLAS_PMTILES_MAXZOOM.",
       "bundle_file": "atlas-maps-mx.atlas-pack"
     },
     {
@@ -386,8 +387,8 @@
       "version": "2026.07",
       "type": "atlas.content.map",
       "name": "Japan Offline Maps",
-      "description": "Offline maps for Japan. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 11), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
-      "size_hint_bytes": 400000000,
+      "description": "Offline maps for Japan. Install pulls a Protomaps/OSM PMTiles extract online (max zoom 12), then works offline. Licence: ODbL \u2014 \u00a9 OpenStreetMap contributors.",
+      "size_hint_bytes": 800000000,
       "size_class": "medium",
       "signed": false,
       "channel": "alpha",
@@ -397,8 +398,8 @@
       "tiles_source": "protomaps",
       "tiles_fetch": {
         "mode": "protomaps_extract",
-        "maxzoom": 11,
-        "size_hint_bytes": 400000000
+        "maxzoom": 12,
+        "size_hint_bytes": 800000000
       },
       "licence_note": "\u00a9 OpenStreetMap contributors (Protomaps basemap)",
       "bundle_file": "atlas-maps-jp.atlas-pack"
@@ -420,8 +421,8 @@
       "version": "2026.07",
       "type": "atlas.content.education",
       "name": "Kids Home Learning",
-      "description": "Starter home-learning curriculum (maths, reading, science, geography, routine) indexed for local AI tutors. Works offline on install; optional expand via ATLAS_KIDS_EXPAND_URL.",
-      "size_hint_bytes": 7367,
+      "description": "Starter home-learning curriculum (maths, reading, science, geography, routine) indexed for local AI tutors. Install also pulls the pinned expand bundle when present.",
+      "size_hint_bytes": 7604,
       "size_class": "small",
       "signed": false,
       "channel": "alpha",
@@ -430,7 +431,73 @@
       "licence_note": "CC BY 4.0 \u2014 Atlas curated lessons",
       "expand_fetch": {
         "mode": "curriculum_bundle",
-        "note": "Set ATLAS_KIDS_EXPAND_URL for optional larger curriculum download"
+        "url": "file:///usr/share/atlas/content/kids-home-learning-expand.tar.gz",
+        "fallback_url": "https://raw.githubusercontent.com/kaal22/atlas-os/main/content/packs/education/kids-home-learning-expand.tar.gz",
+        "filename": "kids-home-learning-expand.tar.gz",
+        "size_hint_bytes": 1450,
+        "note": "Pinned expand ships on-device; override with ATLAS_KIDS_EXPAND_URL"
+      }
+    },
+    {
+      "id": "atlas.education.kolibri-khan-en",
+      "version": "2026.07",
+      "type": "atlas.content.education",
+      "name": "Khan Academy (English - US curriculum)",
+      "description": "Kolibri channel pack with locked Studio ID c9d7f950ab6b5a1199e3d6c10d7f0103. Install from Education for one-click prepare + open Kolibri / USB import. Channel media is not bundled in the core ISO.",
+      "size_hint_bytes": 67814440813,
+      "size_class": "large",
+      "signed": false,
+      "channel": "alpha",
+      "bundle_file": "atlas-education-kolibri-khan-en.atlas-pack",
+      "category": "education",
+      "licence_note": "Khan Academy via Learning Equality Kolibri Studio \u2014 operator may import; not redistributed in Atlas ISO",
+      "kolibri_channel": {
+        "channel_id": "c9d7f950ab6b5a1199e3d6c10d7f0103",
+        "name": "Khan Academy (English - US curriculum)",
+        "redistribution": "operator_may_import_not_bundled",
+        "kolibri_url": "http://127.0.0.1:8083/"
+      },
+      "size_warning": "Khan Academy EN US is ~63 GB of Kolibri channel media. Atlas ships only the locked channel ID \u2014 import online or from USB."
+    },
+    {
+      "id": "atlas.education.kolibri-ck12-en",
+      "version": "2026.07",
+      "type": "atlas.content.education",
+      "name": "CK-12 (K-12)",
+      "description": "Kolibri channel pack with locked Studio ID 1d8f6d84618153c18c695d85074952a7. Install from Education for one-click prepare + open Kolibri / USB import. Channel media is not bundled in the core ISO.",
+      "size_hint_bytes": 6662051873,
+      "size_class": "large",
+      "signed": false,
+      "channel": "alpha",
+      "bundle_file": "atlas-education-kolibri-ck12-en.atlas-pack",
+      "category": "education",
+      "licence_note": "CK-12 Foundation via Kolibri Studio \u2014 operator import; review CK-12 terms for commercial OEM",
+      "kolibri_channel": {
+        "channel_id": "1d8f6d84618153c18c695d85074952a7",
+        "name": "CK-12 (K-12)",
+        "redistribution": "operator_may_import_not_bundled",
+        "kolibri_url": "http://127.0.0.1:8083/"
+      },
+      "size_warning": "CK-12 is ~6.6 GB. Atlas ships the locked channel ID only \u2014 import via Kolibri."
+    },
+    {
+      "id": "atlas.education.kolibri-home-learning",
+      "version": "2026.07",
+      "type": "atlas.content.education",
+      "name": "Inclusive Home Learning Activities",
+      "description": "Kolibri channel pack with locked Studio ID 378cf4128c854c2795c100b5aca7a3ed. Install from Education for one-click prepare + open Kolibri / USB import. Channel media is not bundled in the core ISO.",
+      "size_hint_bytes": 52317616,
+      "size_class": "small",
+      "signed": false,
+      "channel": "alpha",
+      "bundle_file": "atlas-education-kolibri-home-learning.atlas-pack",
+      "category": "education",
+      "licence_note": "Public Kolibri Studio channel (~52 MB) \u2014 operator import; not vendored in git",
+      "kolibri_channel": {
+        "channel_id": "378cf4128c854c2795c100b5aca7a3ed",
+        "name": "Inclusive Home Learning Activities",
+        "redistribution": "operator_may_import_not_bundled",
+        "kolibri_url": "http://127.0.0.1:8083/"
       }
     },
     {
@@ -453,7 +520,11 @@
         "filename": "wikipedia_en_100_nopic.zim",
         "size_hint_bytes": 14000000
       },
-      "licence_note": "CC BY-SA 4.0 / GFDL \u2014 \u00a9 Wikipedia contributors (Kiwix ZIM)"
+      "licence_note": "CC BY-SA 4.0 / GFDL \u2014 \u00a9 Wikipedia contributors (Kiwix ZIM)",
+      "zim_rag": {
+        "enabled": true,
+        "max_articles": 40
+      }
     },
     {
       "id": "atlas.knowledge.wikipedia-en-mini",

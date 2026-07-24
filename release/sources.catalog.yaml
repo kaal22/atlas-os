@@ -170,14 +170,27 @@ library_zim:
 kolibri_channels:
   note: |
     Kolibri app image is in standard_apps / compose (127.0.0.1:8083).
-    Learning channels (Khan Academy, K-12 curricula) are separate locked assets —
-    not shipped in the core ISO. Alpha MVP: open Kolibri from Command Centre Education;
-    import channels via Kolibri UI or future atlas.education.kolibri-* packs.
-  pending:
-    - khan_academy_math_science
-    - k12_curriculum_channels
+    Learning channels are locked catalogue packs (atlas.education.kolibri-*) that
+    prepare import metadata only — channel media is not in the core ISO or git.
+    See content/packs/education/kolibri-channels/CHANNELS.lock.yaml.
+  locked:
+    - id: atlas.education.kolibri-khan-en
+      channel_id: c9d7f950ab6b5a1199e3d6c10d7f0103
+      name: Khan Academy (English - US curriculum)
+      redistribution: operator_may_import_not_bundled
+    - id: atlas.education.kolibri-ck12-en
+      channel_id: 1d8f6d84618153c18c695d85074952a7
+      name: CK-12
+      redistribution: operator_may_import_not_bundled
+    - id: atlas.education.kolibri-home-learning
+      channel_id: 378cf4128c854c2795c100b5aca7a3ed
+      name: Inclusive Home Learning Activities
+      redistribution: operator_may_import_not_bundled
+      note: Preferred alpha one-click online import demo (~52 MB)
   atlas_education:
     kids_home: atlas.education.kids-home  # Markdown RAG for tutors (ships now)
+    kids_expand_url: file:///usr/share/atlas/content/kids-home-learning-expand.tar.gz
+    kids_expand_fallback: https://raw.githubusercontent.com/kaal22/atlas-os/main/content/packs/education/kids-home-learning-expand.tar.gz
 
 maps:
   nomad_map_assets:
@@ -190,7 +203,8 @@ maps:
     daily_builds: https://build.protomaps.com/
     atlas_fetch: |
       Country packs use `pmtiles extract` against a daily planet URL (range requests)
-      with bbox from content/packs/maps/countries.json. Default maxzoom 11.
+      with bbox from content/packs/maps/countries.json. Default maxzoom 12
+      (small countries z13; large countries stay z11 — opt-in higher via ATLAS_PMTILES_MAXZOOM).
       Override: ATLAS_PMTILES_PLANET_URL / ATLAS_PMTILES_URL / ATLAS_PMTILES_MAXZOOM.
   initial_packs:
     - atlas-maps-uk

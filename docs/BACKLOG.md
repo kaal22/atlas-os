@@ -37,14 +37,14 @@ On a live or installed Plasma session:
 
 ### Content & education
 
-- [ ] **Kolibri / Khan / K-12 one-click catalogue channels** — ship approved channels as locked catalogue packs; open from Command Centre Education
-- [ ] **Licence audit** for those channels before bundling (`docs/legal/LICENCE_INVENTORY.md`)
-- [ ] **ZIM HTML → agent RAG** — extract/index HTML from Kiwix ZIMs into the knowledge/RAG path (beyond starter Markdown + small ZIM)
-- [ ] **Kids expand URL** — host and pin an expand archive; wire `ATLAS_KIDS_EXPAND_URL` / pack `meta.expand_fetch.url` to a real hosted `.tar.gz`/`.zip`
+- [x] **Kolibri / Khan / K-12 one-click catalogue channels** — locked Studio IDs as `atlas.education.kolibri-*` packs; Education CC one-click prepare + open Kolibri / USB import (media not in ISO)
+- [x] **Licence audit** for those channels before bundling (`docs/legal/LICENCE_INVENTORY.md` + `CHANNELS.lock.yaml` + `licences.lock.yaml`)
+- [x] **ZIM HTML → agent RAG** — selective extract (`meta.zim_rag`, zimdump/libzim or `rag-html` seed) into knowledge index; large ZIMs still `confirm_large`
+- [x] **Kids expand URL** — pinned `file:///usr/share/atlas/content/kids-home-learning-expand.tar.gz` + GitHub raw fallback; `ATLAS_KIDS_EXPAND_URL` override
 
 ### Maps
 
-- [ ] **Map zoom > 11 / denser extracts** — raise default beyond `ATLAS_PMTILES_MAXZOOM=11` (or ship higher-zoom country packs); expect ~2× size per zoom level
+- [x] **Map zoom > 11 / denser extracts** — default maxzoom 12; small countries z13; large countries stay z11 (opt-in via `ATLAS_PMTILES_MAXZOOM`); size hints + warnings updated
 
 ### Desktop polish & branding
 

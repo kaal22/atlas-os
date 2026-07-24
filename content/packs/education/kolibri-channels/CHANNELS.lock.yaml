@@ -1,0 +1,53 @@
+# Locked Kolibri Studio channel IDs for Atlas Education catalogue packs.
+# Channel *content* (videos) is NOT redistributed in the Atlas ISO or git tree.
+# Operators import online via Kolibri or from a USB channel export.
+# IDs verified against studio.learningequality.org public API (2026-07).
+schema: atlas.kolibri.channels.lock/v1
+updated: "2026-07-24"
+studio_api: https://studio.learningequality.org/api/public/v1/channels
+
+channels:
+  - atlas_pack_id: atlas.education.kolibri-khan-en
+    slug: kolibri-khan-en
+    name: Khan Academy (English - US curriculum)
+    channel_id: c9d7f950ab6b5a1199e3d6c10d7f0103
+    language: en
+    studio_version: 5
+    published_size_bytes: 67814440813
+    size_class: large
+    redistribution: operator_may_import_not_bundled
+    licence_note: >
+      Khan Academy content distributed via Learning Equality Kolibri Studio.
+      Atlas does not ship Khan video blobs in-repo or in the core ISO.
+      Operators may import this locked channel ID into a local Kolibri instance
+      (online) or from a Studio/Kolibri channel export on USB.
+    import_modes: [kolibri_online, usb_export]
+
+  - atlas_pack_id: atlas.education.kolibri-ck12-en
+    slug: kolibri-ck12-en
+    name: CK-12
+    channel_id: 1d8f6d84618153c18c695d85074952a7
+    language: en
+    studio_version: 54
+    published_size_bytes: 6662051873
+    size_class: large
+    redistribution: operator_may_import_not_bundled
+    licence_note: >
+      CK-12 Foundation materials via Kolibri Studio public channel.
+      Not bundled in Atlas ISO; import with locked channel_id only.
+      Review CK-12 licence terms for commercial OEM redistribution.
+    import_modes: [kolibri_online, usb_export]
+
+  - atlas_pack_id: atlas.education.kolibri-home-learning
+    slug: kolibri-home-learning
+    name: Inclusive Home Learning Activities
+    channel_id: 378cf4128c854c2795c100b5aca7a3ed
+    language: mul
+    studio_version: null
+    published_size_bytes: 52317616
+    size_class: small
+    redistribution: operator_may_import_not_bundled
+    licence_note: >
+      Public Kolibri Studio channel (~52 MB). Suitable alpha one-click import
+      demo when Kolibri has network. Still not vendored inside Atlas git.
+    import_modes: [kolibri_online, usb_export]

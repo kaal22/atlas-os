@@ -13,10 +13,29 @@ knowledge base on install so local AI tutors can teach without the internet.
 | Geography | `geography-world.md`, `geography-weather-climate.md` |
 | Habits | `daily-learning-routine.md` |
 
-## Optional expand download
+## Expand bundle (pinned)
 
-Operators can point `ATLAS_KIDS_EXPAND_URL` (or pack `meta.expand_fetch.url`) at a
-larger `.tar.gz` / `.zip` of extra Markdown lessons. That download happens after
-install (same pattern as map tiles / Wikipedia ZIM) and is **not** shipped in git.
+After install, Content Manager downloads the expand archive of extra Markdown
+lessons and re-indexes them into Knowledge.
+
+| Pin | Value |
+|-----|--------|
+| On-device (ISO / package) | `file:///usr/share/atlas/content/kids-home-learning-expand.tar.gz` |
+| Source tree | `content/packs/education/kids-home-learning-expand.tar.gz` |
+| GitHub raw fallback | `https://raw.githubusercontent.com/kaal22/atlas-os/main/content/packs/education/kids-home-learning-expand.tar.gz` |
+| Env override | `ATLAS_KIDS_EXPAND_URL` |
+| Pack meta | `meta.expand_fetch.url` / `fallback_url` |
+
+Expand lessons live under `kids-home-learning-expand/` (fractions, story structure,
+simple machines). Rebuild the tarball with:
+
+```bash
+tar -czf content/packs/education/kids-home-learning-expand.tar.gz \
+  -C content/packs/education kids-home-learning-expand
+./scripts/build-content-packs.sh
+```
+
+GitHub Release asset pattern (optional OEM host): publish the same `.tar.gz` as a
+release asset and set `ATLAS_KIDS_EXPAND_URL` to that download URL.
 
 Licence: Creative Commons Attribution 4.0.

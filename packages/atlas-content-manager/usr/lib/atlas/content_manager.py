@@ -22,11 +22,23 @@ from typing import Any, Callable
 
 ATLAS_OS_VERSION = os.environ.get("ATLAS_OS_VERSION", "0.1.0")
 DISK_HEADROOM_BYTES = int(os.environ.get("ATLAS_PACK_DISK_HEADROOM", str(512 * 1024 * 1024)))
-ALLOWED_WORKFLOWS = frozenset({"maps.reindex", "models.import", "knowledge.index", ""})
+ALLOWED_WORKFLOWS = frozenset(
+    {"maps.reindex", "models.import", "knowledge.index", "education.kolibri_prepare", ""}
+)
 # Protomaps daily basemap (ODbL / © OpenStreetMap). Hotlinking full planet is discouraged;
 # we only pull a bbox extract via HTTP range requests (pmtiles CLI).
 PMTILES_CLI_VERSION = os.environ.get("ATLAS_PMTILES_CLI_VERSION", "1.31.1")
-DEFAULT_PMTILES_MAXZOOM = int(os.environ.get("ATLAS_PMTILES_MAXZOOM", "11"))
+DEFAULT_PMTILES_MAXZOOM = int(os.environ.get("ATLAS_PMTILES_MAXZOOM", "12"))
+# Bundled kids expand archive (offline MVP). Override with ATLAS_KIDS_EXPAND_URL.
+DEFAULT_KIDS_EXPAND_URL = os.environ.get(
+    "ATLAS_KIDS_EXPAND_DEFAULT_URL",
+    "file:///usr/share/atlas/content/kids-home-learning-expand.tar.gz",
+)
+DEFAULT_KIDS_EXPAND_FALLBACK_URL = (
+    "https://raw.githubusercontent.com/kaal22/atlas-os/main/"
+    "content/packs/education/kids-home-learning-expand.tar.gz"
+)
+DEFAULT_ZIM_RAG_MAX_ARTICLES = int(os.environ.get("ATLAS_ZIM_RAG_MAX_ARTICLES", "40"))
 # Below this size a .pmtiles is treated as a stub/placeholder (matches /maps serving + NOMAD sync).
 MIN_USABLE_PMTILES_BYTES = 65536
 USER_AGENT = "AtlasOS-ContentManager/0.1 (+offline-maps; https://atlas.local)"
@@ -387,6 +399,9 @@ def _run_workflow(
         return
     if workflow == "knowledge.index":
         _workflow_knowledge_index(manifest, target, atlas_root)
+        return
+    if workflow == "education.kolibri_prepare":
+        _workflow_education_kolibri_prepare(manifest, target, atlas_root)
         return
     raise PackError(f"unsupported workflow: {workflow}")
 
@@ -855,6 +870,41 @@ def _download_url_to_file(
 ) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     partial = dest.with_suffix(dest.suffix + ".partial")
+    # Local / file:// copies (kids expand shipped under /usr/share/atlas/content/).
+    local_src: Path | None = None
+    if url.startswith("file:"):
+        from urllib.parse import unquote, urlparse
+
+        parsed = urlparse(url)
+        local_src = Path(unquote(parsed.path))
+    elif url.startswith("/") and Path(url).is_file():
+        local_src = Path(url)
+    if local_src is not None:
+        if not local_src.is_file():
+            raise PackError(f"local content file not found: {local_src}")
+        try:
+            total = local_src.stat().st_size
+            with local_src.open("rb") as inp, partial.open("wb") as out:
+                downloaded = 0
+                while True:
+                    if cancel_event and cancel_event.is_set():
+                        partial.unlink(missing_ok=True)
+                        raise FetchCancelledError("download cancelled")
+                    chunk = inp.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    downloaded += len(chunk)
+                    if progress_cb:
+                        progress_cb(downloaded, total)
+            partial.replace(dest)
+            return
+        except FetchCancelledError:
+            raise
+        except OSError as e:
+            partial.unlink(missing_ok=True)
+            raise PackError(f"tile download failed: {e}") from e
+
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=300) as resp, partial.open("wb") as out:
@@ -2013,7 +2063,7 @@ def _fetch_zim_for_manifest_body(
         _cancelled()
         raise FetchCancelledError("download cancelled")
 
-    # Register with Kiwix immediately; Markdown RAG already indexed on install.
+    # Register with Kiwix immediately; optional bounded HTML extract feeds agent RAG.
     language = str(meta.get("language") or "eng")
     registered = register_zim_with_kiwix(
         dest,
@@ -2022,6 +2072,13 @@ def _fetch_zim_for_manifest_body(
         description=str(manifest.get("description") or ""),
         language=language,
     )
+    zim_rag = None
+    try:
+        zim_rag = maybe_extract_zim_html_for_rag(manifest, target, atlas_root, zim_path=dest)
+        if zim_rag and zim_rag.get("extracted"):
+            _workflow_knowledge_index(manifest, target, atlas_root)
+    except Exception:  # noqa: BLE001 — RAG extract is best-effort after ZIM is ready
+        zim_rag = {"ok": False, "error": "zim_rag_extract_failed"}
     size = dest.stat().st_size
     result = {
         "ok": True,
@@ -2034,6 +2091,8 @@ def _fetch_zim_for_manifest_body(
         "licence": licence,
         "attribution": attribution,
     }
+    if zim_rag:
+        result["zim_rag"] = zim_rag
     write_zim_fetch_progress(
         atlas_root,
         {
@@ -2047,10 +2106,367 @@ def _fetch_zim_for_manifest_body(
             "kiwix_path": str(registered),
             "licence": licence,
             "message": "ZIM ready offline (Kiwix)",
+            "zim_rag_articles": (zim_rag or {}).get("extracted") or 0,
         },
         slug,
     )
     return result
+
+
+def _zim_rag_config(manifest: dict[str, Any]) -> dict[str, Any]:
+    meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
+    cfg = meta.get("zim_rag") if isinstance(meta.get("zim_rag"), dict) else {}
+    return dict(cfg)
+
+
+def _safe_article_filename(title: str, index: int) -> str:
+    stem = re.sub(r"[^\w.\-]+", "_", (title or f"article-{index}").strip())[:80] or f"article-{index}"
+    return f"{stem}.html"
+
+
+def extract_zim_html_articles(
+    zim_path: Path,
+    out_dir: Path,
+    *,
+    max_articles: int = DEFAULT_ZIM_RAG_MAX_ARTICLES,
+    allowlist: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Extract a bounded set of HTML articles from a ZIM into out_dir for knowledge ingest.
+
+    Prefer ``zimdump`` on PATH, then python ``libzim`` if installed. Never dumps an entire
+    maxi archive into RAG — callers must pass a modest max_articles.
+    """
+    zim_path = Path(zim_path)
+    out_dir = Path(out_dir)
+    if not zim_path.is_file():
+        raise PackError(f"ZIM not found: {zim_path}")
+    max_articles = max(1, min(int(max_articles), 500))
+    allow = {a.strip() for a in (allowlist or []) if a and a.strip()}
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- zimdump CLI ---
+    zimdump = shutil.which("zimdump")
+    if zimdump:
+        try:
+            list_proc = subprocess.run(
+                [zimdump, "list", "--details", str(zim_path)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            list_proc = None  # type: ignore
+            list_err = str(e)
+        else:
+            list_err = (list_proc.stderr or "").strip()
+        if list_proc and list_proc.returncode == 0:
+            paths: list[str] = []
+            for line in (list_proc.stdout or "").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                # zimdump details lines often look like: path: A/Article_title
+                m = re.search(r"(?:path|url)\s*[:=]\s*(\S+)", line, re.I)
+                cand = m.group(1) if m else (line.split()[0] if " " in line else line)
+                if not cand or cand.endswith(".js") or cand.endswith(".css"):
+                    continue
+                if allow and not any(a.lower() in cand.lower() for a in allow):
+                    continue
+                # Prefer HTML-ish article paths
+                if "/-" in cand and not cand.lower().endswith((".html", ".htm")):
+                    continue
+                if cand not in paths:
+                    paths.append(cand)
+                if len(paths) >= max_articles * 3:
+                    break
+            written = 0
+            for i, entry in enumerate(paths):
+                if written >= max_articles:
+                    break
+                try:
+                    show = subprocess.run(
+                        [zimdump, "show", f"--url={entry}", str(zim_path)],
+                        capture_output=True,
+                        timeout=60,
+                        check=False,
+                    )
+                except (OSError, subprocess.TimeoutExpired):
+                    continue
+                if show.returncode != 0 or not show.stdout:
+                    continue
+                raw = show.stdout
+                # Skip obvious non-HTML
+                if isinstance(raw, (bytes, bytearray)):
+                    head_b = bytes(raw[:200]).lower()
+                    text = raw.decode("utf-8", errors="ignore")
+                else:
+                    text = str(raw)
+                    head_b = text[:200].lower().encode("utf-8", errors="ignore")
+                if b"<html" not in head_b and b"<body" not in head_b:
+                    if not entry.lower().endswith((".html", ".htm")) and b"<" not in head_b:
+                        continue
+                name = _safe_article_filename(Path(entry).name or entry, written)
+                (out_dir / name).write_text(text, encoding="utf-8")
+                written += 1
+            return {
+                "ok": True,
+                "backend": "zimdump",
+                "extracted": written,
+                "out_dir": str(out_dir),
+                "zim": str(zim_path),
+            }
+        return {"ok": False, "backend": "zimdump", "extracted": 0, "error": list_err or "zimdump_list_failed"}
+
+    # --- python libzim ---
+    try:
+        from libzim.reader import Archive  # type: ignore
+    except Exception:
+        Archive = None  # type: ignore
+    if Archive is not None:
+        try:
+            archive = Archive(str(zim_path))
+            written = 0
+            # Iterate entry ids until we collect enough HTML-ish articles.
+            count = int(getattr(archive, "entry_count", 0) or 0)
+            for idx in range(min(count, max_articles * 20)):
+                if written >= max_articles:
+                    break
+                try:
+                    entry = archive._get_entry_by_id(idx)  # type: ignore[attr-defined]
+                except Exception:
+                    try:
+                        entry = archive.get_entry_by_id(idx)  # type: ignore[attr-defined]
+                    except Exception:
+                        continue
+                try:
+                    path = str(getattr(entry, "path", "") or getattr(entry, "title", "") or idx)
+                    if allow and not any(a.lower() in path.lower() for a in allow):
+                        continue
+                    item = entry.get_item() if hasattr(entry, "get_item") else entry
+                    mimetype = str(getattr(item, "mimetype", "") or "")
+                    if mimetype and "html" not in mimetype.lower() and "text" not in mimetype.lower():
+                        continue
+                    content = bytes(item.content) if hasattr(item, "content") else b""
+                    if not content:
+                        continue
+                    text = content.decode("utf-8", errors="ignore")
+                    if "<" not in text[:500]:
+                        continue
+                    title = str(getattr(entry, "title", None) or path or f"article-{written}")
+                    (out_dir / _safe_article_filename(title, written)).write_text(text, encoding="utf-8")
+                    written += 1
+                except Exception:
+                    continue
+            return {
+                "ok": True,
+                "backend": "libzim",
+                "extracted": written,
+                "out_dir": str(out_dir),
+                "zim": str(zim_path),
+            }
+        except Exception as e:
+            return {"ok": False, "backend": "libzim", "extracted": 0, "error": str(e)}
+
+    return {
+        "ok": False,
+        "backend": None,
+        "extracted": 0,
+        "error": "no_zim_extractor (install zimdump or python3-libzim)",
+        "zim": str(zim_path),
+    }
+
+
+def maybe_extract_zim_html_for_rag(
+    manifest: dict[str, Any],
+    target: Path,
+    atlas_root: Path,
+    *,
+    zim_path: Path | None = None,
+) -> dict[str, Any] | None:
+    """When meta.zim_rag.enabled, extract a bounded HTML set under target/extracted/."""
+    cfg = _zim_rag_config(manifest)
+    if not cfg or cfg.get("enabled") is False:
+        return None
+    if os.environ.get("ATLAS_ZIM_RAG_SKIP", "").strip() in {"1", "true", "yes"}:
+        return {"ok": False, "skipped": True, "extracted": 0}
+    max_articles = int(cfg.get("max_articles") or DEFAULT_ZIM_RAG_MAX_ARTICLES)
+    allowlist = cfg.get("allowlist") if isinstance(cfg.get("allowlist"), list) else None
+    zims: list[Path] = []
+    if zim_path and Path(zim_path).is_file():
+        zims.append(Path(zim_path))
+    elif target.is_dir():
+        zims.extend(sorted(target.rglob("*.zim")))
+    if not zims:
+        # Seed HTML (curated) still counts as selective RAG without a ZIM binary.
+        seed = target / "rag-html" if target.is_dir() else None
+        seeded = 0
+        if seed and seed.is_dir():
+            extracted = target / "extracted"
+            extracted.mkdir(parents=True, exist_ok=True)
+            for html_file in sorted(seed.glob("*.html"))[:max_articles]:
+                dest = extracted / html_file.name
+                if not dest.exists():
+                    shutil.copy2(html_file, dest)
+                seeded += 1
+        return {"ok": True, "backend": "rag-html-seed", "extracted": seeded, "zim": None}
+
+    out_dir = Path(target) / "extracted"
+    combined = {"ok": True, "extracted": 0, "backends": [], "zims": []}
+    for zim in zims[:3]:
+        info = extract_zim_html_articles(
+            zim, out_dir, max_articles=max_articles, allowlist=allowlist
+        )
+        combined["backends"].append(info.get("backend"))
+        combined["zims"].append(str(zim))
+        combined["extracted"] = int(combined["extracted"]) + int(info.get("extracted") or 0)
+        if not info.get("ok") and not combined.get("error"):
+            combined["error"] = info.get("error")
+            # Keep ok True if seed HTML already present
+            if combined["extracted"] == 0 and not list(out_dir.glob("*.html")):
+                combined["ok"] = False
+        # Also copy curated rag-html seeds when extract yielded little
+        seed = Path(target) / "rag-html"
+        if seed.is_dir() and int(combined["extracted"]) < max_articles:
+            for html_file in sorted(seed.glob("*.html")):
+                if int(combined["extracted"]) >= max_articles:
+                    break
+                dest = out_dir / html_file.name
+                if not dest.exists():
+                    shutil.copy2(html_file, dest)
+                    combined["extracted"] = int(combined["extracted"]) + 1
+                    if "rag-html-seed" not in combined["backends"]:
+                        combined["backends"].append("rag-html-seed")
+    marker = {
+        "pack_id": manifest.get("id"),
+        "extracted": combined["extracted"],
+        "backends": combined["backends"],
+        "at": time.time(),
+    }
+    try:
+        (out_dir / ".atlas-zim-rag.json").write_text(json.dumps(marker, indent=2) + "\n", encoding="utf-8")
+    except OSError:
+        pass
+    return combined
+
+
+def _kolibri_channel_config(manifest: dict[str, Any]) -> dict[str, Any]:
+    meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
+    cfg = meta.get("kolibri_channel") if isinstance(meta.get("kolibri_channel"), dict) else {}
+    return dict(cfg)
+
+
+def _workflow_education_kolibri_prepare(
+    manifest: dict[str, Any], target: Path, atlas_root: Path
+) -> None:
+    """
+    Stage locked Kolibri channel metadata for one-click Education UX.
+
+    Does not vendor multi-GB channel media. Writes channel.lock.json and import
+    instructions; optionally attempts online import when ATLAS_KOLIBRI_AUTO_IMPORT=1.
+    """
+    cfg = _kolibri_channel_config(manifest)
+    target.mkdir(parents=True, exist_ok=True)
+    channel_id = str(cfg.get("channel_id") or "").strip()
+    lock = {
+        "schema": "atlas.kolibri.channel.lock/v1",
+        "pack_id": manifest.get("id"),
+        "channel_id": channel_id,
+        "channel_name": cfg.get("name") or manifest.get("name"),
+        "language": cfg.get("language") or "en",
+        "studio_version": cfg.get("studio_version"),
+        "published_size_bytes": cfg.get("published_size_bytes"),
+        "redistribution": cfg.get("redistribution") or "operator_may_import_not_bundled",
+        "licence_note": cfg.get("licence_note") or "",
+        "import_modes": cfg.get("import_modes") or ["kolibri_online", "usb_export"],
+        "kolibri_url": "http://127.0.0.1:8083/",
+        "usb_hint": (
+            "Place a Kolibri channel export under /srv/atlas/kolibri/ and use "
+            "Kolibri → Import channel / USB, or: kolibri manage importchannel disk <path>"
+        ),
+        "online_hint": (
+            f"In Kolibri (http://127.0.0.1:8083/) use Device → Channels → Import, "
+            f"or: kolibri manage importchannel network {channel_id} && "
+            f"kolibri manage importcontent network {channel_id}"
+        ),
+        "prepared_at": time.time(),
+    }
+    (target / "channel.lock.json").write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
+    (target / "IMPORT.txt").write_text(
+        "\n".join(
+            [
+                f"Atlas Education — {lock['channel_name']}",
+                f"Locked channel_id: {channel_id}",
+                "",
+                lock["online_hint"],
+                "",
+                lock["usb_hint"],
+                "",
+                f"Licence: {lock['licence_note']}",
+                f"Redistribution: {lock['redistribution']}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    # Ensure Kolibri data root exists for USB drops.
+    kolibri_root = Path(atlas_root) / "kolibri"
+    try:
+        (kolibri_root / "channels").mkdir(parents=True, exist_ok=True)
+        # Symlink/copy lock into a discoverable place
+        dest_lock = kolibri_root / "channels" / f"{channel_id or target.name}.lock.json"
+        shutil.copy2(target / "channel.lock.json", dest_lock)
+    except OSError:
+        pass
+
+    auto = os.environ.get("ATLAS_KOLIBRI_AUTO_IMPORT", "").strip() in {"1", "true", "yes"}
+    import_result: dict[str, Any] = {"attempted": False}
+    if auto and channel_id:
+        import_result = _try_kolibri_network_import(channel_id)
+    (target / ".atlas-kolibri-prepared").write_text(
+        json.dumps({"lock": lock, "import": import_result}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _try_kolibri_network_import(channel_id: str) -> dict[str, Any]:
+    """Best-effort docker/exec import; never fails the pack install."""
+    compose = Path("/srv/atlas/compose/atlas-core.yml")
+    cmds = [
+        [
+            "docker",
+            "compose",
+            "-f",
+            str(compose),
+            "exec",
+            "-T",
+            "kolibri",
+            "kolibri",
+            "manage",
+            "importchannel",
+            "network",
+            channel_id,
+        ],
+        ["docker", "exec", "kolibri", "kolibri", "manage", "importchannel", "network", channel_id],
+    ]
+    last_err = "kolibri_import_unavailable"
+    for cmd in cmds:
+        if not shutil.which(cmd[0]):
+            continue
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, check=False)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            return {"attempted": True, "ok": False, "error": str(e), "cmd": cmd}
+        if proc.returncode == 0:
+            content_cmd = cmd[:-2] + ["importcontent", "network", channel_id]
+            try:
+                subprocess.Popen(content_cmd)  # noqa: S603 — operator-gated via env
+            except OSError:
+                pass
+            return {"attempted": True, "ok": True, "cmd": cmd, "stdout": (proc.stdout or "")[:500]}
+        last_err = (proc.stderr or proc.stdout or last_err)[:500]
+    return {"attempted": True, "ok": False, "error": last_err}
 
 
 def _expand_fetch_config(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -2066,8 +2482,34 @@ def should_auto_expand_content(manifest: dict[str, Any], target: Path) -> bool:
     cfg = _expand_fetch_config(manifest)
     if not cfg or cfg.get("enabled") is False:
         return False
-    url = (os.environ.get("ATLAS_KIDS_EXPAND_URL") or cfg.get("url") or "").strip()
+    url = resolve_expand_fetch_url(cfg)
     return bool(url)
+
+
+def resolve_expand_fetch_url(cfg: dict[str, Any] | None = None) -> str:
+    """Resolve expand URL: env → pack meta → bundled file:// → GitHub raw fallback."""
+    cfg = cfg or {}
+    for candidate in (
+        (os.environ.get("ATLAS_KIDS_EXPAND_URL") or "").strip(),
+        str(cfg.get("url") or "").strip(),
+        str(cfg.get("default_url") or "").strip(),
+        DEFAULT_KIDS_EXPAND_URL,
+    ):
+        if not candidate:
+            continue
+        if candidate.startswith("file:"):
+            from urllib.parse import unquote, urlparse
+
+            path = Path(unquote(urlparse(candidate).path))
+            if path.is_file():
+                return candidate
+            continue
+        if candidate.startswith("/") and Path(candidate).is_file():
+            return candidate
+        if candidate.startswith("http://") or candidate.startswith("https://"):
+            return candidate
+    # Last resort: documented public raw URL (works after push to main).
+    return str(cfg.get("fallback_url") or DEFAULT_KIDS_EXPAND_FALLBACK_URL)
 
 
 def content_expand_progress_path(atlas_root: Path, pack_slug: str | None = None) -> Path:
@@ -2117,7 +2559,7 @@ def fetch_expand_bundle_for_manifest(
     """Download an optional expand tarball/zip into the pack target and re-index Markdown."""
     cfg = _expand_fetch_config(manifest)
     slug = _pack_slug(manifest, target)
-    url = (os.environ.get("ATLAS_KIDS_EXPAND_URL") or cfg.get("url") or "").strip()
+    url = resolve_expand_fetch_url(cfg)
     if not url:
         raise PackError("expand_fetch URL not configured (set meta.expand_fetch.url or ATLAS_KIDS_EXPAND_URL)")
     hint = int(cfg.get("size_hint_bytes") or 0)
@@ -2136,6 +2578,7 @@ def fetch_expand_bundle_for_manifest(
                 "downloaded": downloaded,
                 "total": total or hint,
                 "message": "Downloading curriculum expand bundle…",
+                "url": url,
             },
             slug,
         )
@@ -2150,6 +2593,7 @@ def fetch_expand_bundle_for_manifest(
             "downloaded": 0,
             "total": hint,
             "message": "Starting expand download…",
+            "url": url,
         },
         slug,
     )
@@ -2277,6 +2721,7 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
     """Index pack payload into agent RAG and optionally register Kiwix ZIM books."""
     ingested = 0
     zims: list[str] = []
+    zim_rag_info: dict[str, Any] | None = None
     meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
     language = str(meta.get("language") or "eng")
 
@@ -2294,6 +2739,12 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
                 zims.append(dest.name)
             except OSError:
                 continue
+
+        # Selective ZIM → HTML for agent RAG (bounded; not full maxi dump).
+        try:
+            zim_rag_info = maybe_extract_zim_html_for_rag(manifest, target, atlas_root)
+        except Exception:  # noqa: BLE001
+            zim_rag_info = {"ok": False, "error": "zim_rag_failed"}
 
         try:
             from knowledge_service import KnowledgeService, SUPPORTED_EXTENSIONS  # type: ignore
@@ -2334,6 +2785,7 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
         "pack_id": manifest.get("id"),
         "ingested_docs": ingested,
         "zim_books": zims,
+        "zim_rag": zim_rag_info,
         "indexed_at": time.time(),
     }
     if target.is_dir():

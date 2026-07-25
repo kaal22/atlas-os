@@ -3069,13 +3069,15 @@ async function wizardApplySharing(){
     return api('/api/network/mode',{method:'POST',body:JSON.stringify({mode:'later'})});
   }
   const r=await api('/api/network/mode',{method:'POST',body:JSON.stringify({mode})});
-  if(r.deferred){
-    showMsg('wizMsg','Network daemon unavailable — mode saved for later apply.','info');
+  if(r.deferred||r.warning){
+    showMsg('wizMsg',r.warning||'Network mode saved — firewall apply deferred.','info');
     return r;
   }
   if(r.error||r._status>=400){
-    showMsg('wizMsg',r.error||r.detail||'Could not apply network mode','err');
-    return r;
+    const detail=r.error_detail||r.error||r.detail||'Could not apply network mode';
+    showMsg('wizMsg',detail+' — you can continue setup; change sharing later in System.','err');
+    // Soften: allow Next to proceed after a clear message (intent may still be saved).
+    return {...r, soft_continue:true};
   }
   return r;
 }
@@ -3086,7 +3088,8 @@ async function wizardNext(){
   const current=steps[step-1];
   if(current==='sharing'){
     const r=await wizardApplySharing();
-    if(r&&!r.deferred&&(r.error||r._status>=400)&&!r.skipped) return;
+    // Block only on hard failures without soft_continue / deferred / warning.
+    if(r&&!r.deferred&&!r.warning&&!r.soft_continue&&!r.skipped&&(r.error||r._status>=400)) return;
   }
   if(current==='ai'&&_wizardDraft.model_tag){
     /* choice already in draft */

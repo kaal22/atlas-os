@@ -72,6 +72,72 @@ def test_private_device_commands():
     # Must not open LAN to 8787
     assert not any("port 8787" in c for c in cmds)
     assert any("--force enable" in c for c in cmds)
+    assert any("--force reset" in c for c in cmds)
+
+
+def test_apply_mode_surfaces_ufw_stderr(monkeypatch=None):
+    """Live apply must include ufw stderr, not only CalledProcessError exit code."""
+    import network_modes as nm
+
+    class FakeProc:
+        def __init__(self, returncode=1, stdout="", stderr=""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+
+    calls = {"n": 0}
+
+    def fake_run(cmd, **kwargs):
+        calls["n"] += 1
+        # First call is `ufw status` from apply_mode
+        if len(cmd) >= 2 and cmd[1] == "status":
+            return FakeProc(0, stdout="Status: inactive\n")
+        return FakeProc(1, stderr="ERROR: problem running ufw-init\n")
+
+    orig_run = nm.subprocess.run
+    orig_bin = nm.ufw_binary
+    nm.ufw_binary = lambda: "/usr/sbin/ufw"  # type: ignore[assignment]
+    nm.subprocess.run = fake_run  # type: ignore[assignment]
+    try:
+        try:
+            apply_mode("private_device", dry_run=False)
+            raise AssertionError("expected UfwApplyError")
+        except nm.UfwApplyError as e:
+            assert e.reason == "inactive"
+            msg = str(e)
+            assert "inactive" in msg.lower()
+            assert "problem running ufw-init" in (e.detail or msg)
+    finally:
+        nm.subprocess.run = orig_run  # type: ignore[assignment]
+        nm.ufw_binary = orig_bin  # type: ignore[assignment]
+
+
+def test_apply_mode_missing_ufw():
+    import network_modes as nm
+
+    orig_bin = nm.ufw_binary
+    nm.ufw_binary = lambda: None  # type: ignore[assignment]
+    try:
+        try:
+            apply_mode("private_device", dry_run=False)
+            raise AssertionError("expected UfwApplyError")
+        except nm.UfwApplyError as e:
+            assert e.reason == "missing"
+            assert "ufw not installed" in str(e)
+            warn = nm.soft_fail_warning("private_device", e)
+            assert "mode saved" in warn
+            assert "firewall not applied" in warn
+    finally:
+        nm.ufw_binary = orig_bin  # type: ignore[assignment]
+
+
+def test_soft_fail_warning_inactive():
+    import network_modes as nm
+
+    err = nm.UfwApplyError("boom", reason="inactive", detail="reset failed")
+    warn = nm.soft_fail_warning("private_device", err)
+    assert warn.startswith("ufw inactive — mode saved")
+    assert "private_device" in warn
 
 
 def test_trusted_lan_opens_8787_but_private_does_not():
@@ -91,6 +157,9 @@ if __name__ == "__main__":
     test_trusted_lan_still_requires_auth()
     test_isolation_no_egress()
     test_private_device_commands()
+    test_apply_mode_surfaces_ufw_stderr()
+    test_apply_mode_missing_ufw()
+    test_soft_fail_warning_inactive()
     test_trusted_lan_opens_8787_but_private_does_not()
     test_offline_isolation_denies_egress()
     print("OK test_firewall_modes")

@@ -7,14 +7,18 @@ Type=simple
 ExecStart=/usr/bin/python3 /usr/lib/atlas/system_daemon.py
 RuntimeDirectory=atlas
 Restart=on-failure
-# Hardening
+# Hardening — keep NoNewPrivileges; run as root with a narrow capability set.
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/run/atlas /srv/atlas/logs /etc/atlas
-CapabilityBoundingSet=
-RestrictAddressFamilies=AF_UNIX
+# ufw needs to mutate its rules/state under ProtectSystem=strict.
+ReadWritePaths=/run/atlas /srv/atlas/logs /etc/atlas /etc/ufw /etc/default/ufw /var/lib/ufw /var/log/ufw
+# Empty bounding set previously stripped CAP_NET_ADMIN, so ufw --force reset
+# always failed under this unit. Allow only what iptables/nftables need.
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+# RPC socket is AF_UNIX; netlink/IPv4/IPv6 are required solely for the firewall backend.
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
 
 [Install]
 WantedBy=multi-user.target

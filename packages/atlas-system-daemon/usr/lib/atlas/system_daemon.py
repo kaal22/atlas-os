@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from network_modes import apply_mode, persist_mode  # noqa: E402
+from network_modes import apply_mode, persist_mode, soft_fail_warning  # noqa: E402
 
 SOCK_PATH = os.environ.get("ATLAS_SYSTEM_SOCK", "/run/atlas/system.sock")
 AUDIT_LOG = Path(os.environ.get("ATLAS_AUDIT_LOG", "/srv/atlas/logs/atlas-audit.jsonl"))
@@ -153,16 +153,39 @@ def handle(req: dict[str, Any]) -> dict[str, Any]:
         try:
             commands = apply_mode(mode, dry_run=dry_run)  # type: ignore[arg-type]
         except Exception as e:
-            # Persist intent even if ufw cannot run under AF_UNIX hardening.
+            # Persist intent even if ufw missing/inactive/sandbox-blocked.
+            # Wizard and setup must not hard-fail on firewall apply.
             persist_mode(mode, NETWORK_MODE_PATH)
+            err = str(e)
+            warning = soft_fail_warning(mode, e)
             audit({
                 "event": "network.mode.apply",
-                "result": "fail",
+                "result": "deferred",
                 "mode": mode,
-                "error": str(e),
+                "error": err,
+                "warning": warning,
                 "persisted": True,
             })
-            return {"ok": False, "error": str(e), "persisted": True, "mode": mode}
+            if not dry_run:
+                return {
+                    "ok": True,
+                    "mode": mode,
+                    "persisted": True,
+                    "applied": False,
+                    "deferred": True,
+                    "warning": warning,
+                    "error_detail": err,
+                }
+            return {
+                "ok": True,
+                "mode": mode,
+                "dry_run": True,
+                "persisted": True,
+                "applied": False,
+                "deferred": True,
+                "warning": warning,
+                "error_detail": err,
+            }
 
         if not dry_run:
             persist_mode(mode, NETWORK_MODE_PATH)
@@ -178,7 +201,14 @@ def handle(req: dict[str, Any]) -> dict[str, Any]:
             "dry_run": dry_run,
             "commands": commands,
         })
-        return {"ok": True, "mode": mode, "dry_run": dry_run, "commands": commands}
+        return {
+            "ok": True,
+            "mode": mode,
+            "dry_run": dry_run,
+            "commands": commands,
+            "applied": not dry_run,
+            "persisted": (not dry_run) or mode == "private_device",
+        }
 
     if method.startswith("update.os."):
         # Phase 1: Command Centre runs apt via systemd-run + atlas-os-apt.py

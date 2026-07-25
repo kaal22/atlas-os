@@ -63,6 +63,74 @@ def test_network_mode_private_dry_run():
     assert sd.NETWORK_MODE_PATH.read_text().strip() == "private_device"
 
 
+def test_network_mode_private_ufw_fail_soft_succeeds(monkeypatch=None):
+    """LIVE private_device must persist + ok with warning when ufw fails."""
+    import network_modes as nm
+
+    def boom(mode, dry_run=True):
+        if dry_run:
+            return nm.command_strings(mode)
+        raise nm.UfwApplyError(
+            "ufw --force reset failed (exit 1): ERROR: problem running ufw-init",
+            reason="inactive",
+            detail="ERROR: problem running ufw-init",
+        )
+
+    orig = sd.apply_mode
+    sd.apply_mode = boom  # type: ignore[assignment]
+    try:
+        tok = f"cap:network.mode.apply:nonce:{int(time.time()) + 60}"
+        resp = sd.handle({
+            "method": "network.mode.apply",
+            "token": tok,
+            "params": {"mode": "private_device", "dry_run": False},
+        })
+        assert resp["ok"] is True
+        assert resp.get("deferred") is True
+        assert resp.get("persisted") is True
+        assert resp.get("applied") is False
+        assert "ufw inactive" in (resp.get("warning") or "")
+        assert "mode saved" in (resp.get("warning") or "")
+        assert sd.NETWORK_MODE_PATH.read_text().strip() == "private_device"
+    finally:
+        sd.apply_mode = orig  # type: ignore[assignment]
+
+
+def test_network_mode_any_mode_ufw_fail_soft_succeeds():
+    """Owner-confirmed trusted_lan also soft-succeeds when ufw cannot apply."""
+    import network_modes as nm
+
+    def boom(mode, dry_run=True):
+        if dry_run:
+            return nm.command_strings(mode)
+        raise nm.UfwApplyError(
+            "ufw not installed",
+            reason="missing",
+            detail="ufw binary missing",
+        )
+
+    orig = sd.apply_mode
+    sd.apply_mode = boom  # type: ignore[assignment]
+    try:
+        tok = f"cap:network.mode.apply:nonce:{int(time.time()) + 60}"
+        resp = sd.handle({
+            "method": "network.mode.apply",
+            "token": tok,
+            "params": {
+                "mode": "trusted_lan",
+                "role": "owner",
+                "owner_confirmed": True,
+                "dry_run": False,
+            },
+        })
+        assert resp["ok"] is True
+        assert resp.get("deferred") is True
+        assert "ufw not installed" in (resp.get("warning") or "")
+        assert sd.NETWORK_MODE_PATH.read_text().strip() == "trusted_lan"
+    finally:
+        sd.apply_mode = orig  # type: ignore[assignment]
+
+
 def test_non_private_requires_owner():
     tok = f"cap:network.mode.apply:nonce:{int(time.time()) + 60}"
     resp = sd.handle({
@@ -89,6 +157,8 @@ if __name__ == "__main__":
     test_expired_token_rejected()
     test_valid_token_with_exp_accepted()
     test_network_mode_private_dry_run()
+    test_network_mode_private_ufw_fail_soft_succeeds()
+    test_network_mode_any_mode_ufw_fail_soft_succeeds()
     test_non_private_requires_owner()
     test_audit_written()
     print("OK test_daemon_tokens")

@@ -2401,19 +2401,43 @@ class Handler(BaseHTTPRequestHandler):
                     "mode": mode,
                     "username": sess["username"],
                     "dry_run": result.get("dry_run"),
+                    "deferred": result.get("deferred"),
+                    "warning": result.get("warning"),
                 })
                 return self._json(200, result)
-            # Daemon missing: still persist wizard intent so setup can finish offline.
+            # Daemon missing / unreachable: persist wizard intent so setup can finish.
             if result.get("error") in {"system_daemon_unavailable", "daemon_rpc_failed"}:
                 state = load_wizard_state()
                 state.setdefault("choices", {})["network_mode"] = mode
                 save_wizard_state(state)
                 return self._json(200, {
-                    "ok": False,
+                    "ok": True,
                     "deferred": True,
                     "mode": mode,
+                    "warning": (
+                        "Network mode saved, but the system daemon is unavailable. "
+                        "Firewall rules will apply on next successful daemon start."
+                    ),
                     "error": result.get("error"),
                     "detail": result.get("detail"),
+                })
+            # Intent already persisted by daemon but ok=false (legacy/edge): still continue.
+            if result.get("persisted"):
+                state = load_wizard_state()
+                state.setdefault("choices", {})["network_mode"] = mode
+                save_wizard_state(state)
+                err = result.get("error") or result.get("error_detail") or "firewall_apply_failed"
+                warning = result.get("warning") or (
+                    f"ufw apply failed — mode saved ({mode}), firewall not applied: {err}"
+                )
+                return self._json(200, {
+                    "ok": True,
+                    "deferred": True,
+                    "mode": mode,
+                    "persisted": True,
+                    "applied": False,
+                    "warning": warning,
+                    "error_detail": err,
                 })
             return self._json(400, result)
 

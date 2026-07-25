@@ -20,6 +20,7 @@ from content_manager import (  # noqa: E402
     extract_zim_html_articles,
     install_pack,
     maybe_extract_zim_html_for_rag,
+    _zim_rag_config,
 )
 
 
@@ -207,10 +208,30 @@ def test_expand_resolves_file_url(tmp_path: Path | None = None):
         assert "kids-home-learning-expand.tar.gz" in url
 
 
+def test_zim_rag_defaults_on_for_zim_fetch_packs():
+    cfg = _zim_rag_config(
+        {
+            "id": "atlas.knowledge.medicine-en",
+            "meta": {
+                "zim_fetch": {
+                    "enabled": True,
+                    "default_url": "https://example.test/med.zim",
+                    "filename": "med.zim",
+                }
+            },
+        }
+    )
+    assert cfg.get("enabled") is True
+    assert int(cfg.get("max_articles") or 0) > 0
+    assert _zim_rag_config({"meta": {"zim_rag": {"enabled": False}}}).get("enabled") is False
+    assert _zim_rag_config({"meta": {}}) == {}
+
+
 if __name__ == "__main__":
     test_rag_html_seed_extract_without_zimdump()
     test_extract_zim_html_articles_uses_zimdump_mock()
     test_knowledge_index_ingests_extracted_html()
     test_kolibri_prepare_writes_channel_lock()
     test_expand_resolves_file_url()
+    test_zim_rag_defaults_on_for_zim_fetch_packs()
     print("OK test_zim_rag_and_education")

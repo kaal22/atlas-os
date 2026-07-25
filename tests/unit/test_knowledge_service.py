@@ -97,6 +97,25 @@ def test_shared_system_pack_visible():
         assert any(d["trust"] == "pack" for d in ks.library("alice"))
 
 
+def test_reload_picks_up_external_index_writes():
+    """Command Centre singleton must see pack-install writes without restart."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        live = KnowledgeService(root, keyword_only=True)
+        assert live.library("alice") == []
+        assert live.status()["search_ready"] is False
+
+        writer = KnowledgeService(root, keyword_only=True)
+        p = root / "Democracy.md"
+        p.write_text("Democracy is rule by the people through elections.", encoding="utf-8")
+        writer.ingest_file("system", p, trust="pack")
+
+        assert live.reload_if_changed() is True
+        assert live.status()["search_ready"] is True
+        assert live.library("alice")
+        assert live.search("alice", "Democracy elections")
+
+
 if __name__ == "__main__":
     test_chunk_and_scrub()
     test_cross_user_isolation()
@@ -105,4 +124,5 @@ if __name__ == "__main__":
     test_backup_restore_roundtrip()
     test_html_extract()
     test_shared_system_pack_visible()
+    test_reload_picks_up_external_index_writes()
     print("OK test_knowledge_service")

@@ -2075,10 +2075,16 @@ def _fetch_zim_for_manifest_body(
     zim_rag = None
     try:
         zim_rag = maybe_extract_zim_html_for_rag(manifest, target, atlas_root, zim_path=dest)
-        if zim_rag and zim_rag.get("extracted"):
-            _workflow_knowledge_index(manifest, target, atlas_root)
     except Exception:  # noqa: BLE001 — RAG extract is best-effort after ZIM is ready
         zim_rag = {"ok": False, "error": "zim_rag_extract_failed"}
+    # Always re-index after ZIM lands so curated + extracted HTML become searchable
+    # without restarting Command Centre.
+    try:
+        _workflow_knowledge_index(manifest, target, atlas_root)
+    except Exception:  # noqa: BLE001
+        if not isinstance(zim_rag, dict):
+            zim_rag = {}
+        zim_rag = {**(zim_rag or {}), "index_error": "knowledge_index_failed"}
     size = dest.stat().st_size
     result = {
         "ok": True,
@@ -2114,9 +2120,34 @@ def _fetch_zim_for_manifest_body(
 
 
 def _zim_rag_config(manifest: dict[str, Any]) -> dict[str, Any]:
+    """
+    Resolve zim_rag settings from manifest.meta.
+
+    Knowledge packs with zim_fetch default to a bounded HTML extract so keyword
+    search becomes available after ZIM download (Library browsing alone is not enough).
+    Explicit meta.zim_rag.enabled=false opts out.
+    """
     meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
     cfg = meta.get("zim_rag") if isinstance(meta.get("zim_rag"), dict) else {}
-    return dict(cfg)
+    if cfg:
+        return dict(cfg)
+    zim_fetch = meta.get("zim_fetch") if isinstance(meta.get("zim_fetch"), dict) else {}
+    if not zim_fetch:
+        return {}
+    if zim_fetch.get("enabled") is False:
+        return {}
+    if not (
+        zim_fetch.get("default_url")
+        or zim_fetch.get("url")
+        or zim_fetch.get("filename")
+        or zim_fetch.get("enabled")
+    ):
+        return {}
+    return {
+        "enabled": True,
+        "max_articles": DEFAULT_ZIM_RAG_MAX_ARTICLES,
+        "defaulted": True,
+    }
 
 
 def _safe_article_filename(title: str, index: int) -> str:

@@ -140,7 +140,7 @@ def test_fetch_zim_registers_kiwix(monkeypatch=None):
             },
         }
 
-        def fake_download(url, dest, progress_cb=None):
+        def fake_download(url, dest, progress_cb=None, cancel_event=None):
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(b"FAKEZIMDATA!!")
             if progress_cb:
@@ -148,6 +148,12 @@ def test_fetch_zim_registers_kiwix(monkeypatch=None):
 
         with mock.patch("content_manager._http_head_ok", return_value=True), mock.patch(
             "content_manager._download_url_to_file", side_effect=fake_download
+        ), mock.patch(
+            "content_manager.maybe_extract_zim_html_for_rag",
+            return_value={"ok": True, "extracted": 0},
+        ), mock.patch(
+            "content_manager._workflow_knowledge_index",
+            return_value=None,
         ):
             info = fetch_zim_for_manifest(manifest, target, atlas)
         assert info["ok"]

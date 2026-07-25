@@ -820,6 +820,13 @@ async function page(){
       ]);
       const statusLabel=h.status==='ok'?'Healthy':(h.status==='degraded'?'Needs attention':'Unknown');
       const kbMode=(h.knowledge&&h.knowledge.mode)||'keyword';
+      const docCount=Number(lib.count||0);
+      const searchReady=docCount>0||!!(h.knowledge&&h.knowledge.search_ready);
+      const searchChip=kbMode==='hybrid'
+        ?chip('Hybrid search','ok')
+        :(searchReady
+          ?chip('Keyword search','ok')
+          :chip('Search not indexed','warn'));
       const svcList=sv.services||[];
       const svcOnline=svcList.filter(s=>s.ok).length;
       renderTopbar(id,{modelReady:!!m.ready,sysOk:h.status==='ok'});
@@ -836,7 +843,7 @@ async function page(){
       const heroStatus=`
         ${chip(statusLabel,h.status==='ok'?'ok':'bad')}
         ${chip(m.ready?'AI ready':'Model not installed',m.ready?'ok':'bad')}
-        ${chip(kbMode==='hybrid'?'Hybrid search':'Keyword search',kbMode==='hybrid'?'ok':'neutral')}
+        ${searchChip}
         ${chip('Private device','ok',true)}`;
       const actions=[
         actionTile('#/ask','Open Chat','Talk to local agents','💬'),
@@ -850,10 +857,10 @@ async function page(){
       const metrics=[
         metricCard('System',statusLabel,'Device health overview',h.status==='ok'?'ok':'bad'),
         metricCard('AI model',m.ready?'Ready':'Not installed',m.profile||'No profile',m.ready?'ok':'bad'),
-        metricCard('Documents',lib.count||0,'Indexed in knowledge base'),
+        metricCard('Documents',docCount,'Indexed in knowledge base',searchReady?'ok':'warn'),
         metricCard('Services',svcOnline+'/'+svcList.length,'Local loopback services',svcOnline===svcList.length&&svcList.length?'ok':'bad'),
         metricCard('Version',h.version||'?','Installed Atlas release'),
-        metricCard('Search mode',kbMode,'Knowledge retrieval',kbMode==='hybrid'?'ok':'neutral'),
+        metricCard('Search mode',searchReady?(kbMode==='hybrid'?'hybrid':'keyword'):'not ready','Knowledge retrieval',searchReady?(kbMode==='hybrid'?'ok':'ok'):'warn'),
       ].join('');
       const services=(svcList.length?svcList.map(serviceCard).join(''):emptyState('No services probed yet','Services appear once local daemons start.'));
       const chatRows=(chats.threads||[]).slice(0,4).map(t=>
@@ -862,7 +869,7 @@ async function page(){
         </div>`).join('');
       const activity=[
         m.ready?['AI model ready for chat','Now']:['AI model not installed — visit Models','Setup'],
-        [(lib.count||0)+' documents indexed','Knowledge'],
+        [searchReady?(docCount+' documents indexed'):'No documents indexed — install Wikipedia or add files','Knowledge'],
         [statusLabel+' system status','System'],
         h.hint?[h.hint,'Notice']:null,
       ].filter(Boolean).map(([t,w])=>`<div class="activity-row"><span>${escapeHtml(t)}</span><span class="when">${escapeHtml(w)}</span></div>`).join('');
@@ -872,6 +879,12 @@ async function page(){
           <p>Step ${Number(setup.step)||1} of ${(setup.steps||[]).length||7} — configure AI, sharing, and recovery.</p>
           <button class="btn" type="button" onclick="location.hash='#/setup'">Open Setup</button></div>`
         :(!m.ready?`<div class="callout warn" style="margin-top:1rem"><strong>Complete AI setup</strong><p>${escapeHtml(m.hint||'Download a model to unlock Chat and agents.')}</p></div>`:'');
+      const kbEmptyBanner=!searchReady
+        ?`<div class="callout warn" style="margin-top:1rem"><strong>Keyword search needs indexed content</strong>
+          <p>Install a Wikipedia / Library pack under Content (ZIM download also extracts a bounded set for search), or add files on the Knowledge page.</p>
+          <button class="btn" type="button" onclick="location.hash='#/content'">Open Content</button>
+          <button class="btn secondary" type="button" onclick="location.hash='#/knowledge'">Open Knowledge</button></div>`
+        :'';
       view.innerHTML=`
         <div class="hero">
           <div class="hero-inner">
@@ -899,16 +912,18 @@ async function page(){
           <div>
             ${sectionHead('Knowledge snapshot','Your document library')}
             <div class="card panel card-interactive" onclick="location.hash='#/knowledge'">
-              <h3>${lib.count||0} documents indexed</h3>
-              <p>Search your notes and files locally with source citations in Chat.</p>
+              <h3>${docCount} documents indexed</h3>
+              <p>${searchReady
+                ?'Search your notes and files locally with source citations in Chat.'
+                :'No indexed documents yet — Library ZIMs browse in Kiwix; install Wikipedia starter or wait for ZIM RAG extract to enable keyword search.'}</p>
               <div class="btn-group" style="margin-top:.75rem">
-                <span class="chip chip-${kbMode==='hybrid'?'ok':'neutral'}">${escapeHtml(kbMode)} search</span>
+                <span class="chip chip-${searchReady?'ok':'warn'}">${escapeHtml(searchReady?(kbMode==='hybrid'?'hybrid':'keyword'):'not ready')} search</span>
                 <button type="button" class="btn secondary" onclick="event.stopPropagation();location.hash='#/knowledge'">Browse library</button>
               </div>
             </div>
           </div>
         </div>
-        ${setupBanner}${gpuNote}`;
+        ${kbEmptyBanner}${setupBanner}${gpuNote}`;
     }catch(e){
       view.innerHTML=`<div class="callout warn"><strong>Could not load overview</strong>
         <p>${escapeHtml(e&&e.message?e.message:String(e))}</p>
@@ -989,11 +1004,14 @@ async function page(){
   if(id==='knowledge'){
     const st=await api('/api/knowledge/status');
     const mode=st.mode||'keyword';
+    const docs=Number(st.docs||0);
+    const searchReady=!!st.search_ready||docs>0;
     const kbHint=st.hint?`<div class="msg info">${escapeHtml(st.hint)}</div>`:'';
-    const modeLine=`Search mode: <strong>${escapeHtml(mode)}</strong>`
+    const modeLine=`Search mode: <strong>${escapeHtml(searchReady?mode:'not ready')}</strong>`
+      +(searchReady?'':' · index empty')
       +(st.embed_ready?' · embeddings ready':' · embeddings not installed')
       +(st.qdrant?' · Qdrant up':' · Qdrant down');
-    view.innerHTML=`<p class="page-intro">Add your notes and documents so Atlas can search them locally.</p>
+    view.innerHTML=`<p class="page-intro">Add your notes and documents so Atlas can search them locally. Wikipedia / Library packs also feed this index after install (bounded ZIM extract).</p>
       <p style="font-size:.9rem;color:var(--muted)">${modeLine}</p>
       ${kbHint}
       <div class="grid-2">
@@ -1019,10 +1037,10 @@ async function page(){
       </div>
       <h2 style="margin-top:1.25rem">Search</h2>
       <div style="display:flex;gap:.5rem;align-items:center">
-        <input id=sq placeholder="Search your indexed documents…" style="margin:0;flex:1" />
-        <button class=btn onclick="searchKnowledge()">Search</button>
+        <input id=sq placeholder="${searchReady?'Search your indexed documents…':'Install a Wikipedia pack or add a document first…'}" style="margin:0;flex:1" ${searchReady?'':'disabled'} />
+        <button class=btn id=kbSearchBtn onclick="searchKnowledge()" ${searchReady?'':'disabled'}>Search</button>
       </div>
-      <div id=kbSearchResults style="margin-top:.75rem"></div>`;
+      <div id=kbSearchResults style="margin-top:.75rem">${searchReady?'':'<div class="msg info">Keyword search unlocks once at least one document is indexed.</div>'}</div>`;
     await loadKbBrowser();
     await loadKbLibrary();
     return;
@@ -1226,6 +1244,12 @@ async function ingestSelected(){
   }
   showMsg('kbIngestMsg','Added '+r.name+' ('+r.chunks+' sections indexed).','ok');
   await loadKbLibrary();
+  const sq=document.getElementById('sq');
+  const sbtn=document.getElementById('kbSearchBtn');
+  if(sq){sq.disabled=false;sq.placeholder='Search your indexed documents…';}
+  if(sbtn) sbtn.disabled=false;
+  const empty=document.getElementById('kbSearchResults');
+  if(empty&&/unlocks once/i.test(empty.textContent||'')) empty.innerHTML='';
 }
 async function loadKbLibrary(){
   const lib=await api('/api/knowledge/library');

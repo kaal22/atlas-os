@@ -178,10 +178,26 @@ class KnowledgeService:
     def __post_init__(self) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         self.index_path = self.root / "index.json"
+        self._index_mtime: float | None = None
         if os.environ.get("ATLAS_KNOWLEDGE_KEYWORD_ONLY") == "1":
             self.keyword_only = True
+        self._load_index()
+
+    def _index_stat(self) -> tuple[float, int]:
+        """Return (mtime, size) for change detection across processes."""
+        try:
+            st = self.index_path.stat()
+            return (float(st.st_mtime), int(st.st_size))
+        except OSError:
+            return (0.0, 0)
+
+    def _load_index(self) -> None:
+        self.docs.clear()
         if self.index_path.exists():
-            raw = json.loads(self.index_path.read_text(encoding="utf-8"))
+            try:
+                raw = json.loads(self.index_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = {}
             for d in raw.get("docs", []):
                 self.docs[d["doc_id"]] = DocumentRecord(
                     doc_id=d["doc_id"],
@@ -193,6 +209,22 @@ class KnowledgeService:
                     vectorized=bool(d.get("vectorized")),
                     created_at=float(d.get("created_at") or 0),
                 )
+        self._index_mtime, self._index_size = self._index_stat()
+
+    def reload_if_changed(self) -> bool:
+        """
+        Reload index.json when another process updated it.
+
+        Pack install / ZIM RAG write via a separate KnowledgeService instance.
+        Command Centre keeps a long-lived singleton — without this, Home shows
+        0 documents and search stays empty until restart (and a later save()
+        can wipe the on-disk pack corpus).
+        """
+        mtime, size = self._index_stat()
+        if mtime == getattr(self, "_index_mtime", None) and size == getattr(self, "_index_size", None):
+            return False
+        self._load_index()
+        return True
 
     def save(self) -> None:
         payload = {
@@ -211,8 +243,10 @@ class KnowledgeService:
             ]
         }
         self.index_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        self._index_mtime, self._index_size = self._index_stat()
 
     def status(self) -> dict[str, Any]:
+        self.reload_if_changed()
         q_ok = False if self.keyword_only else qdrant_reachable(self.qdrant_url)
         o_ok = False if self.keyword_only else ollama_reachable(self.ollama_url)
         emb_ok = False if self.keyword_only else embed_model_installed(self.ollama_url)
@@ -221,22 +255,28 @@ class KnowledgeService:
             mode = "hybrid"
         elif not self.keyword_only and (q_ok or emb_ok):
             mode = "degraded"
+        docs = len(self.docs)
+        hint = None
+        if docs == 0:
+            hint = (
+                "No documents indexed yet. Install a Library/Wikipedia pack or "
+                "add files on the Knowledge page to enable search."
+            )
+        elif mode == "hybrid" or self.keyword_only:
+            hint = None
+        elif o_ok and not emb_ok:
+            hint = f"Download embeddings model {EMBED_MODEL} in Models for semantic search."
+        else:
+            hint = "Qdrant or Ollama unavailable — keyword search only."
         return {
             "qdrant": q_ok,
             "ollama": o_ok,
             "embed_model": EMBED_MODEL,
             "embed_ready": emb_ok,
             "mode": mode,
-            "docs": len(self.docs),
-            "hint": (
-                None
-                if mode == "hybrid" or self.keyword_only
-                else (
-                    f"Download embeddings model {EMBED_MODEL} in Models for semantic search."
-                    if o_ok and not emb_ok
-                    else "Qdrant or Ollama unavailable — keyword search only."
-                )
-            ),
+            "docs": docs,
+            "search_ready": docs > 0,
+            "hint": hint,
         }
 
     def ensure_collection(self, vector_size: int = VECTOR_SIZE) -> None:
@@ -298,6 +338,7 @@ class KnowledgeService:
         return doc_user_id == user_id or doc_user_id in SHARED_KNOWLEDGE_USERS
 
     def ingest_file(self, user_id: str, path: Path, *, trust: str = "user_document") -> DocumentRecord:
+        self.reload_if_changed()
         path = Path(path)
         text = extract_text(path)
         if not text.strip():
@@ -333,6 +374,7 @@ class KnowledgeService:
         return rec
 
     def delete_document(self, user_id: str, doc_id: str) -> bool:
+        self.reload_if_changed()
         rec = self.docs.get(doc_id)
         if not rec or rec.user_id != user_id:
             return False
@@ -342,6 +384,7 @@ class KnowledgeService:
         return True
 
     def get_chunk(self, user_id: str, doc_id: str, chunk_index: int) -> dict[str, Any] | None:
+        self.reload_if_changed()
         rec = self.docs.get(doc_id)
         if not rec or not self._doc_visible(user_id, rec.user_id):
             return None
@@ -358,6 +401,7 @@ class KnowledgeService:
         }
 
     def library(self, user_id: str) -> list[dict[str, Any]]:
+        self.reload_if_changed()
         docs = [d for d in self.docs.values() if self._doc_visible(user_id, d.user_id)]
         docs.sort(key=lambda d: d.name.lower())
         return [
@@ -433,6 +477,7 @@ class KnowledgeService:
         return hits
 
     def search(self, user_id: str, query: str, limit: int = 5) -> list[dict[str, Any]]:
+        self.reload_if_changed()
         query = (query or "").strip()
         if not query:
             return []
@@ -468,6 +513,7 @@ class KnowledgeService:
         return relevant[:limit]
 
     def backup(self, dest_dir: Path) -> dict[str, Any]:
+        self.reload_if_changed()
         dest = Path(dest_dir)
         dest.mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d-%H%M%S")

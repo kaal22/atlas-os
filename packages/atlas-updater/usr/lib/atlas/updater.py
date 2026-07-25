@@ -36,6 +36,90 @@ DEFAULT_UPDATE_ENDPOINT = "https://github.com/kaal22/atlas-os/releases/latest/do
 DISK_HEADROOM_BYTES = int(os.environ.get("ATLAS_UPDATE_DISK_HEADROOM", str(256 * 1024 * 1024)))
 DOWNLOAD_MAX_ATTEMPTS = int(os.environ.get("ATLAS_UPDATE_DOWNLOAD_ATTEMPTS", "3"))
 
+# systemd units that .atlas-update manifests may request to restart after apply.
+# Never accept arbitrary unit names or shell — whitelist only.
+ALLOWED_RESTART_SERVICES = frozenset(
+    {
+        "atlas-command-centre",
+        "atlas-command-centre.service",
+        "atlas-system-daemon",
+        "atlas-system-daemon.service",
+        "atlas-agent-runtime",
+        "atlas-agent-runtime.service",
+        "atlas-policy-gateway",
+        "atlas-policy-gateway.service",
+        "atlas-proxy",
+        "atlas-proxy.service",
+        "atlas-firstboot",
+        "atlas-firstboot.service",
+        "ollama",
+        "ollama.service",
+    }
+)
+
+
+def _normalize_unit_name(name: str) -> str:
+    n = (name or "").strip()
+    if not n:
+        return ""
+    if not n.endswith(".service"):
+        n = f"{n}.service"
+    return n
+
+
+def _unit_allowed(name: str) -> bool:
+    raw = (name or "").strip()
+    if not raw or "/" in raw or "\\" in raw or ".." in raw:
+        return False
+    # Refuse template/path-like or multi-unit abuse.
+    if any(c in raw for c in (" ", ";", "|", "&", "$", "`", "\n", "\r", "\t")):
+        return False
+    return raw in ALLOWED_RESTART_SERVICES or _normalize_unit_name(raw) in {
+        _normalize_unit_name(x) for x in ALLOWED_RESTART_SERVICES
+    }
+
+
+def restart_whitelisted_services(
+    services: list[str],
+    *,
+    runner: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None,
+) -> tuple[list[str], list[dict[str, str]]]:
+    """Restart systemd units named in the manifest (whitelist only).
+
+    Returns (restarted_unit_names, errors[{service,error}]).
+    """
+    restarted: list[str] = []
+    errors: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+        if runner is not None:
+            return runner(cmd)
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+    for raw in services:
+        if not isinstance(raw, str):
+            errors.append({"service": str(raw), "error": "invalid_name"})
+            continue
+        if not _unit_allowed(raw):
+            errors.append({"service": raw, "error": "not_whitelisted"})
+            continue
+        unit = _normalize_unit_name(raw)
+        if unit in seen:
+            continue
+        seen.add(unit)
+        try:
+            # Prefer restart; fall back to try-restart so missing units are soft.
+            proc = _run(["systemctl", "try-restart", unit])
+            if proc.returncode != 0:
+                err = (proc.stderr or proc.stdout or f"exit {proc.returncode}").strip()
+                errors.append({"service": unit, "error": err[:500]})
+                continue
+            restarted.append(unit.removesuffix(".service"))
+        except (OSError, subprocess.TimeoutExpired) as e:
+            errors.append({"service": unit, "error": str(e)[:500]})
+    return restarted, errors
+
 
 def _update_endpoint() -> str:
     ep_file = Path("/etc/atlas/update-endpoint")
@@ -78,6 +162,9 @@ class UpdateResult:
     snapshot_id: str | None = None
     rolled_back: bool = False
     version: str | None = None
+    reboot_required: bool = False
+    restarted_services: list[str] | None = None
+    restart_errors: list[dict[str, str]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -400,6 +487,8 @@ def apply_update(
     install_root: Path | None = None,
     health_checker: Callable[[str], bool] | None = None,
     skip_health: bool = False,
+    skip_restart: bool = False,
+    systemctl_runner: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None,
 ) -> UpdateResult:
     """Apply an .atlas-update archive or extracted directory."""
     atlas_data = Path(atlas_data or os.environ.get("ATLAS_DATA", "/srv/atlas"))
@@ -441,6 +530,10 @@ def apply_update(
                 return UpdateResult(False, "apply", "payload missing")
 
             version = str(data.get("to_version") or data.get("version") or "unknown")
+            reboot_required = bool(data.get("reboot_required"))
+            restart_services = [
+                s for s in (data.get("restart_services") or []) if isinstance(s, str)
+            ]
             label = f"pre-update-{version}-{int(time.time())}"
 
             if dry_run:
@@ -450,6 +543,8 @@ def apply_update(
                     f"would apply {version}",
                     snapshot_id=label,
                     version=version,
+                    reboot_required=reboot_required,
+                    restarted_services=list(restart_services) if restart_services else None,
                 )
 
             # Preflight free space: payload size + snapshot copies + headroom.
@@ -526,6 +621,15 @@ def apply_update(
                         snapshot_id=label,
                         rolled_back=True,
                         version=version,
+                        reboot_required=False,
+                    )
+
+                restarted: list[str] = []
+                restart_errors: list[dict[str, str]] = []
+                if restart_services and not skip_restart:
+                    restarted, restart_errors = restart_whitelisted_services(
+                        restart_services,
+                        runner=systemctl_runner,
                     )
 
                 _write_diagnostics(
@@ -536,13 +640,28 @@ def apply_update(
                         "snapshot_id": label,
                         "health": health_results,
                         "applied": applied,
+                        "reboot_required": reboot_required,
+                        "restarted_services": restarted,
+                        "restart_errors": restart_errors,
                     },
                 )
                 try:
                     _write_version(version)
                 except OSError:
                     pass
-                return UpdateResult(True, "apply", version, snapshot_id=label, version=version)
+                detail = version
+                if reboot_required:
+                    detail = f"{version}; reboot recommended"
+                return UpdateResult(
+                    True,
+                    "apply",
+                    detail,
+                    snapshot_id=label,
+                    version=version,
+                    reboot_required=reboot_required,
+                    restarted_services=restarted or None,
+                    restart_errors=restart_errors or None,
+                )
             except Exception as e:
                 try:
                     restore_dir_snapshot(snap)

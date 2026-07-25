@@ -82,9 +82,11 @@ Phase 7 MVP exists; signed-bundle path is wired for CI/dev (real production key 
 - [x] **Refuse unsigned on stable (M1)** — gate + unit tests; production `atlas-update-metadata.pub` still pending release ceremony
 - [x] **Command Centre update UX (M1 thin)** — channel, from/to version, apply/rollback/signature messaging
 - [x] **Dev/CI signed update path** — `sign-update-bundle.sh`, build/publish `--sign`, signing round-trip tests
+- [x] **Post-apply `restart_services` + `reboot_required`** — whitelisted `systemctl try-restart`; CC shows “Reboot recommended”; unit tests mock systemctl
 - [ ] **Signed production updates** — real release keys at ceremony (not inventing secrets in-tree); publish `atlas-update-metadata.pub`
 - [x] **Download/apply reliability (practical slice)** — disk-space preflight, atomic `.partial` + retry/resume; full hardware rollback proof still open
-- [ ] **Beyond GitHub Releases MVP** — signed APT / release channel suitable for appliances (product Phase 7: signed APT repo, app bundles, recovery ISO)
+- [x] **Signed APT track — phase 1 scaffold** — local/USB `atlas-*` apt repo builder (`scripts/build-apt-repo.sh`), `os_updater` + CC `/api/updates/os/*`, docs in `docs/updates/OS_UPDATES.md`; full Debian security upgrades still phase 2
+- [ ] **Beyond GitHub Releases / APT phase 2** — hosted signed APT mirror + full Debian security upgrades (owner-confirm + `ATLAS_OS_ALLOW_FULL_UPGRADE`); product Phase 7 recovery ISO still open
 - [ ] Close V1 criterion #11 (update rollback automated tests) and commercial signing/recovery proof (`docs/user/V1_CRITERIA.md`)
 - [ ] Prove rollback on real hardware / post-apply health under load
 

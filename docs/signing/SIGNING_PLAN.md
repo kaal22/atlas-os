@@ -118,3 +118,17 @@ payloads on **stable/release** unless `ATLAS_ALLOW_UNSIGNED=1` (alpha/dev).
 
 Until a release ceremony publishes `atlas-update-metadata.pub`, only the committed
 dev public key is present — do **not** invent fake production secrets in-tree.
+
+## APT archive keyring (OS package updates)
+
+Separate from OpenSSL update-manifest keys. Phase 1 local/USB APT repos are built with
+`scripts/build-apt-repo.sh` and documented in `docs/updates/OS_UPDATES.md`.
+
+| Artefact | Path | Notes |
+|----------|------|--------|
+| Public keyring | `/usr/share/keyrings/atlas-archive-keyring.gpg` | GPG export only; ceremony-produced |
+| Sources template | `/usr/share/atlas/apt/atlas.list.template` | Copied/adapted to `sources.list.d/atlas.list` |
+| Sign repo | `ATLAS_APT_GPG_KEY=… ./scripts/build-apt-repo.sh` | Writes `Release.gpg` / `InRelease` |
+
+Never commit APT private keys. Until the keyring ships, file:// repos may use
+`[trusted=yes]` for offline/USB only.

@@ -31,11 +31,13 @@ Canonical backlog checkboxes: [`docs/BACKLOG.md`](BACKLOG.md).
 - [x] ZIM HTML → agent RAG (selective / starter; confirm_large for huge ZIMs)
 - [x] Map zoom > 11 / denser extracts (default z12; small z13; large stay z11)
 - [x] Kids expand URL pinned on-device + GitHub raw fallback
+- [x] `.atlas-update` honors `restart_services` + `reboot_required` (CC messaging)
+- [x] APT OS-update **phase 1** scaffold (local/USB `atlas-*` repo + CC `/api/updates/os/*`) — see `docs/updates/OS_UPDATES.md`
 - Plymouth / deeper theme polish  
-- Signed APT / appliance update channel beyond GitHub Releases MVP  
-- Production `atlas-update-metadata` ceremony (dev signing path already ships; see SIGNING_PLAN)  
+- APT **phase 2** — hosted signed mirror + full Debian security upgrades (owner-gated)  
+- Production `atlas-update-metadata` / APT keyring ceremony (dev signing path already ships; see SIGNING_PLAN)  
 - Final ISO cut (`scripts/phase7-iso.sh`) with full boot checklist  
 
 ## Related product phases
 
-Product build order remains in `product.md` (§ Phase 7 updates/backup, Phase 8 OEM). M1 covered unsigned refusal + CC UX; follow-on is first-class signed bundles (`scripts/sign-update-bundle.sh`, build/publish `--sign`) and download/apply disk preflight — see `docs/signing/SIGNING_PLAN.md` and BACKLOG updates section.
+Product build order remains in `product.md` (§ Phase 7 updates/backup, Phase 8 OEM). M1 covered unsigned refusal + CC UX; follow-on is first-class signed bundles (`scripts/sign-update-bundle.sh`, build/publish `--sign`), post-apply service restart / reboot flags, and APT phase-1 local repo — see `docs/signing/SIGNING_PLAN.md`, `docs/updates/OS_UPDATES.md`, and BACKLOG updates section.

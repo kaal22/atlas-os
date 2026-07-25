@@ -1262,6 +1262,11 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
             return self._json(200, {"downloaded": 0, "total": 0, "done": False})
+        if path == "/api/updates/os/status":
+            from os_updater import discover_repo_roots, os_update_status
+            st = os_update_status().to_dict()
+            st["local_repos"] = [str(p) for p in discover_repo_roots()]
+            return self._json(200, st)
         if path == "/api/content/maps-fetch-status":
             qs = parse_qs(urlparse(self.path).query)
             country = (qs.get("country") or [""])[0].strip().lower() or None
@@ -2122,7 +2127,15 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=_do_download, daemon=True).start()
             return self._json(202, {"status": "downloading"})
 
-        if path in {"/api/backup/create", "/api/backup/restore", "/api/backup/verify", "/api/updates/apply"}:
+        if path in {
+            "/api/backup/create",
+            "/api/backup/restore",
+            "/api/backup/verify",
+            "/api/updates/apply",
+            "/api/updates/os/check",
+            "/api/updates/os/apply",
+            "/api/updates/os/enable-source",
+        }:
             if sess.get("role") not in {"owner", "admin"}:
                 return self._json(403, {"error": "forbidden"})
 
@@ -2210,10 +2223,120 @@ class Handler(BaseHTTPRequestHandler):
                 "ok": result_ok,
                 "rolled_back": body.get("rolled_back"),
                 "version": body.get("version"),
+                "reboot_required": body.get("reboot_required"),
+                "restarted_services": body.get("restarted_services"),
                 "username": sess["username"],
             })
             if not result_ok and "error" not in body:
                 body["error"] = body.get("detail") or "apply failed"
+            return self._json(200, body)
+
+        if path in {"/api/updates/os/check", "/api/updates/os/apply", "/api/updates/os/enable-source"}:
+            import subprocess
+
+            helper = HERE / "atlas-os-apt.py"
+            # Prefer packaged helper next to updater when running from source tree.
+            upd_helper = (
+                PACKAGES / "atlas-updater" / "usr" / "lib" / "atlas" / "atlas-os-apt.py"
+            )
+            if not helper.is_file() and upd_helper.is_file():
+                helper = upd_helper
+            if Path("/usr/lib/atlas/atlas-os-apt.py").is_file():
+                helper = Path("/usr/lib/atlas/atlas-os-apt.py")
+            result_file = Path("/srv/atlas/updates/staging/.os-apply-result.json")
+            result_file.unlink(missing_ok=True)
+            if path == "/api/updates/os/check":
+                helper_args = ["check"]
+            elif path == "/api/updates/os/enable-source":
+                repo = (data.get("path") or data.get("repo") or "").strip()
+                if not repo:
+                    return self._json(400, {"error": "path_required"})
+                # Only allow known local/USB-ish roots (no remote URL injection).
+                rp = Path(repo)
+                try:
+                    resolved = str(rp.resolve())
+                except OSError:
+                    resolved = str(rp)
+                allowed_prefixes = (
+                    "/srv/atlas/",
+                    "/usr/share/atlas/",
+                    "/media/",
+                    "/mnt/",
+                    "/run/media/",
+                )
+                if not any(resolved.startswith(p) for p in allowed_prefixes):
+                    return self._json(403, {"error": "path_not_allowed"})
+                helper_args = ["enable-source", resolved]
+            else:
+                # apply
+                full = bool(data.get("full_system"))
+                confirmed = bool(data.get("owner_confirmed"))
+                dry = bool(data.get("dry_run"))
+                helper_args = ["apply"]
+                if full:
+                    helper_args.append("--full")
+                if confirmed:
+                    helper_args.append("--owner-confirmed")
+                if dry:
+                    helper_args.append("--dry-run")
+                if full and not confirmed:
+                    return self._json(
+                        400,
+                        {
+                            "ok": False,
+                            "error": "owner_confirmation_required",
+                            "detail": "Full OS upgrade requires owner_confirmed=true.",
+                        },
+                    )
+            cmd = [
+                "systemd-run", "--wait", "--collect", "--pipe",
+                "-p", "ProtectSystem=false",
+                "-p", "ProtectHome=false",
+                "/usr/bin/python3", str(helper), *helper_args,
+            ]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+            except subprocess.TimeoutExpired:
+                return self._json(500, {"error": "os_update timed out", "ok": False})
+            except OSError as e:
+                # Dev environments without systemd-run: run helper directly.
+                try:
+                    proc = subprocess.run(
+                        ["/usr/bin/python3", str(helper), *helper_args],
+                        capture_output=True,
+                        text=True,
+                        timeout=900,
+                    )
+                except Exception as e2:
+                    return self._json(500, {"error": f"os_update spawn failed: {e}; {e2}", "ok": False})
+            body = None
+            if result_file.is_file():
+                try:
+                    body = json.loads(result_file.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    pass
+            if body is None:
+                out = (proc.stdout or "").strip()
+                if out:
+                    # Last JSON object line
+                    for line in reversed(out.splitlines()):
+                        line = line.strip()
+                        if line.startswith("{"):
+                            try:
+                                body = json.loads(line)
+                                break
+                            except json.JSONDecodeError:
+                                continue
+            if body is None:
+                err = (proc.stderr or "").strip() or f"os_update exited {proc.returncode}"
+                return self._json(500, {"error": err, "ok": False})
+            audit_event({
+                "event": "update.os",
+                "op": path.rsplit("/", 1)[-1],
+                "ok": bool(body.get("ok", True)),
+                "username": sess["username"],
+                "scope": body.get("scope"),
+            })
             return self._json(200, body)
 
         if path == "/api/setup/save":

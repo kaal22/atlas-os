@@ -85,6 +85,7 @@ cat > "$STAGING/update.json" <<EOF
   "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "components": $COMPONENTS,
   "health_urls": ["http://127.0.0.1:8787/"],
+  "reboot_required": false,
   "restart_services": ["atlas-command-centre", "atlas-system-daemon", "atlas-agent-runtime"]
 }
 EOF

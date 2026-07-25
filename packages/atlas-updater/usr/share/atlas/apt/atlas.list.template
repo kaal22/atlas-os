@@ -1,0 +1,16 @@
+# Atlas APT source (template). Installed under /usr/share/atlas/apt/.
+# Operators copy/adapt to /etc/apt/sources.list.d/atlas.list via:
+#   sudo python3 /usr/lib/atlas/atlas-os-apt.py enable-source /srv/atlas/apt-repo
+# or Command Centre → System → OS package updates → Enable local repo.
+#
+# Phase 1: local/USB/file repo of atlas-*.deb only.
+# Prefer signed-by keyring when /usr/share/keyrings/atlas-archive-keyring.gpg exists.
+#
+# Example (signed):
+# deb [signed-by=/usr/share/keyrings/atlas-archive-keyring.gpg] file:/srv/atlas/apt-repo atlas main
+#
+# Example (dev/USB trusted file repo — not for production internet mirrors):
+# deb [trusted=yes] file:/srv/atlas/apt-repo atlas main
+#
+# Remote GitHub-hosted or HTTPS mirror (when published):
+# deb [signed-by=/usr/share/keyrings/atlas-archive-keyring.gpg] https://example.invalid/atlas/apt atlas main

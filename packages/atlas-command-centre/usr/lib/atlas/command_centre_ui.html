@@ -1125,6 +1125,16 @@ async function page(){
         </div>
         <div id="updateMsg" style="margin-top:.5rem"></div>
       </div>
+      <div class="card" id="osUpdateCard">
+        <h3>OS package updates</h3>
+        <p style="font-size:.85rem;color:var(--muted)">APT updates for <code>atlas-*</code> packages from a local/USB signed repo — separate from <code>.atlas-update</code> app bundles. Full Debian upgrades stay gated (owner confirm).</p>
+        <div id="osUpdateStatus"><p style="color:var(--muted)">Loading…</p></div>
+        <div class="btn-group" style="margin-top:.75rem">
+          <button id="btnOsCheck" class="btn secondary" onclick="checkOsUpdates()">Check atlas packages</button>
+          <button id="btnOsApply" class="btn" onclick="applyOsUpdates()" disabled>Apply atlas upgrades</button>
+        </div>
+        <div id="osUpdateMsg" style="margin-top:.5rem"></div>
+      </div>
       <details class="card" style="cursor:pointer">
         <summary style="font-weight:600">Advanced — Import update file</summary>
         <p style="margin-top:.75rem">Select a signed <code>.atlas-update</code> bundle. Atlas takes a snapshot first; failed health checks roll back automatically. Stable/release channels refuse unsigned placeholders.</p>
@@ -1141,6 +1151,7 @@ async function page(){
         </div>
         <div id=reout style="margin-top:.5rem"></div>
       </div>`;
+    refreshOsUpdateStatus();
     return;
   }
   if(id==='setup'){
@@ -2583,7 +2594,18 @@ function formatUpdateApplyMessage(r, fallbackOk){
     return {ok:false,text:detail};
   }
   const ver=r.version||r.detail||fallbackOk||'ok';
-  return {ok:true,text:'Applied '+ver+'. Snapshot kept for rollback if a later health check fails.'};
+  let text='Applied '+ver+'. Snapshot kept for rollback if a later health check fails.';
+  const restarted=(r.restarted_services||[]);
+  if(restarted.length){
+    text+=' Restarted: '+restarted.join(', ')+'.';
+  }
+  if(r.restart_errors&&r.restart_errors.length){
+    text+=' Some service restarts failed (see apply result).';
+  }
+  if(r.reboot_required){
+    text+=' Reboot recommended.';
+  }
+  return {ok:true,text,reboot_required:!!r.reboot_required};
 }
 async function checkOnlineUpdate(){
   const btn=document.getElementById('btnCheckUpdate');
@@ -2656,6 +2678,10 @@ async function downloadOnlineUpdate(){
       const ar=await api('/api/updates/apply',{method:'POST',body:JSON.stringify({path:s.path})});
       const formatted=formatUpdateApplyMessage(ar,_updateOffer.version);
       showMsg('updateMsg',formatted.text,formatted.ok?'ok':'err');
+      if(formatted.ok&&formatted.reboot_required){
+        const um=document.getElementById('updateMsg');
+        if(um) um.insertAdjacentHTML('beforeend','<div class="callout warn" style="margin-top:.5rem"><strong>Reboot recommended</strong><p>This update asked for a reboot before the device is considered fully upgraded.</p></div>');
+      }
       if(btn){btn.disabled=false;btn.textContent='Check for updates';btn.onclick=checkOnlineUpdate;}
       if(prog) prog.style.display='none';
     } else if(s.total>0){
@@ -2676,8 +2702,11 @@ async function previewUpdate(path){
   }
   const m=r.manifest||{};
   box.style.display='block';
+  const reboot=m.reboot_required?'<p class="msg info" style="margin:.5rem 0">Reboot recommended after apply.</p>':'';
+  const restart=(m.restart_services&&m.restart_services.length)?`<p style="font-size:.8125rem;color:var(--muted)">Will restart: ${escapeHtml(m.restart_services.join(', '))}</p>`:'';
   box.innerHTML=`<h4>${escapeHtml(m.from_version||'?')} → ${escapeHtml(m.to_version||'?')}</h4>
     <p style="font-size:.8125rem;color:var(--muted)">Publisher: ${escapeHtml(m.publisher||'unknown')} · Channel: ${escapeHtml(m.channel||'bundle')}</p>
+    ${reboot}${restart}
     <pre class="pre" style="margin:0 0 .75rem">${escapeHtml(r.release_notes||'No release notes.')}</pre>
     <div class="btn-group">
       <button class="btn" onclick="applyUpdateBundle(decodeURIComponent('${jsQuote(path)}'))">Apply update</button>
@@ -2697,6 +2726,96 @@ async function applyUpdateConfirmed(path){
   const r=await api('/api/updates/apply',{method:'POST',body:JSON.stringify({path})});
   const formatted=formatUpdateApplyMessage(r);
   showMsg('updMsg',formatted.text,formatted.ok?'ok':'err');
+  if(formatted.ok&&formatted.reboot_required){
+    const um=document.getElementById('updMsg');
+    if(um) um.insertAdjacentHTML('beforeend','<div class="callout warn" style="margin-top:.5rem"><strong>Reboot recommended</strong><p>This update asked for a reboot before the device is considered fully upgraded.</p></div>');
+  }
+}
+let _osUpgradable=[];
+function renderOsUpdateStatus(st){
+  const box=document.getElementById('osUpdateStatus');
+  const applyBtn=document.getElementById('btnOsApply');
+  if(!box) return;
+  if(!st||st.error==='bad_response'){
+    box.innerHTML='<p class="msg err">OS update API unavailable on this build.</p>';
+    if(applyBtn) applyBtn.disabled=true;
+    return;
+  }
+  const repos=(st.local_repos||[]);
+  const up=(st.upgradable||_osUpgradable||[]);
+  _osUpgradable=up;
+  const src=st.source_configured
+    ?`<div class="stat-row"><span>APT source</span><span style="max-width:60%;text-align:right;font-size:.8rem">${escapeHtml(st.source_path||'configured')}</span></div>`
+    :`<div class="stat-row"><span>APT source</span><span class="pill-sm bad">not configured</span></div>`;
+  const key=st.keyring_present
+    ?`<div class="stat-row"><span>Keyring</span><span class="pill-sm ok">present</span></div>`
+    :`<div class="stat-row"><span>Keyring</span><span class="pill-sm">dev/USB trusted file OK</span></div>`;
+  const repoLine=repos.length
+    ?`<div class="stat-row"><span>Local repo</span><span style="max-width:60%;text-align:right;font-size:.8rem">${escapeHtml(repos[0])}</span></div>`
+    :`<div class="stat-row"><span>Local repo</span><span>none detected</span></div>`;
+  const upHtml=up.length
+    ?`<ul style="margin:.5rem 0 0;padding-left:1.1rem;font-size:.85rem">${up.map(p=>`<li><code>${escapeHtml(p.name)}</code> ${escapeHtml(p.from||'?')} → ${escapeHtml(p.to||'?')}</li>`).join('')}</ul>`
+    :`<p style="color:var(--muted);margin-top:.5rem;font-size:.85rem">No atlas-* upgrades listed. Run check after enabling a repo.</p>`;
+  box.innerHTML=`${src}${key}${repoLine}
+    <div class="stat-row"><span>Installed atlas pkgs</span><span>${(st.installed||[]).length}</span></div>
+    ${upHtml}
+    ${repos.length&&!st.source_configured?`<div class="btn-group" style="margin-top:.5rem"><button class="btn secondary" onclick="enableOsRepo(decodeURIComponent('${jsQuote(repos[0])}'))">Enable local repo</button></div>`:''}`;
+  if(applyBtn) applyBtn.disabled=!up.length;
+}
+async function refreshOsUpdateStatus(){
+  const st=await api('/api/updates/os/status');
+  renderOsUpdateStatus(st);
+}
+async function checkOsUpdates(){
+  const btn=document.getElementById('btnOsCheck');
+  if(btn) btn.disabled=true;
+  showMsg('osUpdateMsg','Checking APT for atlas-* upgrades…','info');
+  const r=await api('/api/updates/os/check',{method:'POST',body:JSON.stringify({})});
+  if(btn) btn.disabled=false;
+  if(r.error&&!r.upgradable){
+    showMsg('osUpdateMsg',r.detail||r.error||'Check failed','err');
+    return;
+  }
+  _osUpgradable=r.upgradable||[];
+  const st=await api('/api/updates/os/status');
+  st.upgradable=_osUpgradable;
+  renderOsUpdateStatus(st);
+  const n=_osUpgradable.length;
+  showMsg('osUpdateMsg',n?`Found ${n} atlas package upgrade(s).`:'No atlas-* upgrades available.','ok');
+}
+async function enableOsRepo(path){
+  showMsg('osUpdateMsg','Enabling APT source…','info');
+  const r=await api('/api/updates/os/enable-source',{method:'POST',body:JSON.stringify({path})});
+  if(r.error||r.ok===false){
+    showMsg('osUpdateMsg',r.detail||r.error||'Enable failed','err');
+    return;
+  }
+  showMsg('osUpdateMsg','APT source written. Run check next.','ok');
+  await refreshOsUpdateStatus();
+}
+async function applyOsUpdates(){
+  if(!_osUpgradable.length){
+    showMsg('osUpdateMsg','Nothing to apply — check first.','err');
+    return;
+  }
+  showModal(`<h3 id="modalTitle">Apply atlas package upgrades?</h3>
+    <p>This runs <code>apt</code> for <strong>atlas-*</strong> packages only (not a full Debian upgrade).</p>
+    <ul style="font-size:.85rem">${_osUpgradable.map(p=>`<li><code>${escapeHtml(p.name)}</code></li>`).join('')}</ul>
+    <div class="btn-group" style="margin-top:.75rem">
+      <button class="btn" onclick="closeModal();confirmApplyOsUpdates()">Apply</button>
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+    </div>`);
+}
+async function confirmApplyOsUpdates(){
+  showMsg('osUpdateMsg','Applying atlas package upgrades…','info');
+  const r=await api('/api/updates/os/apply',{method:'POST',body:JSON.stringify({full_system:false})});
+  if(r.error||r.ok===false){
+    showMsg('osUpdateMsg',r.detail||r.error||'Apply failed','err');
+    return;
+  }
+  _osUpgradable=[];
+  showMsg('osUpdateMsg',r.detail==='nothing_to_upgrade'?'Already up to date.':'Atlas packages upgraded.','ok');
+  await refreshOsUpdateStatus();
 }
 async function applyDefaultAgentFromSetup(){
   try{

@@ -39,6 +39,9 @@ ALLOWED = {
     "update.stage",
     "update.apply",
     "update.rollback",
+    "update.os.status",
+    "update.os.check",
+    "update.os.apply",
     "container.install",
     "container.start",
     "container.stop",
@@ -176,6 +179,22 @@ def handle(req: dict[str, Any]) -> dict[str, Any]:
             "commands": commands,
         })
         return {"ok": True, "mode": mode, "dry_run": dry_run, "commands": commands}
+
+    if method.startswith("update.os."):
+        # Phase 1: Command Centre runs apt via systemd-run + atlas-os-apt.py
+        # (daemon ProtectSystem=strict cannot mutate apt state). Acknowledge
+        # capability tokens for future daemon-owned apt path.
+        audit({"event": "privileged", "result": "allow", "method": method, "via": "capability_ack"})
+        return {
+            "ok": True,
+            "accepted": True,
+            "method": method,
+            "delegate": "atlas-os-apt.py",
+            "detail": (
+                "APT apply runs through atlas-os-apt.py via systemd-run from Command Centre; "
+                "see docs/updates/OS_UPDATES.md"
+            ),
+        }
 
     if method.startswith("container."):
         audit({"event": "privileged", "result": "allow", "method": method, "params": params})

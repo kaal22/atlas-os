@@ -2,14 +2,15 @@
 
 > **Working title:** Atlas OS  
 > **Document:** `product.md`  
-> **Version:** 0.2.0  
-> **Status:** Build specification — acquisition map added  
-> **Date:** 11 July 2026  
+> **Version:** 0.3.0  
+> **Status:** Living product specification — alpha implemented in-tree; see §53 Implementation status  
+> **Date:** 25 July 2026  
 > **Primary platform:** x86-64 laptops, desktops and mini PCs  
 > **Base system:** Debian 13 Stable  
 > **Primary distribution format:** Bootable hybrid ISO  
 > **Secondary formats:** OEM disk image, recovery ISO and software installer  
-> **Product category:** Offline-first AI agent operating environment and knowledge appliance
+> **Product category:** Offline-first AI agent operating environment and knowledge appliance  
+> **Engineering trackers:** `docs/BACKLOG.md`, `docs/PLAN.md`, `docs/updates/OS_UPDATES.md`, `docs/signing/SIGNING_PLAN.md`
 
 ---
 
@@ -33,6 +34,8 @@ It combines:
 Atlas OS is derived in part from the open-source Project N.O.M.A.D. platform, but it is not intended to be a cosmetic rebrand. Project N.O.M.A.D. supplies useful offline content-management and application capabilities. Atlas OS adds the operating system, installer, identity and permissions layer, agent runtime, hardware detection, model routing, security boundary, update infrastructure, recovery system, commercial packaging and end-user experience.
 
 The product should feel like a dedicated appliance rather than a Linux distribution assembled from unrelated components. A non-technical customer must be able to install Atlas OS, choose a use profile, select recommended AI and content packs, and begin using the system without opening a terminal.
+
+**Implementation note (25 July 2026):** Phases 1–7 of the build plan are substantially landed in the monorepo (ISO tooling, Command Centre on `:8787`, agents, knowledge/RAG, content packs, maps, education, signed `.atlas-update` bundles, backup). Remaining work is primarily polish, production signing/ceremony, deeper content, CI hardening, and final ISO verification — see **§53 Implementation status**.
 
 ---
 
@@ -466,18 +469,11 @@ This installs the Atlas application and agent stack on a supported Debian-family
    - Optional recovery key export.
 6. Atlas installs the tested OS payload.
 7. Device reboots.
-8. First-run wizard analyses hardware.
-9. Customer selects a profile:
-   - Personal.
-   - Travel.
-   - Family.
-   - Off-grid.
-   - Private AI workstation.
-   - Field team.
-10. Atlas recommends an AI profile and estimated storage.
-11. Customer selects content packs.
-12. Atlas provisions containers, models and indexes.
-13. Dashboard opens with a guided tour.
+8. First-run wizard (Command Centre) runs a **7-step** flow: Welcome → Device → AI model → Content → Sharing → Agents → Recovery. State persists in `first-run.json` via `/api/setup/*`.
+9. Atlas probes hardware and recommends a local Ollama model profile.
+10. Customer selects optional content packs (maps / knowledge / education / models).
+11. Customer chooses network sharing mode and a default agent; recovery backup is offered.
+12. Home dashboard opens with a setup banner until the wizard is complete (full guided tour remains aspirational).
 
 ### 11.2 Daily experience
 
@@ -813,17 +809,16 @@ Purpose:
 - Responsive local web application.
 - Desktop shell and mobile portal.
 
-Suggested stack:
+**Status (implemented):** Python HTTP service (`atlas-command-centre`) on **`http://127.0.0.1:8787/`** (canonical; `atlas-proxy` on `:80` is optional compatibility only). UI is a local HTML/JS app with Home (setup banner + download progress), Chat, Agents, Models, Content (Maps / Knowledge / Education / Models groups), Library, Education, Maps, Knowledge, System (updates/backup), and Setup wizard. Hash routes include `#/home`, `#/ask`, `#/library`, `#/education`, `#/maps`, `#/content`, `#/system`, `#/setup`.
 
-- React.
-- TypeScript.
-- Vite.
-- Tailwind CSS.
+Suggested longer-term stack (not required for alpha):
+
+- React / TypeScript / Vite / Tailwind CSS.
 - Accessible component library.
 - Server-sent events or WebSockets for progress.
 - Local API gateway.
 
-Core routes:
+Core routes (product target; alpha covers the subset above):
 
 ```text
 /
@@ -917,11 +912,15 @@ Purpose:
 - Perform narrowly defined privileged host operations.
 - Replace broad browser-facing Docker socket access.
 
+**Status (implemented — v0):** Listens on Unix socket `/run/atlas/system.sock`. Capability-token gated RPC (`cap:<capability>:<nonce>`). Network mode apply/read via `ufw` with `CAP_NET_ADMIN`; when `ufw` is inactive or missing, **soft-fails**: persists intent to `/etc/atlas/network-mode` and returns a warning so Sharing setup can finish. Hotspot enable/disable stubs exist; broader host ops (storage/update/container) remain on the product roadmap.
+
 Example API capabilities:
 
 ```text
 system.health.read
 system.power.profile.set
+network.mode.apply          # implemented
+network.mode.read           # implemented
 network.hotspot.enable
 network.hotspot.disable
 storage.mount
@@ -963,6 +962,8 @@ Purpose:
 - Remove superseded files safely.
 - Display licences and attribution.
 
+**Status (implemented):** `.atlas-pack` format + `catalogue.json` (Maps / Knowledge / Education / Models groups in Command Centre Content). Online map tile fetch from Protomaps with progress UI (cancel/retry); Kiwix ZIM downloads; Kolibri channel pack prepare/import; model starter packs. Catalogue signing for production packs remains ceremony work.
+
 ### 16.8 Atlas Backup Service
 
 Purpose:
@@ -973,6 +974,8 @@ Purpose:
 - Support full and selective restore.
 - Support migration to replacement hardware.
 
+**Status:** Offline backup/restore paths exist for Phase 7 alpha; full clean-hardware restore proof and recovery ISO remain open (see §53).
+
 ### 16.9 Atlas Updater
 
 Purpose:
@@ -982,6 +985,13 @@ Purpose:
 - Create rollback snapshots.
 - Run pre-flight and post-flight checks.
 - Roll back automatically on failure.
+
+**Status (implemented — app-bundle path + APT phase 1 scaffold):**
+
+- Signed `.atlas-update` bundles (`openssl dgst -sha256` over `checksums.sha256`); `scripts/sign-update-bundle.sh`, `build-release-update.sh --sign`, `publish-release.sh`; dev keys via `generate-dev-keys.sh`; stable refuses unsigned unless `ATLAS_ALLOW_UNSIGNED=1`.
+- Disk-space preflight; atomic `.partial` downloads with resume; `restart_services` / `reboot_required` honored with whitelisted `systemctl try-restart`.
+- Command Centre System → Software updates (`/api/updates/*`).
+- APT OS updates **phase 1**: `os_updater.py`, `atlas-os-apt.py`, local/USB repo templates + keyring docs (`docs/updates/OS_UPDATES.md`). Hosted signed APT mirror and full Debian security upgrades are phase 2.
 
 ---
 
@@ -1380,6 +1390,8 @@ A maintenance job must detect orphaned vectors and files.
 
 ### 19.1 Supported sources
 
+**Status:** User document import, Library ZIM browsing, and bounded ZIM HTML→RAG extraction (with agent keyword search after install) are implemented. Full maxi-ZIM embedding remains bounded / confirm-gated.
+
 Initial formats:
 
 - PDF.
@@ -1455,43 +1467,61 @@ The Knowledge Service must:
 
 ### 20.1 User-facing profiles
 
-The interface presents capability profiles rather than raw model names.
+The interface presents capability profiles rather than raw model names. Runtime is **Ollama** (host-native).
+
+**Status (shipped catalogue — `model_catalog.py` / `model_router.py`):**
+
+| Profile / role | Ollama tag | Notes |
+|----------------|------------|--------|
+| Tiny / Starter (CPU) | `qwen2.5:1.5b` | Low-RAM VMs |
+| Light / Balanced (default) | `qwen3:4b` | Default Atlas Guide chat model |
+| Embedding | `nomic-embed-text` | Knowledge / RAG |
+| Advanced (GPU) | `qwen3:14b` | Needs capable NVIDIA GPU |
+| Vision / multimodal (optional) | `gemma4:e4b` | “Multimodal / higher RAM (~16 GB)”; GPU or high-RAM systems |
+| Router profiles | `tiny`, `light`, `balanced`, `vision`, `advanced` (+ `code`) | Hardware-aware recommend |
 
 #### Tiny
 
-- 8 GB RAM target.
+- 8 GB RAM target (catalogue allows ~4 GB for starter).
 - CPU-compatible.
 - Basic chat and classification.
 - Minimal context and concurrency.
+- **Implemented tag:** `qwen2.5:1.5b`.
 
 #### Light
 
-- 16 GB RAM target.
+- 8–16 GB RAM target.
 - Fast general assistance.
 - Suitable for low-power laptops.
+- **Implemented tag:** `qwen3:4b` (default).
 
 #### Balanced
 
-- 32 GB RAM target.
+- 16 GB+ RAM target.
 - Better reasoning and document work.
 - Recommended mainstream profile.
+- **Implemented tag:** currently routes to `qwen3:4b` (same default until a larger balanced model is locked).
 
 #### Advanced
 
-- 32–64 GB RAM plus capable GPU.
+- 16–64 GB RAM plus capable GPU.
 - Higher-quality reasoning and long context.
+- **Implemented tags:** `qwen3:14b` (GPU advanced); optional `gemma4:e4b` for multimodal / higher RAM.
 
 #### Code
 
 - Specialised for programming and technical work.
+- **Alpha:** router profile maps toward advanced GPU models; dedicated code SKU not yet separate.
 
 #### Vision
 
 - Accepts images where supported.
+- **Implemented tag:** `gemma4:e4b` (optional).
 
 #### Embedding
 
 - Dedicated local embedding model.
+- **Implemented tag:** `nomic-embed-text`.
 
 ### 20.2 Hardware detection
 
@@ -1972,16 +2002,20 @@ pack.atlas-pack
 
 ### 26.5 Initial content packs
 
-- Core English knowledge.
-- United Kingdom maps.
-- Europe maps.
-- First-aid reference collection.
-- Vehicle maintenance references.
-- Travel planning resources.
-- Family learning starter pack.
-- Public-domain books.
-- Technical repair references.
-- Language phrase packs.
+**Status (catalogue shipped):** Groups **Maps**, **Knowledge**, **Education**, **Models** in Command Centre. Packs live as `.atlas-pack` under `/usr/share/atlas/packs/` with `catalogue.json`.
+
+Shipped / lockable packs (alpha):
+
+- **Maps (18 countries):** AU, BR, CA, DE, ES, FR, IE, IN, IT, JP, KE, MX, NG, NL, NZ, UK, US, ZA (+ UK stub for offline smoke). Per-country PMTiles; online Protomaps fetch with progress; MapLibre viewer at `/maps` (labels, roads, offline place search). Built via `scripts/build-content-packs.sh`.
+- **Knowledge (Kiwix ZIM):** Wikipedia EN mini / nopic / maxi, medical, iFixit how-to, Project Gutenberg; Library page. Bounded ZIM→RAG extraction feeds agent keyword search (index reload after install — `e7a3f0c`). Full maxi ZIM→RAG remains bounded/`confirm_large`.
+- **Education:** Kolibri channel packs (Khan Academy EN, CK-12 EN, home learning) + kids home pack; Education page. Channel media not embedded in ISO — one-click prepare + USB/operator import.
+- **Models:** Starter models pack metadata (`qwen3:4b` + `nomic-embed-text`); pulls via Ollama from Command Centre.
+
+Product-aspirational packs still to curate as signed SKUs:
+
+- Europe / high-zoom regional map SKUs (beyond per-country defaults).
+- First-aid / vehicle / travel phrase language packs as dedicated product SKUs.
+- Full Kolibri channels with embedded media for OEM images.
 
 Every pack requires a redistribution audit.
 
@@ -1991,103 +2025,72 @@ Every pack requires a redistribution audit.
 
 ### 27.1 Wizard steps
 
+**Status (implemented):** Seven steps in Command Centre Setup (`SETUP_STEPS` in `command_centre.py`). State file: `…/databases/first-run.json`. APIs: `/api/setup/state`, `/api/setup/save`, `/api/setup/advance` (and related). Labels: Welcome, Device, AI model, Content, Sharing, Agents, Recovery.
+
+Earlier product drafts listed product-profile, privacy, provisioning timeline and guided-tour steps. Those concerns are folded into Device/AI/Sharing defaults or deferred; the **shipped alpha wizard is the seven steps below**.
+
 #### Step 1: Welcome
 
 Explains:
 
 - Local-first operation.
 - What remains offline.
-- Optional online functions.
+- Optional online downloads for models/packs.
 - Estimated setup stages.
 
-#### Step 2: Device analysis
+#### Step 2: Device
 
 Displays:
 
-- Hardware summary.
-- Compatibility warnings.
-- Battery health.
-- Storage.
-- GPU status.
-- Suggested performance tier.
+- Hardware summary (RAM, GPU/VRAM).
+- Suggested model profile from the recommendation engine.
+- Compatibility / GPU setup hints where relevant.
 
-#### Step 3: Product profile
+#### Step 3: AI model
 
-Select:
+Atlas recommends and can pull:
 
-- Personal.
-- Explorer.
-- Family.
-- Field.
-- Private AI workstation.
+- Tiny (`qwen2.5:1.5b`).
+- Default / light-balanced (`qwen3:4b`).
+- Embeddings (`nomic-embed-text`).
+- Advanced / vision options (`qwen3:14b`, `gemma4:e4b`) when hardware fits.
 
-#### Step 4: Privacy
+Displays estimated storage and whether a model is already ready.
 
-Choose:
+#### Step 4: Content
 
-- Local only.
-- Allow optional internet downloads.
-- Allow optional external model provider.
-- Anonymous diagnostics disabled by default.
+Choose region and content packs (maps, knowledge ZIMs, education, models) from the catalogue; downloads show progress on Home.
 
-#### Step 5: AI profile
-
-Atlas recommends:
-
-- Tiny.
-- Light.
-- Balanced.
-- Advanced.
-- Code.
-- Vision.
-
-Displays estimated:
-
-- Storage.
-- RAM/VRAM.
-- Speed band.
-- Power consumption.
-- Licence.
-
-#### Step 6: Content
-
-Choose region and content packs.
-
-#### Step 7: Sharing
+#### Step 5: Sharing
 
 Choose:
 
-- This computer only.
+- This computer only (`private_device`).
 - Trusted home network.
-- Private hotspot.
+- Private hotspot (where supported).
 - Configure later.
 
-#### Step 8: Agents
+Network mode is applied via the System Daemon; inactive `ufw` soft-fails with persisted intent.
 
-Enable initial agents.
+#### Step 6: Agents
 
-#### Step 9: Recovery
+Enable / select initial default agent (e.g. Atlas Guide).
 
-- Save recovery key.
-- Configure backup destination.
-- Create initial recovery snapshot.
+#### Step 7: Recovery
 
-#### Step 10: Provisioning
-
-Show a clear progress timeline.
-
-#### Step 11: Guided tour
-
-Open the dashboard and complete a sample local query.
+- Configure backup / recovery snapshot where available.
+- Finish setup (marks `first-run.json` completed).
 
 ### 27.2 Resume behaviour
 
 If setup is interrupted:
 
-- Persist completed steps.
-- Resume safely.
-- Clean partial model/content installations.
+- Persist completed steps in `first-run.json`.
+- Resume safely from the saved step.
+- Clean partial model/content installations where jobs support cancel.
 - Never leave default credentials active.
+
+**Deferred (not in the 7-step alpha wizard):** separate Product profile / Privacy steps, full provisioning timeline UI, and post-setup guided tour.
 
 ---
 
@@ -2105,6 +2108,8 @@ Separate channels:
 - Content packs.
 - Firmware recommendations.
 
+**Status:** Application/content hotfixes ship as signed **`.atlas-update`** bundles. Atlas `.deb` / APT track is **phase 1 scaffold** (local/USB `atlas-*` repo + CC `/api/updates/os/*`). Full Debian security upgrades and hosted signed APT mirror are phase 2 (`docs/updates/OS_UPDATES.md`).
+
 ### 28.2 Channels
 
 ```text
@@ -2113,7 +2118,7 @@ candidate
 developer
 ```
 
-Consumer systems default to `stable`.
+Consumer systems default to `stable`. Stable/release refuse `DEV-UNSIGNED-PLACEHOLDER` unless `ATLAS_ALLOW_UNSIGNED=1`.
 
 ### 28.3 Update sequence
 
@@ -2126,7 +2131,7 @@ Check metadata
 → Download to staging
 → Verify hashes
 → Apply
-→ Reboot if needed
+→ Restart whitelisted services / reboot if required
 → Run health checks
 → Commit snapshot
 ```
@@ -2141,23 +2146,26 @@ Health check fails
 → Inform user
 ```
 
+**Status:** Disk preflight + atomic resume downloads implemented; `restart_services` / `reboot_required` honored. Automated rollback proof on real hardware and V1 criterion #11 still open.
+
 ### 28.4 Offline updates
 
 Users can import:
 
 ```text
-atlas-update-1.0.0-to-1.1.0.bundle
+atlas-update-0.1.0-to-0.1.1.atlas-update
 ```
 
 Bundle contents:
 
-- Signed manifest.
-- Required packages.
-- Required container layers.
+- Signed manifest / `checksums.sha256` + OpenSSL signature.
+- Required packages / files under Atlas allowlists.
 - Migrations.
 - Rollback metadata.
 - Licence changes.
 - Release notes.
+
+Tooling: `scripts/build-update-bundle.sh`, `build-release-update.sh --sign`, `sign-update-bundle.sh`, `publish-release.sh`, `generate-dev-keys.sh`. Operator policy: `docs/signing/SIGNING_PLAN.md`.
 
 ### 28.5 Upstream update policy
 
@@ -2907,7 +2915,11 @@ Release signing keys must be held outside ordinary build containers and protecte
 
 ## 42. Development Phases
 
+Status legend for this section (25 July 2026): **Done** = landed in monorepo / alpha path; **Partial** = core path works, production hardening open; **Open** = not done. Canonical checkboxes: `docs/BACKLOG.md`, `docs/PLAN.md`. Full snapshot: **§53**.
+
 ### Phase 0 — Legal and architectural foundation
+
+**Status: Partial** — repo structure, threat-model notes, signing plan, licence inventory exist; formal product-name clearance / complete commercial legal sign-off remain release gates.
 
 Deliverables:
 
@@ -2926,6 +2938,8 @@ Exit criteria:
 
 ### Phase 1 — Bootable branded OS
 
+**Status: Done (in-tree)** — Debian live-build, KDE Plasma + SDDM, Calamares Atlas branding, hybrid ISO scripts (`phase1-iso.sh` … `phase7-iso.sh`). Wallpaper wiring + SDDM `theme.conf.user` shipped; **visual confirm on real live/ISO boot still open**. Custom Plymouth splash not yet.
+
 Deliverables:
 
 - Debian live-build configuration.
@@ -2943,6 +2957,8 @@ Exit criteria:
 
 ### Phase 2 — Offline core payload
 
+**Status: Done (in-tree)** — pinned OCI payload, Command Centre launcher on `:8787`, local bindings, NOMAD adapter path.
+
 Deliverables:
 
 - Docker installation.
@@ -2958,6 +2974,8 @@ Exit criteria:
 - Kiwix, maps and base management run after offline install.
 
 ### Phase 3 — Identity and security layer
+
+**Status: Done / Partial** — local auth, firewall network modes, System Daemon v0, audit hooks. Reverse-proxy path optional (`atlas-proxy`). Production Secure Boot keys open.
 
 Deliverables:
 
@@ -2975,6 +2993,8 @@ Exit criteria:
 - No ordinary browser-facing root operation.
 
 ### Phase 4 — Agent runtime
+
+**Status: Done (in-tree)** — agent manifests, task flow, model router, policy gateway, Atlas Guide / Research and related launch agents.
 
 Deliverables:
 
@@ -2994,6 +3014,8 @@ Exit criteria:
 
 ### Phase 5 — Knowledge and documents
 
+**Status: Done / Partial** — import, hybrid/keyword search, Library, bounded ZIM→RAG extract, Document/Research agents. Full maxi ZIM→RAG and broader evaluation remain open.
+
 Deliverables:
 
 - Import pipeline.
@@ -3009,6 +3031,8 @@ Exit criteria:
 - Cross-user leakage tests pass.
 
 ### Phase 6 — Content and models
+
+**Status: Done (in-tree)** — `.atlas-pack`, catalogue, USB/online install paths, hardware recommendations, Ollama model catalogue (incl. optional `gemma4:e4b`), 18-country maps, education packs. Production pack signing ceremony still open.
 
 Deliverables:
 
@@ -3026,6 +3050,8 @@ Exit criteria:
 
 ### Phase 7 — Updates, backup and recovery
 
+**Status: Partial** — offline signed `.atlas-update` + CC UX + disk/resume reliability + service restart flags **done**; APT phase-1 scaffold **done**; hosted signed APT, recovery ISO, HSM/air-gapped release keys, hardware rollback proof **open**.
+
 Deliverables:
 
 - Signed APT repository.
@@ -3041,6 +3067,8 @@ Exit criteria:
 - Full restore works on clean hardware.
 
 ### Phase 8 — OEM and commercial release
+
+**Status: Open** — OEM image tooling stubs exist; commercial release pipeline, HSM keys, certification and customer unbox proof remain.
 
 Deliverables:
 
@@ -3198,6 +3226,8 @@ The first internal alpha must include:
 - Encrypted backup.
 - Snapshot rollback.
 - Diagnostic bundle.
+
+**Status (25 July 2026):** The internal alpha checklist above is largely met in-tree (including multi-country maps, expanded knowledge/education packs, and signed offline update bundles). The alpha is not commercially releasable until Docker-socket exposure, production update signing and recovery paths are verified — see §53.2 / Phase 7–8 leftovers.
 
 The alpha is not commercially releasable until Docker-socket exposure, update signing and recovery paths are verified.
 
@@ -3729,6 +3759,8 @@ A model is not considered bundled merely because its Ollama tag appears in a scr
 
 The release process must pull the model into an empty model store, package that store, hash it and save its licence.
 
+**Status:** Command Centre pulls from the curated Ollama catalogue; default chat is `qwen3:4b`. Optional catalogue entries include tiny `qwen2.5:1.5b`, embeddings `nomic-embed-text`, advanced `qwen3:14b`, and multimodal `gemma4:e4b`.
+
 Initial starter candidates:
 
 ```yaml
@@ -3739,11 +3771,24 @@ models:
     licence: Apache-2.0
     role: General local chat and agent tool use
 
+  chat_tiny:
+    ollama_tag: qwen2.5:1.5b
+    role: Low-RAM starter
+
   embeddings:
-    ollama_tag: nomic-embed-text:v1.5
+    ollama_tag: nomic-embed-text
     upstream_model: nomic-ai/nomic-embed-text-v1.5
     licence: Apache-2.0
-    role: NOMAD-compatible English document embeddings
+    role: Document / ZIM RAG embeddings
+
+  advanced_gpu:
+    ollama_tag: qwen3:14b
+    role: Optional higher-quality GPU chat
+
+  multimodal_optional:
+    ollama_tag: gemma4:e4b
+    title: Multimodal / higher RAM (~16 GB)
+    role: Optional vision-capable model for GPU or high-RAM systems
 ```
 
 An alternative multilingual embedding candidate is:
@@ -3765,7 +3810,7 @@ ollama serve &
 OLLAMA_PID=$!
 
 ollama pull qwen3:4b
-ollama pull nomic-embed-text:v1.5
+ollama pull nomic-embed-text
 
 kill "$OLLAMA_PID"
 wait "$OLLAMA_PID" || true
@@ -3778,7 +3823,7 @@ sha256sum atlas-models-starter.tar.zst
 
 The resulting tarball SHA-256, model tags, model metadata, model blob hashes, licences and Ollama version must be added to the release lock.
 
-The customer installation must import the packaged model directory without downloading anything.
+The customer installation must import the packaged model directory without downloading anything (OEM / offline editions). Alpha appliances may also pull curated tags when the user opts in during setup.
 
 ### 52.8 Wikipedia and Kiwix content
 
@@ -3787,6 +3832,8 @@ Kiwix content is distributed as ZIM files. The authoritative public download roo
 ```text
 https://download.kiwix.org/zim/wikipedia/
 ```
+
+**Status (implemented):** Knowledge packs for Wikipedia EN mini / nopic / maxi, medical, iFixit, Gutenberg; Library page in Command Centre; bounded ZIM→RAG extraction into the knowledge index (search enables after install). ISO still does not embed large ZIMs by default.
 
 As of 11 July 2026, the relevant English packages are approximately:
 
@@ -3835,6 +3882,8 @@ atlas-wikipedia-en-maxi-2026.02.atlas-pack
 
 NOMAD's map viewer uses PMTiles and MapLibre-compatible assets.
 
+**Status (implemented):** `atlas-maps-viewer` serves MapLibre + PMTiles at `/maps` with labels, roads and offline place search. Command Centre Content installs per-country packs; online tile fetch from Protomaps with progress UI (cancel/retry). Default maxzoom 12 (small countries z13; large stay z11). Separate high-zoom commercial SKUs remain backlog.
+
 Approved upstream discovery sources:
 
 ```yaml
@@ -3853,14 +3902,30 @@ protomaps:
 
 Atlas must not ship a world map by default. Planet-scale PMTiles files can exceed 100 GB.
 
-Initial map packs:
+Initial map packs (**shipped catalogue — 18 countries**):
 
 ```text
+atlas-maps-au.atlas-pack
+atlas-maps-br.atlas-pack
+atlas-maps-ca.atlas-pack
+atlas-maps-de.atlas-pack
+atlas-maps-es.atlas-pack
+atlas-maps-fr.atlas-pack
+atlas-maps-ie.atlas-pack
+atlas-maps-in.atlas-pack
+atlas-maps-it.atlas-pack
+atlas-maps-jp.atlas-pack
+atlas-maps-ke.atlas-pack
+atlas-maps-mx.atlas-pack
+atlas-maps-ng.atlas-pack
+atlas-maps-nl.atlas-pack
+atlas-maps-nz.atlas-pack
 atlas-maps-uk.atlas-pack
-atlas-maps-ireland.atlas-pack
-atlas-maps-western-europe.atlas-pack
-atlas-maps-europe.atlas-pack
+atlas-maps-us.atlas-pack
+atlas-maps-za.atlas-pack
 ```
+
+Builder: `scripts/build-content-packs.sh` / `fetch-country-pmtiles.sh`. UK stub pack supports offline smoke tests.
 
 Each pack must record:
 
@@ -3879,6 +3944,8 @@ Each pack must record:
 The Kolibri application image and Kolibri learning channels are separate assets.
 
 The ISO may contain the application without containing Khan Academy or other large education channels.
+
+**Status (implemented — channel packs, media not in ISO):** Locked Studio IDs as `atlas.education.kolibri-*` packs (Khan EN, CK-12 EN, home learning) plus kids home pack; Education page one-click prepare / open Kolibri / USB import. Licence inventory + channel locks under `docs/legal/`. Full channels with embedded media for OEM remain backlog (P3).
 
 The content acquisition process must:
 
@@ -4103,3 +4170,75 @@ Install Atlas-built NOMAD management services from the bundled OCI payload.
 Install host-native Ollama, import the starter model pack, start Qdrant, start Kiwix and register the starter ZIM.
 
 This ordering ensures that the build agent knows exactly where every product component comes from before it begins composing the operating system.
+
+---
+
+## 53. Implementation status
+
+> Snapshot as of **25 July 2026**. Spec sections above remain the product definition; this section records engineering reality in the monorepo. Prefer `docs/BACKLOG.md` and `docs/PLAN.md` for checkbox tracking.
+
+### 53.1 Implemented (in-tree / alpha)
+
+| Area | What landed |
+|------|-------------|
+| **First-run wizard** | 7 steps — Welcome, Device, AI model, Content, Sharing, Agents, Recovery; state in `first-run.json`; `/api/setup/*` |
+| **Command Centre** | Port **8787** canonical; Home with setup banner + download progress; Library, Education, Maps, Content, Models, System |
+| **Content packs** | `.atlas-pack` + `catalogue.json`; Maps / Knowledge / Education / Models groups |
+| **Offline maps** | 18 country PMTiles packs; Protomaps online fetch with progress (cancel/retry); MapLibre `/maps` viewer (labels, roads, offline place search) |
+| **Knowledge** | Kiwix ZIM packs (Wikipedia mini/nopic/maxi, medical, iFixit, Gutenberg); Library page; bounded ZIM→RAG extract + index reload after install |
+| **Education** | Kolibri packs (Khan, CK-12, home learning) + kids home; Education page (media not embedded in ISO) |
+| **AI models** | Ollama; default `qwen3:4b`; tiny `qwen2.5:1.5b`; embeddings `nomic-embed-text`; advanced `qwen3:14b`; optional `gemma4:e4b` multimodal / higher RAM; router profiles light/balanced/vision/advanced |
+| **Updates** | Signed `.atlas-update` (OpenSSL sha256); sign/build/publish scripts; disk preflight; atomic resume downloads; `restart_services` / `reboot_required`; APT OS phase-1 scaffold |
+| **System daemon** | Unix-socket RPC + capability tokens; network mode via ufw; soft-fail when ufw inactive (persist `/etc/atlas/network-mode`) |
+| **Branding** | Default wallpaper wiring (SDDM + Plasma), `set-wallpaper.sh`, live-build hook |
+| **Release tooling** | `build-content-packs.sh`, `build-release-update.sh --sign`, `publish-release.sh`, `generate-dev-keys.sh`, `dev-sync.manifest` / dev-pull |
+| **ISO** | `phase7-iso.sh` build path; maps-viewer / content-manager file-conflict fix |
+
+Milestone 1 (canonical `:8787`, wallpaper path hardening, stable unsigned refusal, CC update UX, signing unit tests) is **done in-tree** — see `docs/PLAN.md`.
+
+### 53.2 What's left
+
+Reconciled from `docs/BACKLOG.md` + `docs/PLAN.md` (verify before treating as done):
+
+#### P1 — Desktop polish & branding
+
+- Theme polish (Plasma look-and-feel, Command Centre UI, `atlas-launcher` shell) so the desktop reads as Atlas, not stock Breeze.
+- Custom splash screens (Plymouth boot splash; deeper SDDM branding beyond wallpaper).
+- Wallpaper **verification on real live/ISO boot** (in-tree wiring exists; checklist in BACKLOG).
+
+#### P3 — Deeper content
+
+- Full Kolibri channels with **embedded media** (OEM / large images).
+- Full maxi ZIM→RAG beyond the bounded extract / `confirm_large` path.
+- Separate **high-zoom map SKUs** (beyond default maxzoom policy).
+
+#### P4 — CI
+
+- CI hardening: automated verify-cache / unit / security / ISO smoke as far as the builder allows.
+
+#### P5 — Release / production
+
+- Final ISO build verification (`scripts/phase7-iso.sh` / release cut) — UEFI+BIOS boot, Calamares offline install, branding, CC, packs, update dry-run, checksums/SBOM/signatures.
+- HSM / air-gapped **production** release keys (`atlas-update-metadata`, APT keyring ceremony) — never invent secrets in-tree.
+- Hosted **signed APT** mirror + APT phase 2 (full Debian security upgrades, owner-gated).
+- Production **Secure Boot** keys.
+- Full branded **Plymouth** theme.
+- Recovery ISO / clean-hardware restore proof; V1 criterion #11 (update rollback automated tests).
+
+### 53.3 Explicitly not claimed as done
+
+Do not treat the following as shipped merely because they appear in earlier aspirational sections:
+
+- React/Vite Command Centre rewrite (§16.1 suggested stack).
+- Full 11-step first-run wizard with guided tour (§27 deferred items).
+- Hosted production APT + recovery ISO + OEM commercial unbox path (Phases 7–8 exit criteria).
+- Enterprise fleet management, ARM64 ISO, unrestricted agent shell, public third-party agent marketplace (§6 Non-Goals).
+
+### 53.4 Related docs
+
+- `docs/BACKLOG.md` — actionable checkboxes  
+- `docs/PLAN.md` — milestone summary (`:8787` decision)  
+- `docs/updates/OS_UPDATES.md` — APT vs `.atlas-update`  
+- `docs/signing/SIGNING_PLAN.md` — key classes and operator flow  
+- `docs/user/V1_CRITERIA.md` — commercial V1 gates (where present)  
+

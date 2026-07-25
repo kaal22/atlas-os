@@ -63,7 +63,8 @@ build_simple_deb() {
     atlas-knowledge) depends="python3, poppler-utils" ;;
     atlas-agent-runtime) depends="python3, atlas-policy-gateway, atlas-model-manager, atlas-knowledge" ;;
     atlas-command-centre) depends="python3, atlas-auth, atlas-agent-runtime, atlas-policy-gateway, atlas-model-manager, atlas-knowledge, atlas-content-manager, atlas-maps-viewer, atlas-backup, atlas-updater" ;;
-    atlas-content-manager) depends="python3" ;;
+    # sync-nomad-maps.sh lives only in atlas-maps-viewer (do not ship a copy here)
+    atlas-content-manager) depends="python3, atlas-maps-viewer" ;;
     atlas-maps-viewer) depends="" ;;
     atlas-backup) depends="python3, openssl" ;;
     atlas-updater) depends="python3" ;;

@@ -24,13 +24,14 @@ PROFILES = {
     "balanced": {"min_ram_gb": 16, "min_vram_gb": 0, "model": "qwen3:4b"},
     "advanced": {"min_ram_gb": 24, "min_vram_gb": 6, "model": "qwen3:4b"},
     "code": {"min_ram_gb": 16, "min_vram_gb": 8, "model": "qwen3:4b"},
-    "vision": {"min_ram_gb": 24, "min_vram_gb": 8, "model": "qwen3:4b"},
+    "vision": {"min_ram_gb": 24, "min_vram_gb": 8, "model": "gemma4:e4b"},
 }
 
 # Prefer these when the profile tag is not installed (e.g. user downloaded Starter).
 CHAT_FALLBACK_ORDER = (
     "qwen3:4b",
     "qwen2.5:1.5b",
+    "gemma4:e4b",
     "qwen2.5:3b",
     "llama3.2:3b",
     "llama3.2:1b",

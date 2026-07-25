@@ -30,6 +30,13 @@ entries:
     redistribution: allowed
     decision: approved_for_starter_pack
 
+  - id: gemma4-e4b
+    component: Gemma 4 E4B via Ollama tag gemma4:e4b
+    licence: Apache-2.0
+    redistribution: allowed
+    decision: approved_for_optional_download_not_starter
+    note: Multimodal / higher-RAM (~16 GB) optional catalogue entry; not bundled in starter pack
+
   - id: nomic-embed-text-v1.5
     component: nomic-embed-text:v1.5
     licence: Apache-2.0

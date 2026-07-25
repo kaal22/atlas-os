@@ -66,6 +66,12 @@ models:
     upstream_model: Qwen/Qwen3-4B
     licence: Apache-2.0
     role: General local chat and agent tool use
+  multimodal_optional:
+    ollama_tag: "gemma4:e4b"
+    upstream_model: google/gemma-4-E4B
+    licence: Apache-2.0
+    role: Optional multimodal chat for GPU / higher-RAM (~16 GB) systems
+    note: Not starter default; Command Centre catalogue entry multimodal-higher-ram
   embeddings:
     ollama_tag: "nomic-embed-text:v1.5"
     upstream_model: nomic-ai/nomic-embed-text-v1.5

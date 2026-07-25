@@ -54,6 +54,32 @@ def test_installed_marks_ready_tag():
     assert next(c for c in cat if c["tag"] == "qwen3:4b")["installed"] is True
 
 
+def test_gemma_optional_higher_ram_not_default():
+    """gemma4:e4b is optional multimodal; starter recommendation stays qwen3:4b."""
+    from model_router import PROFILES
+
+    assert "gemma4:e4b" in ALLOWED_TAGS
+    assert PROFILES["light"]["model"] == "qwen3:4b"
+    assert PROFILES["balanced"]["model"] == "qwen3:4b"
+    assert PROFILES["vision"]["model"] == "gemma4:e4b"
+
+    hw_low = Hardware(ram_gb=8.0, vram_gb=0.0, gpu="none")
+    cat_low = catalogue_for_hardware(hw_low, installed=[])
+    gemma = next(c for c in cat_low if c["id"] == "multimodal-higher-ram")
+    assert gemma["tag"] == "gemma4:e4b"
+    assert gemma["compatible"] is False
+    assert gemma["beginner"] is False
+    rec = pick_recommended(cat_low, "light")
+    assert rec["tag"] == "qwen3:4b"
+
+    hw_hi = Hardware(ram_gb=16.0, vram_gb=0.0, gpu="none")
+    cat_hi = catalogue_for_hardware(hw_hi, installed=[])
+    gemma_hi = next(c for c in cat_hi if c["id"] == "multimodal-higher-ram")
+    assert gemma_hi["compatible"] is True
+    rec_hi = pick_recommended(cat_hi, "balanced")
+    assert rec_hi["tag"] == "qwen3:4b"
+
+
 def test_ready_even_if_over_ram_recommendation():
     """A finished pull must unlock Chat even when RAM is below the catalogue min."""
     from model_catalog import model_setup_status
@@ -139,6 +165,7 @@ if __name__ == "__main__":
     test_low_ram_gets_starter()
     test_pull_rejects_unknown_tag()
     test_installed_marks_ready_tag()
+    test_gemma_optional_higher_ram_not_default()
     test_ready_even_if_over_ram_recommendation()
     test_resolve_uses_installed_starter()
     test_extract_text_and_empty_openai_falls_back()

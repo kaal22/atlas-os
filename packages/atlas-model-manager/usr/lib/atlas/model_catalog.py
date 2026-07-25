@@ -72,6 +72,18 @@ CATALOGUE: list[dict[str, Any]] = [
         "beginner": False,
         "profiles": ["advanced", "code"],
     },
+    {
+        "id": "multimodal-higher-ram",
+        "tag": "gemma4:e4b",
+        "title": "Multimodal / higher RAM (~16 GB)",
+        "blurb": "Gemma 4 E4B. Optional vision-capable model for GPU or high-RAM systems (~9.6 GB download).",
+        "size_gb": 9.6,
+        "min_ram_gb": 16,
+        "min_vram_gb": 0,
+        "cpu_ok": True,
+        "beginner": False,
+        "profiles": ["vision", "advanced"],
+    },
 ]
 
 ALLOWED_TAGS = {c["tag"] for c in CATALOGUE}

@@ -1,14 +1,15 @@
 # arcalium.script — full-bleed splash with basic message/password support
-# Master art: assets/plymouthsplash.png (installed as background.jpg @ 1920×1080)
+# Master art: assets/plymouthsplash.png → background.png @ 1920×1080
+# Pattern matches Debian joy.script (script module + PNG only; no JPEG).
 
 Window.SetBackgroundTopColor(0.02, 0.02, 0.04);
 Window.SetBackgroundBottomColor(0.02, 0.02, 0.04);
 
+bg_image = Image("background.png");
+
 window_max_width = Window.GetX() * 2 + Window.GetWidth();
 window_max_height = Window.GetY() * 2 + Window.GetHeight();
 screen_ratio = window_max_width / window_max_height;
-
-bg_image = Image("background.jpg");
 bg_image_ratio = bg_image.GetWidth() / bg_image.GetHeight();
 if (screen_ratio > bg_image_ratio)
     bg_scale_factor = window_max_width / bg_image.GetWidth();

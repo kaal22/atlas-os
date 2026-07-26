@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Regenerate Arcalium Plymouth theme assets from assets/plymouthsplash.png
 # (master ~5504×3072). Optional override: scripts/install-plymouth-assets.sh /path/to.png
+#
+# Plymouth's script module only links libpng (no libjpeg), so the splash MUST
+# be a real PNG — JPEG backgrounds paint as a black screen.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,11 +17,12 @@ fi
 
 mkdir -p "$THEME"
 
-# Ship a 1080p cover-ready JPEG splash (~250KB) so initramfs stays lean;
-# arcalium.script cover-scales at runtime.
+# Ship a 1080p cover-cropped PNG; arcalium.script cover-scales at runtime.
+# Compression keeps initramfs lean without relying on JPEG (unsupported).
 magick "$SRC" -strip -resize 1920x1080^ -gravity center -extent 1920x1080 \
-  -quality 88 "$THEME/background.jpg"
-rm -f "$THEME/background.png"
+  -define png:compression-level=9 -define png:compression-filter=5 \
+  "$THEME/background.png"
+rm -f "$THEME/background.jpg"
 
 # Minimal password UI (dark translucent field + light dots) for LUKS/crypt prompts.
 magick -size 320x48 xc:'rgba(20,20,28,180)' \
@@ -33,4 +37,5 @@ magick -size 8x8 xc:none -fill 'rgba(240,240,245,220)' -draw 'circle 4,4 4,1' \
   "$THEME/password_dot16.png"
 
 echo "Plymouth assets installed from $SRC → $THEME"
-identify "$THEME/background.jpg"
+identify "$THEME/background.png"
+file "$THEME/background.png"

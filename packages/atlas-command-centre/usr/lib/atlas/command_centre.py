@@ -89,6 +89,7 @@ from content_manager import (  # noqa: E402
     write_index_knowledge_progress,
     write_maps_fetch_progress,
     write_zim_fetch_progress,
+    zim_rag_planned_extract_count,
     _pack_slug,
 )
 from backup_service import (  # noqa: E402
@@ -2102,6 +2103,7 @@ class Handler(BaseHTTPRequestHandler):
                         or "Indexing already in progress — this may take a minute",
                     },
                 )
+            planned_n = zim_rag_planned_extract_count(manifest) or 40
             write_index_knowledge_progress(
                 DATA,
                 {
@@ -2110,12 +2112,16 @@ class Handler(BaseHTTPRequestHandler):
                     "phase": "starting",
                     "done": False,
                     "indeterminate": True,
-                    "message": "Indexing… this may take a minute (ZIM extract + knowledge ingest)",
+                    "planned_articles": planned_n,
+                    "message": (
+                        f"Indexing… extracting up to {planned_n} seeded articles "
+                        "(not full Wikipedia)"
+                    ),
                 },
                 pack_id,
             )
 
-            def _do_index(m=manifest, tgt=target, pid=pack_id, user=sess.get("username"), client_ip=ip):
+            def _do_index(m=manifest, tgt=target, pid=pack_id, user=sess.get("username"), client_ip=ip, planned=planned_n):
                 write_index_knowledge_progress(
                     DATA,
                     {
@@ -2124,7 +2130,11 @@ class Handler(BaseHTTPRequestHandler):
                         "phase": "extracting",
                         "done": False,
                         "indeterminate": True,
-                        "message": "Extracting ZIM articles and indexing for agents…",
+                        "planned_articles": planned,
+                        "message": (
+                            f"Extracting {planned} seeded articles for agent index "
+                            "(bounded sample; full browse remains Kiwix Library)…"
+                        ),
                     },
                     pid,
                 )
@@ -2223,7 +2233,10 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "status": "indexing",
                     "id": pack_id,
-                    "message": "Indexing… this may take a minute",
+                    "planned_articles": planned_n,
+                    "message": (
+                        f"Extracting {planned_n} seeded articles for agent index…"
+                    ),
                 },
             )
 

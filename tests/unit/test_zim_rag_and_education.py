@@ -65,6 +65,7 @@ def test_extract_zim_html_articles_uses_zimdump_mock():
         zim = Path(td) / "sample.zim"
         zim.write_bytes(b"FAKE-ZIM")
         out = Path(td) / "extracted"
+        list_calls = []
 
         def fake_run(cmd, **kwargs):
             class R:
@@ -73,8 +74,9 @@ def test_extract_zim_html_articles_uses_zimdump_mock():
                 stderr = b""
 
             if cmd[1] == "list":
+                list_calls.append(cmd)
                 r = R()
-                r.stdout = "path: A/Gravity\npath: A/Water_cycle\n"
+                r.stdout = "path: A/Should_Not_Be_Used\n"
                 return r
             if cmd[1] == "show":
                 r = R()
@@ -86,11 +88,46 @@ def test_extract_zim_html_articles_uses_zimdump_mock():
         with mock.patch("content_manager.shutil.which", return_value="/usr/bin/zimdump"), mock.patch(
             "content_manager.subprocess.run", side_effect=fake_run
         ):
-            info = extract_zim_html_articles(zim, out, max_articles=2)
+            info = extract_zim_html_articles(
+                zim, out, max_articles=2, allowlist=["Gravity", "Water"]
+            )
         assert info["ok"]
         assert info["backend"] == "zimdump"
+        assert info["mode"] == "seed_titles"
         assert info["extracted"] == 2
+        assert list_calls == [], "zimdump list must never run for Index-for-agents RAG"
         assert list(out.glob("*.html"))
+
+
+def test_extract_never_calls_zimdump_list_even_when_seeds_miss():
+    with tempfile.TemporaryDirectory() as td:
+        zim = Path(td) / "sample.zim"
+        zim.write_bytes(b"FAKE-ZIM")
+        out = Path(td) / "extracted"
+        list_calls = []
+
+        def fake_run(cmd, **kwargs):
+            class R:
+                returncode = 1
+                stdout = b""
+                stderr = b"missing"
+
+            if cmd[1] == "list":
+                list_calls.append(cmd)
+                return R()
+            return R()
+
+        with mock.patch("content_manager.shutil.which", return_value="/usr/bin/zimdump"), mock.patch(
+            "content_manager.subprocess.run", side_effect=fake_run
+        ), mock.patch(
+            "content_manager._extract_zim_via_libzim",
+            return_value={"ok": False, "backend": "libzim", "extracted": 0, "error": "no_libzim"},
+        ):
+            info = extract_zim_html_articles(
+                zim, out, max_articles=5, allowlist=["Missing_Page_XYZ"]
+            )
+        assert list_calls == []
+        assert int(info.get("extracted") or 0) == 0
 
 
 def test_knowledge_index_ingests_extracted_html():
@@ -244,6 +281,9 @@ def test_zim_rag_defaults_on_for_zim_fetch_packs():
     assert "Eiffel_Tower" in (explicit.get("allowlist") or [])
     custom = _zim_rag_config({"meta": {"zim_rag": {"enabled": True, "allowlist": ["Only_This"]}}})
     assert custom.get("allowlist") == ["Only_This"]
+    empty = _zim_rag_config({"meta": {"zim_rag": {"enabled": True, "allowlist": []}}})
+    assert "Eiffel_Tower" in (empty.get("allowlist") or [])
+    assert int(empty.get("max_articles") or 0) <= 100
     assert _zim_rag_config({"meta": {"zim_rag": {"enabled": False}}}).get("enabled") is False
     assert _zim_rag_config({"meta": {}}) == {}
 
@@ -253,6 +293,7 @@ def test_extract_prefers_seed_titles_via_zimdump():
         zim = Path(td) / "sample.zim"
         zim.write_bytes(b"FAKE-ZIM")
         out = Path(td) / "extracted"
+        list_calls = []
 
         def fake_run(cmd, **kwargs):
             class R:
@@ -261,6 +302,7 @@ def test_extract_prefers_seed_titles_via_zimdump():
                 stderr = b""
 
             if cmd[1] == "list":
+                list_calls.append(cmd)
                 r = R()
                 r.stdout = "path: A/Unrelated\n"
                 return r
@@ -283,6 +325,7 @@ def test_extract_prefers_seed_titles_via_zimdump():
             )
         assert info["ok"]
         assert info["extracted"] >= 1
+        assert list_calls == []
         assert any("Eiffel" in p.name for p in out.glob("*.html"))
 
 
@@ -315,7 +358,7 @@ def test_finds_zim_in_kiwix_library():
         zim = atlas / "kiwix" / "wikipedia_en_all_mini.zim"
         zim.parent.mkdir(parents=True)
         zim.write_bytes(b"FAKE-ZIM")
-        out_html = None
+        list_calls = []
 
         def fake_run(cmd, **kwargs):
             class R:
@@ -324,6 +367,7 @@ def test_finds_zim_in_kiwix_library():
                 stderr = b""
 
             if cmd[1] == "list":
+                list_calls.append(cmd)
                 r = R()
                 r.stdout = "path: A/Gravity\n"
                 return r
@@ -336,7 +380,7 @@ def test_finds_zim_in_kiwix_library():
         manifest = {
             "id": "atlas.knowledge.wikipedia-en-mini",
             "meta": {
-                "zim_rag": {"enabled": True, "max_articles": 2},
+                "zim_rag": {"enabled": True, "max_articles": 2, "allowlist": ["Gravity"]},
                 "zim_fetch": {"filename": "wikipedia_en_all_mini.zim"},
             },
         }
@@ -346,6 +390,7 @@ def test_finds_zim_in_kiwix_library():
             info = maybe_extract_zim_html_for_rag(manifest, target, atlas)
         assert info and info.get("ok")
         assert int(info.get("extracted") or 0) >= 1
+        assert list_calls == []
         assert (target / ".atlas-zim-rag.json").is_file()
         assert (target / "extracted" / ".atlas-zim-rag.json").is_file()
 
@@ -353,6 +398,7 @@ def test_finds_zim_in_kiwix_library():
 if __name__ == "__main__":
     test_rag_html_seed_extract_without_zimdump()
     test_extract_zim_html_articles_uses_zimdump_mock()
+    test_extract_never_calls_zimdump_list_even_when_seeds_miss()
     test_extract_prefers_seed_titles_via_zimdump()
     test_knowledge_index_ingests_extracted_html()
     test_kolibri_prepare_writes_channel_lock()

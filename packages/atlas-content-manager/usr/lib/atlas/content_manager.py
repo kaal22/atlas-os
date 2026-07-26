@@ -39,6 +39,8 @@ DEFAULT_KIDS_EXPAND_FALLBACK_URL = (
     "content/packs/education/kids-home-learning-expand.tar.gz"
 )
 DEFAULT_ZIM_RAG_MAX_ARTICLES = int(os.environ.get("ATLAS_ZIM_RAG_MAX_ARTICLES", "40"))
+# Hard ceiling — agent index is an intentional sample, never a full Wikipedia dump.
+ABSOLUTE_ZIM_RAG_MAX_ARTICLES = int(os.environ.get("ATLAS_ZIM_RAG_ABSOLUTE_MAX", "100"))
 # Popular titles for bounded ZIM→RAG (agent keyword search). Full browse remains Library/Kiwix.
 # Underscores match common ZIM paths; extractors also try space variants.
 DEFAULT_ZIM_RAG_SEED_TITLES: tuple[str, ...] = (
@@ -2231,6 +2233,35 @@ def _fetch_zim_for_manifest_body(
     return result
 
 
+def _clamp_zim_rag_max_articles(value: Any) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        n = DEFAULT_ZIM_RAG_MAX_ARTICLES
+    return max(1, min(n, ABSOLUTE_ZIM_RAG_MAX_ARTICLES))
+
+
+def _normalize_zim_rag_allowlist(cfg: dict[str, Any]) -> list[str]:
+    """Resolve seed/allowlist titles — never empty (would invite a full-archive scan)."""
+    for key in ("allowlist", "seed_titles"):
+        raw = cfg.get(key)
+        if isinstance(raw, list):
+            titles = [str(a).strip() for a in raw if a and str(a).strip()]
+            if titles:
+                return titles
+    return list(DEFAULT_ZIM_RAG_SEED_TITLES)
+
+
+def zim_rag_planned_extract_count(manifest: dict[str, Any]) -> int:
+    """How many articles Index for agents will attempt (seed-capped sample)."""
+    cfg = _zim_rag_config(manifest)
+    if not cfg or cfg.get("enabled") is False:
+        return 0
+    max_articles = _clamp_zim_rag_max_articles(cfg.get("max_articles") or DEFAULT_ZIM_RAG_MAX_ARTICLES)
+    allow = _normalize_zim_rag_allowlist(cfg)
+    return min(max_articles, len(allow))
+
+
 def _zim_rag_config(manifest: dict[str, Any]) -> dict[str, Any]:
     """
     Resolve zim_rag settings from manifest.meta.
@@ -2238,6 +2269,9 @@ def _zim_rag_config(manifest: dict[str, Any]) -> dict[str, Any]:
     Knowledge packs with zim_fetch default to a bounded HTML extract so keyword
     search becomes available after ZIM download (Library browsing alone is not enough).
     Explicit meta.zim_rag.enabled=false opts out.
+
+    Always resolves a non-empty seed allowlist. Agent RAG is title-keyed only —
+    never a full ZIM dump (full browse remains Kiwix Library).
     """
     meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
     cfg = meta.get("zim_rag") if isinstance(meta.get("zim_rag"), dict) else {}
@@ -2263,13 +2297,12 @@ def _zim_rag_config(manifest: dict[str, Any]) -> dict[str, Any]:
         }
     if out.get("enabled") is False:
         return out
-    # Seed popular titles unless the pack sets an explicit empty allowlist.
-    if "allowlist" not in out and "seed_titles" not in out:
-        out["allowlist"] = list(DEFAULT_ZIM_RAG_SEED_TITLES)
-    elif "allowlist" not in out and isinstance(out.get("seed_titles"), list):
-        out["allowlist"] = list(out["seed_titles"])
-    if "max_articles" not in out:
-        out["max_articles"] = DEFAULT_ZIM_RAG_MAX_ARTICLES
+    out["allowlist"] = _normalize_zim_rag_allowlist(out)
+    out["max_articles"] = _clamp_zim_rag_max_articles(
+        out.get("max_articles") if "max_articles" in out else DEFAULT_ZIM_RAG_MAX_ARTICLES
+    )
+    # Explicit opt-in only; default is seed-title extract (never zimdump list-all).
+    out["fill_from_listing"] = bool(out.get("fill_from_listing"))
     return out
 
 
@@ -2318,8 +2351,10 @@ def _extract_zim_via_zimdump(
     max_articles: int,
     allow: set[str],
 ) -> dict[str, Any]:
+    """Title-keyed extract only — never ``zimdump list`` (that walks the whole archive)."""
     written = 0
     tried_urls: set[str] = set()
+    seeds = sorted(t for t in allow if t)[:max_articles]
 
     def _show(url: str) -> str | None:
         if url in tried_urls:
@@ -2341,74 +2376,24 @@ def _extract_zim_via_zimdump(
             return raw.decode("utf-8", errors="ignore")
         return str(raw)
 
-    # Prefer explicit seed titles so popular pages (e.g. Eiffel Tower) land in RAG.
-    if allow:
-        for title in sorted(allow):
-            if written >= max_articles:
+    for title in seeds:
+        if written >= max_articles:
+            break
+        for cand in _zim_title_path_candidates(title):
+            text = _show(cand)
+            if text and _write_zim_html_article(out_dir, title, text, written):
+                written += 1
                 break
-            for cand in _zim_title_path_candidates(title):
-                text = _show(cand)
-                if text and _write_zim_html_article(out_dir, title, text, written):
-                    written += 1
-                    break
-
-    # Fill remaining slots from archive listing (sample), after seed-title attempts above.
-    list_allow: set[str] = set()
-    if written < max_articles:
-        try:
-            list_proc = subprocess.run(
-                [zimdump, "list", "--details", str(zim_path)],
-                capture_output=True,
-                text=True,
-                timeout=120,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as e:
-            if written:
-                return {
-                    "ok": True,
-                    "backend": "zimdump",
-                    "extracted": written,
-                    "out_dir": str(out_dir),
-                    "zim": str(zim_path),
-                    "list_error": str(e),
-                }
-            return {"ok": False, "backend": "zimdump", "extracted": 0, "error": str(e)}
-        if list_proc.returncode == 0:
-            paths: list[str] = []
-            for line in (list_proc.stdout or "").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                m = re.search(r"(?:path|url)\s*[:=]\s*(\S+)", line, re.I)
-                cand = m.group(1) if m else (line.split()[0] if " " in line else line)
-                if not cand or cand.endswith(".js") or cand.endswith(".css"):
-                    continue
-                if list_allow and not any(a.lower() in cand.lower() for a in list_allow):
-                    continue
-                if "/-" in cand and not cand.lower().endswith((".html", ".htm")):
-                    continue
-                if cand not in paths:
-                    paths.append(cand)
-                if len(paths) >= max_articles * 3:
-                    break
-            for entry in paths:
-                if written >= max_articles:
-                    break
-                text = _show(entry)
-                if text and _write_zim_html_article(out_dir, Path(entry).name or entry, text, written):
-                    written += 1
-        elif written == 0:
-            err = (list_proc.stderr or "").strip() or "zimdump_list_failed"
-            return {"ok": False, "backend": "zimdump", "extracted": 0, "error": err}
 
     return {
         "ok": written > 0,
         "backend": "zimdump",
+        "mode": "seed_titles",
+        "planned": len(seeds),
         "extracted": written,
         "out_dir": str(out_dir),
         "zim": str(zim_path),
-        **({"error": "zimdump_no_articles"} if written == 0 else {}),
+        **({"error": "zimdump_no_seed_articles"} if written == 0 else {}),
     }
 
 
@@ -2419,6 +2404,7 @@ def _extract_zim_via_libzim(
     max_articles: int,
     allow: set[str],
 ) -> dict[str, Any]:
+    """Title-keyed extract via libzim getters — never enumerate entry_count."""
     try:
         from libzim.reader import Archive  # type: ignore
     except Exception:
@@ -2433,6 +2419,7 @@ def _extract_zim_via_libzim(
     try:
         archive = Archive(str(zim_path))
         written = 0
+        seeds = sorted(t for t in allow if t)[:max_articles]
 
         def _entry_html(entry: Any) -> tuple[str, str] | None:
             try:
@@ -2452,57 +2439,40 @@ def _extract_zim_via_libzim(
             except Exception:
                 return None
 
-        if allow:
-            for title in sorted(allow):
-                if written >= max_articles:
-                    break
-                entry = None
-                for cand in _zim_title_path_candidates(title):
-                    for getter_name in ("get_entry_by_path", "get_entry_by_title"):
-                        getter = getattr(archive, getter_name, None)
-                        if not callable(getter):
-                            continue
-                        try:
-                            entry = getter(cand)
-                            break
-                        except Exception:
-                            entry = None
-                    if entry is not None:
-                        break
-                if entry is None:
-                    continue
-                got = _entry_html(entry)
-                if not got:
-                    continue
-                t, text = got
-                if _write_zim_html_article(out_dir, title or t, text, written):
-                    written += 1
-
-        count = int(getattr(archive, "entry_count", 0) or 0)
-        for idx in range(min(count, max_articles * 20)):
+        for title in seeds:
             if written >= max_articles:
                 break
-            try:
-                entry = archive._get_entry_by_id(idx)  # type: ignore[attr-defined]
-            except Exception:
-                try:
-                    entry = archive.get_entry_by_id(idx)  # type: ignore[attr-defined]
-                except Exception:
-                    continue
+            entry = None
+            for cand in _zim_title_path_candidates(title):
+                for getter_name in ("get_entry_by_path", "get_entry_by_title"):
+                    getter = getattr(archive, getter_name, None)
+                    if not callable(getter):
+                        continue
+                    try:
+                        entry = getter(cand)
+                        break
+                    except Exception:
+                        entry = None
+                if entry is not None:
+                    break
+            if entry is None:
+                continue
             got = _entry_html(entry)
             if not got:
                 continue
             t, text = got
-            if _write_zim_html_article(out_dir, t, text, written):
+            if _write_zim_html_article(out_dir, title or t, text, written):
                 written += 1
 
         return {
             "ok": written > 0,
             "backend": "libzim",
+            "mode": "seed_titles",
+            "planned": len(seeds),
             "extracted": written,
             "out_dir": str(out_dir),
             "zim": str(zim_path),
-            **({"error": "libzim_no_articles"} if written == 0 else {}),
+            **({"error": "libzim_no_seed_articles"} if written == 0 else {}),
         }
     except Exception as e:
         return {"ok": False, "backend": "libzim", "extracted": 0, "error": str(e)}
@@ -2516,18 +2486,21 @@ def extract_zim_html_articles(
     allowlist: list[str] | None = None,
 ) -> dict[str, Any]:
     """
-    Extract a bounded set of HTML articles from a ZIM into out_dir for knowledge ingest.
+    Extract a bounded seed-title set of HTML articles from a ZIM for Index-for-agents RAG.
 
-    Prefer seed/allowlist titles (popular pages for agent search), then fill from archive
-    listing. Uses ``zimdump`` (zim-tools) on PATH, then python ``libzim``. Never dumps an
-    entire maxi archive into RAG — callers must pass a modest max_articles.
+    Opens articles by path/title only (zimdump show / libzim getters). Never runs
+    ``zimdump list`` or walks entry_count — those enumerate millions of Wikipedia
+    entries and are unsuitable for agent indexing. Full ZIM browse remains Kiwix.
     """
     zim_path = Path(zim_path)
     out_dir = Path(out_dir)
     if not zim_path.is_file():
         raise PackError(f"ZIM not found: {zim_path}")
-    max_articles = max(1, min(int(max_articles), 500))
-    allow = {a.strip() for a in (allowlist or []) if a and a.strip()}
+    max_articles = _clamp_zim_rag_max_articles(max_articles)
+    titles = [a.strip() for a in (allowlist or []) if a and str(a).strip()]
+    if not titles:
+        titles = list(DEFAULT_ZIM_RAG_SEED_TITLES)
+    allow = set(titles)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     zimdump = shutil.which("zimdump")
@@ -2612,16 +2585,19 @@ def maybe_extract_zim_html_for_rag(
     *,
     zim_path: Path | None = None,
 ) -> dict[str, Any] | None:
-    """When meta.zim_rag.enabled, extract a bounded HTML set under target/extracted/."""
+    """When meta.zim_rag.enabled, extract a bounded seed HTML set under target/extracted/.
+
+    Used by Index for agents / knowledge.index — not chat reply latency. Caps at
+    seed allowlist (~40) with an absolute max of ABSOLUTE_ZIM_RAG_MAX_ARTICLES.
+    """
     cfg = _zim_rag_config(manifest)
     if not cfg or cfg.get("enabled") is False:
         return None
     if os.environ.get("ATLAS_ZIM_RAG_SKIP", "").strip() in {"1", "true", "yes"}:
         return {"ok": False, "skipped": True, "extracted": 0}
-    max_articles = int(cfg.get("max_articles") or DEFAULT_ZIM_RAG_MAX_ARTICLES)
-    allowlist = cfg.get("allowlist") if isinstance(cfg.get("allowlist"), list) else None
-    if allowlist is None and isinstance(cfg.get("seed_titles"), list):
-        allowlist = cfg.get("seed_titles")
+    max_articles = _clamp_zim_rag_max_articles(cfg.get("max_articles") or DEFAULT_ZIM_RAG_MAX_ARTICLES)
+    allowlist = _normalize_zim_rag_allowlist(cfg)
+    planned = min(max_articles, len(allowlist))
     zims = _find_pack_zim_paths(manifest, target, atlas_root, zim_path=zim_path)
     out_dir = Path(target) / "extracted"
     if not zims:
@@ -2638,6 +2614,8 @@ def maybe_extract_zim_html_for_rag(
         result: dict[str, Any] = {
             "ok": seeded > 0,
             "backend": "rag-html-seed",
+            "mode": "seed_titles",
+            "planned": planned,
             "extracted": seeded,
             "zim": None,
             "zims": [],
@@ -2653,6 +2631,8 @@ def maybe_extract_zim_html_for_rag(
         marker = {
             "pack_id": manifest.get("id"),
             "extracted": seeded,
+            "planned": planned,
+            "mode": "seed_titles",
             "backends": ["rag-html-seed"] if seeded else [],
             "zims": [],
             "error": result.get("error"),
@@ -2661,7 +2641,14 @@ def maybe_extract_zim_html_for_rag(
         _write_zim_rag_marker(Path(target), marker)
         return result
 
-    combined: dict[str, Any] = {"ok": True, "extracted": 0, "backends": [], "zims": []}
+    combined: dict[str, Any] = {
+        "ok": True,
+        "extracted": 0,
+        "planned": planned,
+        "mode": "seed_titles",
+        "backends": [],
+        "zims": [],
+    }
     for zim in zims[:3]:
         info = extract_zim_html_articles(
             zim, out_dir, max_articles=max_articles, allowlist=allowlist
@@ -2669,6 +2656,8 @@ def maybe_extract_zim_html_for_rag(
         combined["backends"].append(info.get("backend"))
         combined["zims"].append(str(zim))
         combined["extracted"] = int(combined["extracted"]) + int(info.get("extracted") or 0)
+        if info.get("planned"):
+            combined["planned"] = info.get("planned")
         if not info.get("ok") and not combined.get("error"):
             combined["error"] = info.get("error")
             # Keep ok True if seed HTML already present
@@ -2689,6 +2678,8 @@ def maybe_extract_zim_html_for_rag(
     marker = {
         "pack_id": manifest.get("id"),
         "extracted": combined["extracted"],
+        "planned": combined.get("planned"),
+        "mode": "seed_titles",
         "backends": combined["backends"],
         "zims": combined["zims"],
         "error": combined.get("error"),
@@ -2765,8 +2756,9 @@ def reindex_knowledge_pack(
         "marker": str(target / ".atlas-zim-rag.json"),
         "message": (
             f"Indexed {ingested} document(s) for agents"
-            + (f" ({extracted} from ZIM extract)" if extracted else "")
+            + (f" ({extracted} seeded ZIM articles)" if extracted else "")
         ),
+        "planned_articles": zim_rag_planned_extract_count(manifest),
     }
 
 

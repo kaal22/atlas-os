@@ -2166,7 +2166,7 @@ async function pollIndexKnowledge(id){
     retryKind:'index',
     packId:id,
     totalHint:0,
-    startMessage:'Indexing… this may take a minute (ZIM extract + knowledge ingest)',
+    startMessage:'Extracting seeded articles for agent index (bounded sample, not full Wikipedia)…',
     failPrefix:'Index for agents failed',
     okMessage:'Indexed for agents',
   });
@@ -2178,11 +2178,11 @@ async function indexKnowledgePack(id){
   }
   _indexingPackId=id;
   try{
-    showMsg('contentMsg','Indexing… this may take a minute (ZIM extract + knowledge ingest).','info');
+    showMsg('contentMsg','Extracting seeded articles for agent index…','info');
     paintContentFetchPanel({
       label:'Index for agents', status:'indexing', phase:'starting', done:false,
       downloaded:0, total:0, indeterminate:true,
-      message:'Indexing… this may take a minute',
+      message:'Extracting seeded articles for agent index…',
       packId:id, retryKind:'index',
     });
     await refreshContentPage();

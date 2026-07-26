@@ -1,5 +1,5 @@
 #!/bin/sh
-# Apply Atlas wallpaper on KDE Plasma (live + installed sessions).
+# Apply Arcalium wallpaper on KDE Plasma (live + installed sessions).
 set -e
 
 # Per-user log so a prior root run cannot leave an unwritable /tmp file.
@@ -40,14 +40,14 @@ pick_wall() {
   fi
   if [ "$w" -ge 2400 ] || [ "$h" -ge 1350 ]; then
     [ -f "$base/atlas-wallpaper-1440p.png" ] && { printf '%s' "$base/atlas-wallpaper-1440p.png"; return 0; }
-    [ -f "$base/atlas-default.png" ] && { printf '%s' "$base/atlas-default.png"; return 0; }
+    [ -f "$base/arcalium-default.png" ] && { printf '%s' "$base/arcalium-default.png"; return 0; }
   fi
   if [ -f "$base/atlas-wallpaper-1080p.png" ]; then
     printf '%s' "$base/atlas-wallpaper-1080p.png"
     return 0
   fi
-  if [ -f "$base/atlas-default.png" ]; then
-    printf '%s' "$base/atlas-default.png"
+  if [ -f "$base/arcalium-default.png" ]; then
+    printf '%s' "$base/arcalium-default.png"
     return 0
   fi
   if [ -f "$base/atlas-wallpaper.png" ]; then

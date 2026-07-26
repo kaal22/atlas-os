@@ -132,8 +132,8 @@ def main() -> None:
     master.resize((2560, 1440), Image.Resampling.LANCZOS).save(
         OUT_WALL / "atlas-wallpaper-1440p.png", optimize=True
     )
-    # Compatibility alias used by older hooks
-    shutil.copy2(wall_original, OUT_WALL / "atlas-default.png")
+    # Native default used by SDDM + set-wallpaper fallbacks
+    shutil.copy2(wall_original, OUT_WALL / "arcalium-default.png")
 
     # Plasma wallpaper plugin images
     master.resize((1920, 1080), Image.Resampling.LANCZOS).save(

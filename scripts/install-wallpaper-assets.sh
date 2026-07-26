@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Regenerate Atlas desktop wallpaper assets from assets/atlas-default.png
+# Regenerate Arcalium desktop wallpaper assets from assets/arcaliumos.png
 # (native 2560×1440). Optional override: scripts/install-wallpaper-assets.sh /path/to.png
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="${1:-$ROOT/assets/atlas-default.png}"
+SRC="${1:-$ROOT/assets/arcaliumos.png}"
 WALL="$ROOT/config/includes.chroot/usr/share/backgrounds/atlas"
 PLASMA="$ROOT/config/includes.chroot/usr/share/wallpapers/Atlas/contents/images"
 
@@ -16,8 +16,10 @@ fi
 mkdir -p "$WALL" "$PLASMA"
 
 # Native / default install path used by SDDM + set-wallpaper fallbacks.
-magick "$SRC" -strip "$WALL/atlas-default.png"
-cp "$WALL/atlas-default.png" "$WALL/atlas-wallpaper.png"
+magick "$SRC" -strip "$WALL/arcalium-default.png"
+cp "$WALL/arcalium-default.png" "$WALL/atlas-wallpaper.png"
+# Drop superseded Atlas-named default if present from older trees.
+rm -f "$WALL/atlas-default.png"
 
 for spec in "1080p:1920x1080" "1440p:2560x1440" "4k:3840x2160"; do
   label="${spec%%:*}"
@@ -31,4 +33,4 @@ magick "$SRC" -strip -resize 2560x1440! "$PLASMA/2560x1440.png"
 magick "$SRC" -strip -resize 3840x2160! "$PLASMA/3840x2160.png"
 
 echo "Wallpaper assets installed from $SRC"
-identify "$WALL/atlas-default.png" "$WALL/atlas-wallpaper-1080p.png" "$WALL/atlas-wallpaper-1440p.png" "$WALL/atlas-wallpaper-4k.png"
+identify "$WALL/arcalium-default.png" "$WALL/atlas-wallpaper-1080p.png" "$WALL/atlas-wallpaper-1440p.png" "$WALL/atlas-wallpaper-4k.png"

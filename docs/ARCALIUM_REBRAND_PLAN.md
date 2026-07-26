@@ -65,7 +65,7 @@ Slogan and meta title/description are fixed assets (see header). Apply slogan on
 | **Env prefix** | `ATLAS_*` in **~60** `.py`/`.sh`/`.conf`/`.yml` files | `ATLAS_COMMAND_CENTRE_URL`, `ATLAS_DATA`, `ATLAS_ALLOW_UNSIGNED`, … |
 | **os-release** | `NAME="Atlas OS"`, `ID=atlas`, `HOME_URL=https://atlas-os.local/` | `config/includes.chroot/etc/os-release` |
 | **Live hostname** | `hostname=atlas-live`, `username=atlas` | `auto/config` `--bootappend-live` |
-| **Wallpaper / icons** | Plasma package `wallpapers/Atlas`; backgrounds `…/backgrounds/atlas/atlas-*.png`; icons `atlas.png` / `atlas-services.*` | `config/includes.chroot/usr/share/wallpapers/Atlas/`, `assets/atlas-default.png`, `assets/atlas-wallpaper-master.png` |
+| **Wallpaper / icons** | Plasma package `wallpapers/Atlas`; backgrounds `…/backgrounds/atlas/` (`arcalium-default.png` + sized `atlas-wallpaper-*.png`); icons `atlas.png` / `atlas-services.*` | `config/includes.chroot/usr/share/wallpapers/Atlas/`, `assets/arcaliumos.png` |
 | **SDDM** | Breeze theme + Atlas background via hook; config `10-atlas.conf` | `config/includes.chroot/etc/sddm.conf.d/10-atlas.conf`; hook `9030-atlas-wallpaper` |
 | **Plymouth** | **Not customised** (stock) | noted in `docs/BACKLOG.md` / `product.md` §53.2 |
 | **Calamares branding** | Component `atlas`; product strings “Atlas OS” / “Atlas” | `calamares/branding/atlas/`, packaged via `atlas-branding` → `/usr/share/atlas/calamares/` |
@@ -110,7 +110,7 @@ Establish slogan, meta tags, logo/wallpaper ownership, and where new Arcalium as
 
 | Area | Paths |
 |------|--------|
-| Source assets | `assets/atlas-default.png`, `assets/atlas-wallpaper-master.png` |
+| Source assets | `assets/arcaliumos.png` (sole master; installed as `arcalium-default.png`) |
 | Packaged logo | `packages/atlas-command-centre/usr/lib/atlas/atlas-logo.png`, launcher `…/launcher/logo.png` |
 | Wallpaper package | `config/includes.chroot/usr/share/wallpapers/Atlas/metadata.json` + `contents/images/*` |
 | Backgrounds | `config/includes.chroot/usr/share/backgrounds/atlas/atlas-*.png` |

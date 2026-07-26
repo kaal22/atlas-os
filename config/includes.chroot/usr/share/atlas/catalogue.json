@@ -422,7 +422,7 @@
       "type": "atlas.content.education",
       "name": "Kids Home Learning",
       "description": "Starter home-learning curriculum (maths, reading, science, geography, routine) indexed for local AI tutors. Install also pulls the pinned expand bundle when present.",
-      "size_hint_bytes": 7638,
+      "size_hint_bytes": 7652,
       "size_class": "small",
       "signed": false,
       "channel": "alpha",
@@ -505,7 +505,7 @@
       "version": "2026.07",
       "type": "atlas.content.knowledge",
       "name": "Wikipedia EN starter (curated + top-100)",
-      "description": "Curated Wikipedia articles for agent RAG, plus install-time download of English top-100 nopic ZIM (~13 MB) for Kiwix. For full dumps install mini / nopic / maxi.",
+      "description": "Curated Wikipedia articles for agent RAG, plus install-time download of English top-100 nopic ZIM (~13 MB) for Kiwix. For full dumps install mini / nopic / maxi. Agent keyword search uses a bounded ~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix.",
       "size_hint_bytes": 14000000,
       "size_class": "small",
       "signed": false,
@@ -531,7 +531,7 @@
       "version": "2026.07",
       "type": "atlas.content.knowledge",
       "name": "Wikipedia EN mini",
-      "description": "Full English Wikipedia mini ZIM (~12 GB) for Kiwix. Large download \u2014 confirm free disk before install.",
+      "description": "Full English Wikipedia mini ZIM (~12 GB) for Kiwix. Large download \u2014 confirm free disk before install. Agent keyword search uses a bounded ~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix.",
       "size_hint_bytes": 12000000000,
       "size_class": "large",
       "signed": false,
@@ -547,6 +547,10 @@
         "size_hint_bytes": 12000000000
       },
       "licence_note": "CC BY-SA 4.0 / GFDL \u2014 \u00a9 Wikipedia contributors (Kiwix ZIM)",
+      "zim_rag": {
+        "enabled": true,
+        "max_articles": 40
+      },
       "size_warning": "English Wikipedia mini is ~12 GB. Ensure free disk before installing."
     },
     {
@@ -554,7 +558,7 @@
       "version": "2026.07",
       "type": "atlas.content.knowledge",
       "name": "Wikipedia EN nopic",
-      "description": "Full English Wikipedia without pictures (~49 GB) for Kiwix. Large download \u2014 confirm free disk before install.",
+      "description": "Full English Wikipedia without pictures (~49 GB) for Kiwix. Large download \u2014 confirm free disk before install. Agent keyword search uses a bounded ~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix.",
       "size_hint_bytes": 49000000000,
       "size_class": "large",
       "signed": false,
@@ -570,6 +574,10 @@
         "size_hint_bytes": 49000000000
       },
       "licence_note": "CC BY-SA 4.0 / GFDL \u2014 \u00a9 Wikipedia contributors (Kiwix ZIM)",
+      "zim_rag": {
+        "enabled": true,
+        "max_articles": 40
+      },
       "size_warning": "English Wikipedia nopic is ~49 GB. Ensure free disk before installing."
     },
     {
@@ -577,7 +585,7 @@
       "version": "2026.07",
       "type": "atlas.content.knowledge",
       "name": "Wikipedia EN maxi",
-      "description": "Full English Wikipedia with media (~115 GB) for Kiwix. Very large download \u2014 confirm free disk / external storage before install.",
+      "description": "Full English Wikipedia with media (~115 GB) for Kiwix. Very large download \u2014 confirm free disk / external storage before install. Agent keyword search uses a bounded ~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix.",
       "size_hint_bytes": 115000000000,
       "size_class": "large",
       "signed": false,
@@ -593,6 +601,10 @@
         "size_hint_bytes": 115000000000
       },
       "licence_note": "CC BY-SA 4.0 / GFDL \u2014 \u00a9 Wikipedia contributors (Kiwix ZIM)",
+      "zim_rag": {
+        "enabled": true,
+        "max_articles": 40
+      },
       "size_warning": "English Wikipedia maxi is ~115 GB. Prefer external SSD / OEM preload; ensure free disk before installing."
     },
     {

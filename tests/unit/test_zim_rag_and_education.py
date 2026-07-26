@@ -236,13 +236,57 @@ def test_zim_rag_defaults_on_for_zim_fetch_packs():
     )
     assert cfg.get("enabled") is True
     assert int(cfg.get("max_articles") or 0) > 0
+    assert "Eiffel_Tower" in (cfg.get("allowlist") or [])
+    explicit = _zim_rag_config({"meta": {"zim_rag": {"enabled": True, "max_articles": 5}}})
+    assert "Eiffel_Tower" in (explicit.get("allowlist") or [])
+    custom = _zim_rag_config({"meta": {"zim_rag": {"enabled": True, "allowlist": ["Only_This"]}}})
+    assert custom.get("allowlist") == ["Only_This"]
     assert _zim_rag_config({"meta": {"zim_rag": {"enabled": False}}}).get("enabled") is False
     assert _zim_rag_config({"meta": {}}) == {}
+
+
+def test_extract_prefers_seed_titles_via_zimdump():
+    with tempfile.TemporaryDirectory() as td:
+        zim = Path(td) / "sample.zim"
+        zim.write_bytes(b"FAKE-ZIM")
+        out = Path(td) / "extracted"
+
+        def fake_run(cmd, **kwargs):
+            class R:
+                returncode = 0
+                stdout = b""
+                stderr = b""
+
+            if cmd[1] == "list":
+                r = R()
+                r.stdout = "path: A/Unrelated\n"
+                return r
+            if cmd[1] == "show":
+                r = R()
+                url = cmd[2].split("=", 1)[-1]
+                if "Eiffel" in url:
+                    r.stdout = b"<html><body><h1>Eiffel Tower</h1><p>Paris landmark.</p></body></html>"
+                else:
+                    r.returncode = 1
+                    r.stdout = b""
+                return r
+            return R()
+
+        with mock.patch("content_manager.shutil.which", return_value="/usr/bin/zimdump"), mock.patch(
+            "content_manager.subprocess.run", side_effect=fake_run
+        ):
+            info = extract_zim_html_articles(
+                zim, out, max_articles=5, allowlist=["Eiffel_Tower", "Missing_Page"]
+            )
+        assert info["ok"]
+        assert info["extracted"] >= 1
+        assert any("Eiffel" in p.name for p in out.glob("*.html"))
 
 
 if __name__ == "__main__":
     test_rag_html_seed_extract_without_zimdump()
     test_extract_zim_html_articles_uses_zimdump_mock()
+    test_extract_prefers_seed_titles_via_zimdump()
     test_knowledge_index_ingests_extracted_html()
     test_kolibri_prepare_writes_channel_lock()
     test_expand_resolves_file_url()

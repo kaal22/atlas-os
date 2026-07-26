@@ -426,6 +426,11 @@ manifest = {
         "variant": variant,
         "size_hint_bytes": size_hint,
         "size_class": "large",
+        "zim_rag": {
+            "enabled": True,
+            "max_articles": 40,
+            "note": "Bounded HTML sample for agent keyword search; full ZIM is Library/Kiwix",
+        },
         "zim_fetch": {
             "enabled": True,
             "mode": "kiwix_download",
@@ -450,7 +455,7 @@ PY
   build_wiki_zim_sku \
     "atlas.knowledge.wikipedia-en-mini" "mini" \
     "Wikipedia EN mini" \
-    "Full English Wikipedia mini ZIM (~12 GB) for Kiwix. Large download — confirm free disk before install." \
+    "Full English Wikipedia mini ZIM (~12 GB) for Kiwix. Large download — confirm free disk before install. Agent keyword search uses a bounded ~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix." \
     "12000000000" \
     "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_mini_2026-06.zim" \
     "wikipedia_en_all_mini.zim" \
@@ -459,7 +464,7 @@ PY
   build_wiki_zim_sku \
     "atlas.knowledge.wikipedia-en-nopic" "nopic" \
     "Wikipedia EN nopic" \
-    "Full English Wikipedia without pictures (~49 GB) for Kiwix. Large download — confirm free disk before install." \
+    "Full English Wikipedia without pictures (~49 GB) for Kiwix. Large download — confirm free disk before install. Agent keyword search uses a bounded ~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix." \
     "49000000000" \
     "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_nopic_2026-06.zim" \
     "wikipedia_en_all_nopic.zim" \
@@ -468,7 +473,7 @@ PY
   build_wiki_zim_sku \
     "atlas.knowledge.wikipedia-en-maxi" "maxi" \
     "Wikipedia EN maxi" \
-    "Full English Wikipedia with media (~115 GB) for Kiwix. Very large download — confirm free disk / external storage before install." \
+    "Full English Wikipedia with media (~115 GB) for Kiwix. Very large download — confirm free disk / external storage before install. Agent keyword search uses a bounded ~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix." \
     "115000000000" \
     "https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_maxi_2026-02.zim" \
     "wikipedia_en_all_maxi.zim" \
@@ -756,7 +761,9 @@ wiki_skus = [
         "name": "Wikipedia EN starter (curated + top-100)",
         "description": (
             "Curated Wikipedia articles for agent RAG, plus install-time download of English "
-            "top-100 nopic ZIM (~13 MB) for Kiwix. For full dumps install mini / nopic / maxi."
+            "top-100 nopic ZIM (~13 MB) for Kiwix. For full dumps install mini / nopic / maxi. "
+            "Agent keyword search uses a bounded ~40-article extract (includes popular titles "
+            "like Eiffel Tower); full browse is Library/Kiwix."
         ),
         "size_hint_bytes": 14_000_000,
         "size_class": "small",
@@ -774,7 +781,8 @@ wiki_skus = [
         "name": "Wikipedia EN mini",
         "description": (
             "Full English Wikipedia mini ZIM (~12 GB) for Kiwix. Large download — "
-            "confirm free disk before install."
+            "confirm free disk before install. Agent keyword search uses a bounded "
+            "~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix."
         ),
         "size_hint_bytes": 12_000_000_000,
         "size_class": "large",
@@ -788,13 +796,15 @@ wiki_skus = [
             "filename": "wikipedia_en_all_mini.zim",
             "size_hint_bytes": 12_000_000_000,
         },
+        "zim_rag": {"enabled": True, "max_articles": 40},
     },
     {
         "id": "atlas.knowledge.wikipedia-en-nopic",
         "name": "Wikipedia EN nopic",
         "description": (
             "Full English Wikipedia without pictures (~49 GB) for Kiwix. Large download — "
-            "confirm free disk before install."
+            "confirm free disk before install. Agent keyword search uses a bounded "
+            "~40-article extract (includes popular titles like Eiffel Tower); full browse is Library/Kiwix."
         ),
         "size_hint_bytes": 49_000_000_000,
         "size_class": "large",
@@ -808,13 +818,16 @@ wiki_skus = [
             "filename": "wikipedia_en_all_nopic.zim",
             "size_hint_bytes": 49_000_000_000,
         },
+        "zim_rag": {"enabled": True, "max_articles": 40},
     },
     {
         "id": "atlas.knowledge.wikipedia-en-maxi",
         "name": "Wikipedia EN maxi",
         "description": (
             "Full English Wikipedia with media (~115 GB) for Kiwix. Very large download — "
-            "confirm free disk / external storage before install."
+            "confirm free disk / external storage before install. Agent keyword search uses a "
+            "bounded ~40-article extract (includes popular titles like Eiffel Tower); "
+            "full browse is Library/Kiwix."
         ),
         "size_hint_bytes": 115_000_000_000,
         "size_class": "large",
@@ -829,6 +842,7 @@ wiki_skus = [
             "filename": "wikipedia_en_all_maxi.zim",
             "size_hint_bytes": 115_000_000_000,
         },
+        "zim_rag": {"enabled": True, "max_articles": 40},
     },
     {
         "id": "atlas.knowledge.medicine-en",

@@ -49,6 +49,9 @@ curl
 ca-certificates
 jq
 python3
+# ZIM → agent RAG extract (content_manager); Library browse still uses containerized kiwix-serve
+zim-tools
+python3-libzim
 rsync
 zstd
 openssh-client

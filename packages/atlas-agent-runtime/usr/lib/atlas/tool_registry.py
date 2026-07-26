@@ -37,7 +37,26 @@ def _knowledge_search(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, An
     if ks is None:
         return {"ok": True, "hits": [], "note": "knowledge_unavailable"}
     hits = ks.search(user, query)
-    return {"ok": True, "hits": hits}
+    # Never surface pack control / ZIM RAG markers to the model (legacy indexes).
+    try:
+        from knowledge_service import is_rag_control_path  # type: ignore
+    except ImportError:
+        def is_rag_control_path(path: str) -> bool:  # type: ignore
+            name = Path(path).name.lower()
+            return name in {
+                "manifest.json",
+                ".atlas-zim-rag.json",
+                ".atlas-indexed",
+            } or name.startswith(".atlas-")
+
+    cleaned = []
+    for h in hits or []:
+        name = str(h.get("name") or "")
+        path = str(h.get("path") or "")
+        if is_rag_control_path(name) or is_rag_control_path(path):
+            continue
+        cleaned.append(h)
+    return {"ok": True, "hits": cleaned}
 
 
 def _documents_read(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
@@ -56,6 +75,14 @@ def _documents_read(args: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]
         return {"ok": False, "error": "invalid_path"}
     if not any(str(resolved).startswith(str(r.resolve() if r.exists() else r)) for r in allowed_roots):
         return {"ok": False, "error": "path_outside_allowed_roots"}
+    try:
+        from knowledge_service import is_rag_control_path  # type: ignore
+    except ImportError:
+        def is_rag_control_path(p) -> bool:  # type: ignore
+            name = Path(p).name.lower()
+            return name.startswith(".atlas-") or name in {"manifest.json", "checksums.json"}
+    if is_rag_control_path(resolved):
+        return {"ok": False, "error": "control_file_blocked"}
     if not resolved.is_file():
         return {"ok": False, "error": "not_found"}
     text = resolved.read_text(encoding="utf-8", errors="ignore")[:20_000]

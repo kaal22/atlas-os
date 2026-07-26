@@ -75,6 +75,7 @@ from content_manager import (  # noqa: E402
     read_pack_metadata,
     read_pmtiles_header,
     read_zim_fetch_progress,
+    reindex_knowledge_pack,
     reindex_maps,
     repair_maps_registry,
     request_cancel_maps_fetch,
@@ -1992,6 +1993,43 @@ class Handler(BaseHTTPRequestHandler):
                     "zim_status": "fetching",
                 },
             )
+
+        if path == "/api/content/index-knowledge":
+            if sess.get("role") not in {"owner", "admin"}:
+                return self._json(403, {"error": "forbidden"})
+            pack_id = data.get("id") or data.get("catalogue_id") or ""
+            installed = load_installed(DATA).get("packs") or []
+            match = next((p for p in installed if p.get("id") == pack_id), None) if pack_id else None
+            if not match:
+                return self._json(404, {"error": "pack_not_installed"})
+            target = Path(match["target"])
+            manifest_path = target / "manifest.json"
+            if not manifest_path.is_file():
+                return self._json(400, {"error": "manifest_missing_on_target"})
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError) as e:
+                return self._json(400, {"error": str(e)})
+            try:
+                info = reindex_knowledge_pack(manifest, target, DATA)
+            except PackError as e:
+                return self._json(400, {"error": str(e)})
+            except Exception as e:  # noqa: BLE001
+                return self._json(500, {"error": str(e)})
+            # Reload shared knowledge index so agents see new extracts immediately.
+            try:
+                KS._load_index()
+            except Exception:
+                pass
+            audit_event({
+                "event": "content.index_knowledge",
+                "pack_id": match.get("id"),
+                "ingested_docs": info.get("ingested_docs"),
+                "zim_rag_articles": info.get("zim_rag_articles"),
+                "username": sess.get("username"),
+                "ip": ip,
+            })
+            return self._json(200, info)
 
         if path == "/api/content/cancel-maps-fetch":
             if sess.get("role") not in {"owner", "admin"}:

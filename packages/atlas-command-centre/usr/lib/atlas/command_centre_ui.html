@@ -1634,7 +1634,10 @@ async function renderContent(){
           }
           if(p.category==='knowledge'&&(p.zim_fetch||p.download_on_install)){
             retries.push(`<button class="btn secondary" onclick="retryFetchZim('${escapeHtml(p.id)}')">Retry ZIM</button>`);
+            retries.push(`<button class="btn" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
             retries.push(`<button class="btn" onclick="window.open(KIWIX_URL,'_blank','noopener')">Open Library</button>`);
+          } else if(p.category==='knowledge'&&p.installed){
+            retries.push(`<button class="btn" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
           }
           if(p.category==='education'&&p.expand_fetch){
             retries.push(`<button class="btn secondary" onclick="retryFetchExpand('${escapeHtml(p.id)}')">Retry expand</button>`);
@@ -2130,6 +2133,18 @@ async function retryFetchZim(id){
   const pollPromise=pollZimFetch({id,zim_pack_slug:slug,zim_size_hint_bytes:r.zim_size_hint_bytes||0});
   await refreshContentPage();
   await pollPromise;
+  await refreshContentPage();
+}
+async function indexKnowledgePack(id){
+  showMsg('contentMsg','Indexing pack for agent search (bounded ZIM extract)…','info');
+  const r=await api('/api/content/index-knowledge',{method:'POST',body:JSON.stringify({id})});
+  if(r.error||!r.ok){
+    showMsg('contentMsg',r.error||'Index failed','err');
+    return;
+  }
+  const n=r.zim_rag_articles||0;
+  const docs=r.ingested_docs||0;
+  showMsg('contentMsg',r.message||(`Indexed ${docs} docs`+(n?` (${n} from ZIM)`:'')),'ok');
   await refreshContentPage();
 }
 async function retryFetchExpand(id){

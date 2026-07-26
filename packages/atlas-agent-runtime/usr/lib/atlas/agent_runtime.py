@@ -217,7 +217,14 @@ def _research_behavior_rules() -> str:
         "and available tools only — do not invent knowledge-base hits or cite Sources.\n"
         "Never narrate pack install status, ZIM/RAG extraction progress, catalogue size class, "
         "licence stubs, or files like manifest.json / .atlas-zim-rag.json as research findings.\n"
-        "If no relevant knowledge documents were found, say so simply and offer a clearer topic.\n"
+        "Never suggest Kiwix CLI, zimdump, libzim, or terminal extract commands. "
+        "Agent search uses a bounded sample of articles indexed from installed packs — "
+        "not the full ZIM. Full Wikipedia browsing is Library (Kiwix) in Command Centre.\n"
+        "If keyword search finds nothing for a Wikipedia topic: say the agent index may not "
+        "include that article yet, and tell the user to open Content → the Wikipedia pack → "
+        "'Index for agents' (or reinstall the pack). Do not offer to extract it yourself.\n"
+        "If no relevant knowledge documents were found, say so simply and offer a clearer topic "
+        "or Library browse.\n"
     )
 TRANSITIONS = {
     "draft": {"planned", "cancelled"},
@@ -518,10 +525,23 @@ class AgentRuntime:
                 f"{_rag_answer_instructions()}"
             )
         elif task.tool_context:
-            tool_bits = "Tool results:\n" + json.dumps(task.tool_context, indent=2)[:4000]
+            # Strip bulky / control payloads before the model sees tool JSON.
+            safe_ctx = []
+            for item in task.tool_context:
+                entry = dict(item)
+                res = entry.get("result")
+                if isinstance(res, dict) and res.get("hits") is not None:
+                    entry["result"] = {
+                        **res,
+                        "hits": _filter_control_sources(list(res.get("hits") or [])),
+                    }
+                safe_ctx.append(entry)
+            tool_bits = "Tool results:\n" + json.dumps(safe_ctx, indent=2)[:4000]
             user_body = (
                 f"{task.prompt}\n\n{tool_bits}\n\n"
-                "Using any useful tool results above, answer the user clearly."
+                "Using any useful tool results above, answer the user clearly. "
+                "If hits are empty, say search found nothing — do not invent pack/ZIM status "
+                "or suggest terminal/Kiwix CLI commands."
             )
         messages.append({"role": "user", "content": user_body})
 

@@ -39,6 +39,50 @@ DEFAULT_KIDS_EXPAND_FALLBACK_URL = (
     "content/packs/education/kids-home-learning-expand.tar.gz"
 )
 DEFAULT_ZIM_RAG_MAX_ARTICLES = int(os.environ.get("ATLAS_ZIM_RAG_MAX_ARTICLES", "40"))
+# Popular titles for bounded ZIM→RAG (agent keyword search). Full browse remains Library/Kiwix.
+# Underscores match common ZIM paths; extractors also try space variants.
+DEFAULT_ZIM_RAG_SEED_TITLES: tuple[str, ...] = (
+    "Eiffel_Tower",
+    "Paris",
+    "France",
+    "Solar_System",
+    "Earth",
+    "Moon",
+    "Sun",
+    "Water",
+    "Gravity",
+    "Internet",
+    "Democracy",
+    "Human_body",
+    "Climate_change",
+    "Photosynthesis",
+    "DNA",
+    "Albert_Einstein",
+    "Mathematics",
+    "Computer",
+    "Africa",
+    "India",
+    "United_States",
+    "United_Kingdom",
+    "China",
+    "World_War_II",
+    "Olympic_Games",
+    "Pyramid",
+    "Great_Wall_of_China",
+    "Amazon_River",
+    "Pacific_Ocean",
+    "Artificial_intelligence",
+    "COVID-19",
+    "Medicine",
+    "Agriculture",
+    "Electricity",
+    "Language",
+    "Music",
+    "History",
+    "Geography",
+    "Biology",
+    "Physics",
+)
 # Below this size a .pmtiles is treated as a stub/placeholder (matches /maps serving + NOMAD sync).
 MIN_USABLE_PMTILES_BYTES = 65536
 USER_AGENT = "AtlasOS-ContentManager/0.1 (+offline-maps; https://atlas.local)"
@@ -2130,29 +2174,270 @@ def _zim_rag_config(manifest: dict[str, Any]) -> dict[str, Any]:
     meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
     cfg = meta.get("zim_rag") if isinstance(meta.get("zim_rag"), dict) else {}
     if cfg:
-        return dict(cfg)
-    zim_fetch = meta.get("zim_fetch") if isinstance(meta.get("zim_fetch"), dict) else {}
-    if not zim_fetch:
-        return {}
-    if zim_fetch.get("enabled") is False:
-        return {}
-    if not (
-        zim_fetch.get("default_url")
-        or zim_fetch.get("url")
-        or zim_fetch.get("filename")
-        or zim_fetch.get("enabled")
-    ):
-        return {}
-    return {
-        "enabled": True,
-        "max_articles": DEFAULT_ZIM_RAG_MAX_ARTICLES,
-        "defaulted": True,
-    }
+        out = dict(cfg)
+    else:
+        zim_fetch = meta.get("zim_fetch") if isinstance(meta.get("zim_fetch"), dict) else {}
+        if not zim_fetch:
+            return {}
+        if zim_fetch.get("enabled") is False:
+            return {}
+        if not (
+            zim_fetch.get("default_url")
+            or zim_fetch.get("url")
+            or zim_fetch.get("filename")
+            or zim_fetch.get("enabled")
+        ):
+            return {}
+        out = {
+            "enabled": True,
+            "max_articles": DEFAULT_ZIM_RAG_MAX_ARTICLES,
+            "defaulted": True,
+        }
+    if out.get("enabled") is False:
+        return out
+    # Seed popular titles unless the pack sets an explicit empty allowlist.
+    if "allowlist" not in out and "seed_titles" not in out:
+        out["allowlist"] = list(DEFAULT_ZIM_RAG_SEED_TITLES)
+    elif "allowlist" not in out and isinstance(out.get("seed_titles"), list):
+        out["allowlist"] = list(out["seed_titles"])
+    if "max_articles" not in out:
+        out["max_articles"] = DEFAULT_ZIM_RAG_MAX_ARTICLES
+    return out
 
 
 def _safe_article_filename(title: str, index: int) -> str:
     stem = re.sub(r"[^\w.\-]+", "_", (title or f"article-{index}").strip())[:80] or f"article-{index}"
     return f"{stem}.html"
+
+
+def _zim_title_path_candidates(title: str) -> list[str]:
+    """Common ZIM path / title spellings for a Wikipedia-style article name."""
+    raw = (title or "").strip()
+    if not raw:
+        return []
+    underscored = raw.replace(" ", "_")
+    spaced = raw.replace("_", " ")
+    cands: list[str] = []
+    for base in (underscored, spaced, raw):
+        for prefix in ("", "A/", "C/", "fulltext/"):
+            cands.append(f"{prefix}{base}")
+        if not base.lower().endswith((".html", ".htm")):
+            cands.append(f"{base}.html")
+            cands.append(f"A/{base}.html")
+    # Preserve order, drop dupes
+    seen: set[str] = set()
+    out: list[str] = []
+    for c in cands:
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
+
+def _write_zim_html_article(out_dir: Path, title: str, text: str, index: int) -> Path | None:
+    if not text or "<" not in text[:800]:
+        return None
+    dest = out_dir / _safe_article_filename(title, index)
+    dest.write_text(text, encoding="utf-8")
+    return dest
+
+
+def _extract_zim_via_zimdump(
+    zimdump: str,
+    zim_path: Path,
+    out_dir: Path,
+    *,
+    max_articles: int,
+    allow: set[str],
+) -> dict[str, Any]:
+    written = 0
+    tried_urls: set[str] = set()
+
+    def _show(url: str) -> str | None:
+        if url in tried_urls:
+            return None
+        tried_urls.add(url)
+        try:
+            show = subprocess.run(
+                [zimdump, "show", f"--url={url}", str(zim_path)],
+                capture_output=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if show.returncode != 0 or not show.stdout:
+            return None
+        raw = show.stdout
+        if isinstance(raw, (bytes, bytearray)):
+            return raw.decode("utf-8", errors="ignore")
+        return str(raw)
+
+    # Prefer explicit seed titles so popular pages (e.g. Eiffel Tower) land in RAG.
+    if allow:
+        for title in sorted(allow):
+            if written >= max_articles:
+                break
+            for cand in _zim_title_path_candidates(title):
+                text = _show(cand)
+                if text and _write_zim_html_article(out_dir, title, text, written):
+                    written += 1
+                    break
+
+    # Fill remaining slots from archive listing (sample), after seed-title attempts above.
+    list_allow: set[str] = set()
+    if written < max_articles:
+        try:
+            list_proc = subprocess.run(
+                [zimdump, "list", "--details", str(zim_path)],
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            if written:
+                return {
+                    "ok": True,
+                    "backend": "zimdump",
+                    "extracted": written,
+                    "out_dir": str(out_dir),
+                    "zim": str(zim_path),
+                    "list_error": str(e),
+                }
+            return {"ok": False, "backend": "zimdump", "extracted": 0, "error": str(e)}
+        if list_proc.returncode == 0:
+            paths: list[str] = []
+            for line in (list_proc.stdout or "").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                m = re.search(r"(?:path|url)\s*[:=]\s*(\S+)", line, re.I)
+                cand = m.group(1) if m else (line.split()[0] if " " in line else line)
+                if not cand or cand.endswith(".js") or cand.endswith(".css"):
+                    continue
+                if list_allow and not any(a.lower() in cand.lower() for a in list_allow):
+                    continue
+                if "/-" in cand and not cand.lower().endswith((".html", ".htm")):
+                    continue
+                if cand not in paths:
+                    paths.append(cand)
+                if len(paths) >= max_articles * 3:
+                    break
+            for entry in paths:
+                if written >= max_articles:
+                    break
+                text = _show(entry)
+                if text and _write_zim_html_article(out_dir, Path(entry).name or entry, text, written):
+                    written += 1
+        elif written == 0:
+            err = (list_proc.stderr or "").strip() or "zimdump_list_failed"
+            return {"ok": False, "backend": "zimdump", "extracted": 0, "error": err}
+
+    return {
+        "ok": written > 0,
+        "backend": "zimdump",
+        "extracted": written,
+        "out_dir": str(out_dir),
+        "zim": str(zim_path),
+        **({"error": "zimdump_no_articles"} if written == 0 else {}),
+    }
+
+
+def _extract_zim_via_libzim(
+    zim_path: Path,
+    out_dir: Path,
+    *,
+    max_articles: int,
+    allow: set[str],
+) -> dict[str, Any]:
+    try:
+        from libzim.reader import Archive  # type: ignore
+    except Exception:
+        return {
+            "ok": False,
+            "backend": None,
+            "extracted": 0,
+            "error": "no_zim_extractor (install zim-tools / zimdump or python3-libzim)",
+            "zim": str(zim_path),
+        }
+
+    try:
+        archive = Archive(str(zim_path))
+        written = 0
+
+        def _entry_html(entry: Any) -> tuple[str, str] | None:
+            try:
+                path = str(getattr(entry, "path", "") or getattr(entry, "title", "") or "")
+                item = entry.get_item() if hasattr(entry, "get_item") else entry
+                mimetype = str(getattr(item, "mimetype", "") or "")
+                if mimetype and "html" not in mimetype.lower() and "text" not in mimetype.lower():
+                    return None
+                content = bytes(item.content) if hasattr(item, "content") else b""
+                if not content:
+                    return None
+                text = content.decode("utf-8", errors="ignore")
+                if "<" not in text[:500]:
+                    return None
+                title = str(getattr(entry, "title", None) or path or f"article-{written}")
+                return title, text
+            except Exception:
+                return None
+
+        if allow:
+            for title in sorted(allow):
+                if written >= max_articles:
+                    break
+                entry = None
+                for cand in _zim_title_path_candidates(title):
+                    for getter_name in ("get_entry_by_path", "get_entry_by_title"):
+                        getter = getattr(archive, getter_name, None)
+                        if not callable(getter):
+                            continue
+                        try:
+                            entry = getter(cand)
+                            break
+                        except Exception:
+                            entry = None
+                    if entry is not None:
+                        break
+                if entry is None:
+                    continue
+                got = _entry_html(entry)
+                if not got:
+                    continue
+                t, text = got
+                if _write_zim_html_article(out_dir, title or t, text, written):
+                    written += 1
+
+        count = int(getattr(archive, "entry_count", 0) or 0)
+        for idx in range(min(count, max_articles * 20)):
+            if written >= max_articles:
+                break
+            try:
+                entry = archive._get_entry_by_id(idx)  # type: ignore[attr-defined]
+            except Exception:
+                try:
+                    entry = archive.get_entry_by_id(idx)  # type: ignore[attr-defined]
+                except Exception:
+                    continue
+            got = _entry_html(entry)
+            if not got:
+                continue
+            t, text = got
+            if _write_zim_html_article(out_dir, t, text, written):
+                written += 1
+
+        return {
+            "ok": written > 0,
+            "backend": "libzim",
+            "extracted": written,
+            "out_dir": str(out_dir),
+            "zim": str(zim_path),
+            **({"error": "libzim_no_articles"} if written == 0 else {}),
+        }
+    except Exception as e:
+        return {"ok": False, "backend": "libzim", "extracted": 0, "error": str(e)}
 
 
 def extract_zim_html_articles(
@@ -2165,8 +2450,9 @@ def extract_zim_html_articles(
     """
     Extract a bounded set of HTML articles from a ZIM into out_dir for knowledge ingest.
 
-    Prefer ``zimdump`` on PATH, then python ``libzim`` if installed. Never dumps an entire
-    maxi archive into RAG — callers must pass a modest max_articles.
+    Prefer seed/allowlist titles (popular pages for agent search), then fill from archive
+    listing. Uses ``zimdump`` (zim-tools) on PATH, then python ``libzim``. Never dumps an
+    entire maxi archive into RAG — callers must pass a modest max_articles.
     """
     zim_path = Path(zim_path)
     out_dir = Path(out_dir)
@@ -2176,137 +2462,25 @@ def extract_zim_html_articles(
     allow = {a.strip() for a in (allowlist or []) if a and a.strip()}
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # --- zimdump CLI ---
     zimdump = shutil.which("zimdump")
+    dump_info: dict[str, Any] | None = None
     if zimdump:
-        try:
-            list_proc = subprocess.run(
-                [zimdump, "list", "--details", str(zim_path)],
-                capture_output=True,
-                text=True,
-                timeout=120,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as e:
-            list_proc = None  # type: ignore
-            list_err = str(e)
-        else:
-            list_err = (list_proc.stderr or "").strip()
-        if list_proc and list_proc.returncode == 0:
-            paths: list[str] = []
-            for line in (list_proc.stdout or "").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                # zimdump details lines often look like: path: A/Article_title
-                m = re.search(r"(?:path|url)\s*[:=]\s*(\S+)", line, re.I)
-                cand = m.group(1) if m else (line.split()[0] if " " in line else line)
-                if not cand or cand.endswith(".js") or cand.endswith(".css"):
-                    continue
-                if allow and not any(a.lower() in cand.lower() for a in allow):
-                    continue
-                # Prefer HTML-ish article paths
-                if "/-" in cand and not cand.lower().endswith((".html", ".htm")):
-                    continue
-                if cand not in paths:
-                    paths.append(cand)
-                if len(paths) >= max_articles * 3:
-                    break
-            written = 0
-            for i, entry in enumerate(paths):
-                if written >= max_articles:
-                    break
-                try:
-                    show = subprocess.run(
-                        [zimdump, "show", f"--url={entry}", str(zim_path)],
-                        capture_output=True,
-                        timeout=60,
-                        check=False,
-                    )
-                except (OSError, subprocess.TimeoutExpired):
-                    continue
-                if show.returncode != 0 or not show.stdout:
-                    continue
-                raw = show.stdout
-                # Skip obvious non-HTML
-                if isinstance(raw, (bytes, bytearray)):
-                    head_b = bytes(raw[:200]).lower()
-                    text = raw.decode("utf-8", errors="ignore")
-                else:
-                    text = str(raw)
-                    head_b = text[:200].lower().encode("utf-8", errors="ignore")
-                if b"<html" not in head_b and b"<body" not in head_b:
-                    if not entry.lower().endswith((".html", ".htm")) and b"<" not in head_b:
-                        continue
-                name = _safe_article_filename(Path(entry).name or entry, written)
-                (out_dir / name).write_text(text, encoding="utf-8")
-                written += 1
-            return {
-                "ok": True,
-                "backend": "zimdump",
-                "extracted": written,
-                "out_dir": str(out_dir),
-                "zim": str(zim_path),
-            }
-        return {"ok": False, "backend": "zimdump", "extracted": 0, "error": list_err or "zimdump_list_failed"}
+        dump_info = _extract_zim_via_zimdump(
+            zimdump, zim_path, out_dir, max_articles=max_articles, allow=allow
+        )
+        if dump_info.get("ok") and int(dump_info.get("extracted") or 0) > 0:
+            return dump_info
+        # Fall through to libzim when zimdump found nothing usable.
 
-    # --- python libzim ---
-    try:
-        from libzim.reader import Archive  # type: ignore
-    except Exception:
-        Archive = None  # type: ignore
-    if Archive is not None:
-        try:
-            archive = Archive(str(zim_path))
-            written = 0
-            # Iterate entry ids until we collect enough HTML-ish articles.
-            count = int(getattr(archive, "entry_count", 0) or 0)
-            for idx in range(min(count, max_articles * 20)):
-                if written >= max_articles:
-                    break
-                try:
-                    entry = archive._get_entry_by_id(idx)  # type: ignore[attr-defined]
-                except Exception:
-                    try:
-                        entry = archive.get_entry_by_id(idx)  # type: ignore[attr-defined]
-                    except Exception:
-                        continue
-                try:
-                    path = str(getattr(entry, "path", "") or getattr(entry, "title", "") or idx)
-                    if allow and not any(a.lower() in path.lower() for a in allow):
-                        continue
-                    item = entry.get_item() if hasattr(entry, "get_item") else entry
-                    mimetype = str(getattr(item, "mimetype", "") or "")
-                    if mimetype and "html" not in mimetype.lower() and "text" not in mimetype.lower():
-                        continue
-                    content = bytes(item.content) if hasattr(item, "content") else b""
-                    if not content:
-                        continue
-                    text = content.decode("utf-8", errors="ignore")
-                    if "<" not in text[:500]:
-                        continue
-                    title = str(getattr(entry, "title", None) or path or f"article-{written}")
-                    (out_dir / _safe_article_filename(title, written)).write_text(text, encoding="utf-8")
-                    written += 1
-                except Exception:
-                    continue
-            return {
-                "ok": True,
-                "backend": "libzim",
-                "extracted": written,
-                "out_dir": str(out_dir),
-                "zim": str(zim_path),
-            }
-        except Exception as e:
-            return {"ok": False, "backend": "libzim", "extracted": 0, "error": str(e)}
-
-    return {
-        "ok": False,
-        "backend": None,
-        "extracted": 0,
-        "error": "no_zim_extractor (install zimdump or python3-libzim)",
-        "zim": str(zim_path),
-    }
+    lib_info = _extract_zim_via_libzim(
+        zim_path, out_dir, max_articles=max_articles, allow=allow
+    )
+    if lib_info.get("ok") and int(lib_info.get("extracted") or 0) > 0:
+        return lib_info
+    if dump_info is not None:
+        # Prefer the more specific zimdump error when both failed.
+        return dump_info
+    return lib_info
 
 
 def maybe_extract_zim_html_for_rag(
@@ -2324,6 +2498,8 @@ def maybe_extract_zim_html_for_rag(
         return {"ok": False, "skipped": True, "extracted": 0}
     max_articles = int(cfg.get("max_articles") or DEFAULT_ZIM_RAG_MAX_ARTICLES)
     allowlist = cfg.get("allowlist") if isinstance(cfg.get("allowlist"), list) else None
+    if allowlist is None and isinstance(cfg.get("seed_titles"), list):
+        allowlist = cfg.get("seed_titles")
     zims: list[Path] = []
     if zim_path and Path(zim_path).is_file():
         zims.append(Path(zim_path))
@@ -2382,10 +2558,50 @@ def maybe_extract_zim_html_for_rag(
     return combined
 
 
+def reindex_knowledge_pack(
+    manifest: dict[str, Any],
+    target: Path,
+    atlas_root: Path,
+) -> dict[str, Any]:
+    """
+    Re-run bounded ZIM→RAG extract + knowledge.index for an installed pack.
+
+    Safe to call from Command Centre ("Index for agents") without re-downloading the ZIM.
+    """
+    target = Path(target)
+    atlas_root = Path(atlas_root)
+    if not target.is_dir():
+        raise PackError(f"pack target missing: {target}")
+    _workflow_knowledge_index(manifest, target, atlas_root)
+    marker_path = target / ".atlas-indexed"
+    zim_rag: dict[str, Any] | None = None
+    ingested = 0
+    if marker_path.is_file():
+        try:
+            marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            zim_rag = marker.get("zim_rag") if isinstance(marker.get("zim_rag"), dict) else None
+            ingested = int(marker.get("ingested_docs") or 0)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            pass
+    extracted = int((zim_rag or {}).get("extracted") or 0)
+    return {
+        "ok": True,
+        "pack_id": manifest.get("id"),
+        "ingested_docs": ingested,
+        "zim_rag_articles": extracted,
+        "zim_rag": zim_rag,
+        "message": (
+            f"Indexed {ingested} document(s) for agents"
+            + (f" ({extracted} from ZIM extract)" if extracted else "")
+        ),
+    }
+
+
 def _kolibri_channel_config(manifest: dict[str, Any]) -> dict[str, Any]:
     meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
     cfg = meta.get("kolibri_channel") if isinstance(meta.get("kolibri_channel"), dict) else {}
     return dict(cfg)
+
 
 
 def _workflow_education_kolibri_prepare(

@@ -4,7 +4,26 @@ set -e
 # Do NOT create firstboot-pending here — that must only appear on the
 # installed target (Calamares), never in the live session.
 mkdir -p /etc/atlas
-mkdir -p /srv/atlas/{users,workspaces,documents,knowledge,embeddings,models,maps,kiwix,kolibri,media,content-packs,agent-packages,backups,exports,databases,logs,tmp}
+# Explicit dirs — this hook runs under /bin/sh (dash), which does NOT expand braces.
+# A quoted/brace mkdir would create a literal "{users,workspaces,...}" directory.
+mkdir -p \
+  /srv/atlas/users \
+  /srv/atlas/workspaces \
+  /srv/atlas/documents \
+  /srv/atlas/knowledge \
+  /srv/atlas/embeddings \
+  /srv/atlas/models \
+  /srv/atlas/maps \
+  /srv/atlas/kiwix \
+  /srv/atlas/kolibri \
+  /srv/atlas/media \
+  /srv/atlas/content-packs \
+  /srv/atlas/agent-packages \
+  /srv/atlas/backups \
+  /srv/atlas/exports \
+  /srv/atlas/databases \
+  /srv/atlas/logs \
+  /srv/atlas/tmp
 chmod 755 /srv/atlas
 rm -f /etc/atlas/firstboot-pending /etc/atlas/firstboot-done
 

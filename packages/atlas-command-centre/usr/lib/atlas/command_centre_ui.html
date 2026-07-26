@@ -489,6 +489,7 @@ let _kbSelected='';
 let _contentFetchState=null;
 let _contentFetchPoll=0;
 let _contentFetchActive=false;
+let _indexingPackId=null;
 
 function showAuth(){
   if(authScreen) authScreen.classList.remove('hidden');
@@ -1342,6 +1343,9 @@ function contentFetchRetryButtons(state){
   if((failed||cancelled)&&state.retryKind==='expand'&&state.packId){
     return `<button class="btn" onclick="retryFetchExpand('${escapeHtml(state.packId)}')">Retry expand</button>`;
   }
+  if(failed&&state.retryKind==='index'&&state.packId){
+    return `<button class="btn" onclick="indexKnowledgePack('${escapeHtml(state.packId)}')">Retry index</button>`;
+  }
   return '';
 }
 function paintContentFetchPanel(state){
@@ -1425,7 +1429,7 @@ function paintContentFetchPanel(state){
     const retry=contentFetchRetryButtons(state);
     if(retry){
       actions.innerHTML=retry;
-    }else if(busy&&state.retryKind&&state.retryKind!=='expand'){
+    }else if(busy&&state.retryKind&&state.retryKind!=='expand'&&state.retryKind!=='index'){
       actions.innerHTML=`<button class="btn secondary" type="button" onclick="cancelContentFetch()">Cancel</button>`;
     }else if(showOk&&state.retryKind==='maps'&&(state.country||state.packId)){
       actions.innerHTML=`<button class="btn" type="button" onclick="openAtlasMap('${escapeHtml(state.country||'')}')">Open map</button>`;
@@ -1526,9 +1530,10 @@ async function pollContentFetch(opts){
         if(cancelled){
           banner={text:'Download cancelled. Use Retry to start again.',kind:'info'};
         }else if(failed){
-          banner={text:(opts.failPrefix||'Download failed')+': '+(st.error||'unknown')+'. Use Retry.',kind:'err'};
+          banner={text:(opts.failPrefix||'Failed')+': '+(st.error||st.message||'unknown'),kind:'err'};
         }else{
-          banner={text:(opts.okMessage||'Ready')+(st.path?' ('+st.path+')':''),kind:'ok'};
+          const detail=st.message||opts.okMessage||'Ready';
+          banner={text:detail+(st.path&&!String(detail).includes(String(st.path))?' ('+st.path+')':''),kind:'ok'};
         }
         showMsg('contentMsg',banner.text,banner.kind);
         if(_contentFetchState) _contentFetchState.banner=banner;
@@ -1651,10 +1656,12 @@ async function renderContent(){
           }
           if(isZimKnowledgePack(p)){
             retries.push(`<button class="btn secondary" onclick="retryFetchZim('${escapeHtml(p.id)}')">Retry ZIM</button>`);
-            retries.push(`<button class="btn" type="button" title="Build bounded ZIM extract for agent search (works even if extracted=0)" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
+            const indexing=_indexingPackId===p.id;
+            retries.push(`<button class="btn" type="button" ${indexing?'disabled':''} title="Build bounded ZIM extract for agent search (works even if extracted=0)" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">${indexing?'Indexing…':'Index for agents'}</button>`);
             retries.push(`<button class="btn" onclick="window.open(KIWIX_URL,'_blank','noopener')">Open Library</button>`);
           } else if(isKnowledgePack(p)){
-            retries.push(`<button class="btn" type="button" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
+            const indexing=_indexingPackId===p.id;
+            retries.push(`<button class="btn" type="button" ${indexing?'disabled':''} onclick="indexKnowledgePack('${escapeHtml(p.id)}')">${indexing?'Indexing…':'Index for agents'}</button>`);
           }
           if(cat==='education'&&p.expand_fetch){
             retries.push(`<button class="btn secondary" onclick="retryFetchExpand('${escapeHtml(p.id)}')">Retry expand</button>`);
@@ -2152,17 +2159,63 @@ async function retryFetchZim(id){
   await pollPromise;
   await refreshContentPage();
 }
+async function pollIndexKnowledge(id){
+  return pollContentFetch({
+    label:'Index for agents',
+    statusUrl:'/api/content/index-knowledge-status?id='+encodeURIComponent(id),
+    retryKind:'index',
+    packId:id,
+    totalHint:0,
+    startMessage:'Indexing… this may take a minute (ZIM extract + knowledge ingest)',
+    failPrefix:'Index for agents failed',
+    okMessage:'Indexed for agents',
+  });
+}
 async function indexKnowledgePack(id){
-  showMsg('contentMsg','Indexing pack for agent search (bounded ZIM extract)…','info');
-  const r=await api('/api/content/index-knowledge',{method:'POST',body:JSON.stringify({id})});
-  if(r.error||!r.ok){
-    showMsg('contentMsg',r.error||'Index failed','err');
+  if(_indexingPackId){
+    showMsg('contentMsg','Indexing already in progress…','info');
     return;
   }
-  const n=r.zim_rag_articles||0;
-  const docs=r.ingested_docs||0;
-  showMsg('contentMsg',r.message||(`Indexed ${docs} docs`+(n?` (${n} from ZIM)`:'')),'ok');
-  await refreshContentPage();
+  _indexingPackId=id;
+  try{
+    showMsg('contentMsg','Indexing… this may take a minute (ZIM extract + knowledge ingest).','info');
+    paintContentFetchPanel({
+      label:'Index for agents', status:'indexing', phase:'starting', done:false,
+      downloaded:0, total:0, indeterminate:true,
+      message:'Indexing… this may take a minute',
+      packId:id, retryKind:'index',
+    });
+    await refreshContentPage();
+    const r=await api('/api/content/index-knowledge',{method:'POST',body:JSON.stringify({id})});
+    if(r.error||(!r.ok&&r.status!=='indexing')){
+      const err=r.message||r.error||'Index failed';
+      showMsg('contentMsg',err,'err');
+      paintContentFetchPanel({
+        label:'Index for agents', status:'error', done:true, error:err, message:err,
+        packId:id, retryKind:'index',
+      });
+      if(_contentFetchState) _contentFetchState.banner={text:err,kind:'err'};
+      return;
+    }
+    const st=await pollIndexKnowledge(id);
+    if(st&&st.done&&st.status==='ready'){
+      const n=st.zim_rag_articles||0;
+      const docs=st.ingested_docs||0;
+      const msg=st.message||(`Indexed ${docs} docs`+(n?` (${n} from ZIM)`:''));
+      showMsg('contentMsg',msg,'ok');
+      if(_contentFetchState){
+        _contentFetchState.message=msg;
+        _contentFetchState.banner={text:msg,kind:'ok'};
+        paintContentFetchPanel(_contentFetchState);
+      }
+    }else if(st&&(st.error||st.status==='error')){
+      const err=st.message||st.error||'Index failed';
+      showMsg('contentMsg',err,'err');
+    }
+  }finally{
+    _indexingPackId=null;
+    await refreshContentPage();
+  }
 }
 async function retryFetchExpand(id){
   showMsg('contentMsg','Retrying curriculum expand download…','info');

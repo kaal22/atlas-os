@@ -71,6 +71,7 @@ from content_manager import (  # noqa: E402
     maps_skip_fetch_env,
     merge_catalogue_status,
     read_content_expand_progress,
+    read_index_knowledge_progress,
     read_maps_fetch_progress,
     read_pack_metadata,
     read_pmtiles_header,
@@ -85,6 +86,7 @@ from content_manager import (  # noqa: E402
     uninstall_pack,
     validate_pmtiles_archive,
     write_content_expand_progress,
+    write_index_knowledge_progress,
     write_maps_fetch_progress,
     write_zim_fetch_progress,
     _pack_slug,
@@ -1311,6 +1313,10 @@ class Handler(BaseHTTPRequestHandler):
             if pack_id and not pack_slug:
                 pack_slug = pack_id.rsplit(".", 1)[-1].lower()
             return self._json(200, read_content_expand_progress(DATA, pack_slug))
+        if path == "/api/content/index-knowledge-status":
+            qs = parse_qs(urlparse(self.path).query)
+            pack_id = (qs.get("id") or qs.get("pack_id") or [""])[0].strip() or None
+            return self._json(200, read_index_knowledge_progress(DATA, pack_id))
         if path == "/api/chat/threads":
             return self._json(200, {"threads": CHAT.list_threads(sess["username"])})
         if path.startswith("/api/chat/threads/"):
@@ -2013,38 +2019,213 @@ class Handler(BaseHTTPRequestHandler):
             if sess.get("role") not in {"owner", "admin"}:
                 return self._json(403, {"error": "forbidden"})
             pack_id = data.get("id") or data.get("catalogue_id") or ""
+            if not pack_id:
+                return self._json(
+                    400,
+                    {
+                        "error": "pack_id_required",
+                        "message": "Pass catalogue id, e.g. atlas.knowledge.wikipedia-en-mini",
+                    },
+                )
             installed = load_installed(DATA).get("packs") or []
             match = next((p for p in installed if p.get("id") == pack_id), None) if pack_id else None
             if not match:
-                return self._json(404, {"error": "pack_not_installed"})
+                # Also accept slug-only ids (wikipedia-en-mini) for VM/curl convenience.
+                slug = str(pack_id).rsplit(".", 1)[-1].strip().lower()
+                match = next(
+                    (
+                        p
+                        for p in installed
+                        if str(p.get("id") or "").rsplit(".", 1)[-1].strip().lower() == slug
+                        or Path(str(p.get("target") or "")).name == slug
+                    ),
+                    None,
+                )
+                if match:
+                    pack_id = match.get("id") or pack_id
+            if not match:
+                return self._json(
+                    404,
+                    {
+                        "error": "pack_not_installed",
+                        "id": pack_id,
+                        "message": (
+                            f"No installed pack matching {pack_id}. "
+                            "Expected e.g. atlas.knowledge.wikipedia-en-mini → "
+                            "/srv/atlas/knowledge/packs/wikipedia-en-mini"
+                        ),
+                    },
+                )
             target = Path(match["target"])
+            if not target.is_dir():
+                # Recover common Wikipedia layout if registry target is stale.
+                slug = str(match.get("id") or pack_id).rsplit(".", 1)[-1].strip().lower()
+                fallback = DATA / "knowledge" / "packs" / slug
+                if fallback.is_dir():
+                    target = fallback
+                else:
+                    return self._json(
+                        404,
+                        {
+                            "error": "pack_target_missing",
+                            "id": pack_id,
+                            "target": str(Path(match["target"])),
+                            "message": (
+                                f"Pack directory missing: {match['target']}. "
+                                f"Look under {DATA / 'knowledge' / 'packs'}"
+                            ),
+                        },
+                    )
             manifest_path = target / "manifest.json"
             if not manifest_path.is_file():
-                return self._json(400, {"error": "manifest_missing_on_target"})
+                return self._json(
+                    400,
+                    {
+                        "error": "manifest_missing_on_target",
+                        "target": str(target),
+                        "message": f"manifest.json missing under {target}",
+                    },
+                )
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError) as e:
-                return self._json(400, {"error": str(e)})
-            try:
-                info = reindex_knowledge_pack(manifest, target, DATA)
-            except PackError as e:
-                return self._json(400, {"error": str(e)})
-            except Exception as e:  # noqa: BLE001
-                return self._json(500, {"error": str(e)})
-            # Reload shared knowledge index so agents see new extracts immediately.
-            try:
-                KS._load_index()
-            except Exception:
-                pass
-            audit_event({
-                "event": "content.index_knowledge",
-                "pack_id": match.get("id"),
-                "ingested_docs": info.get("ingested_docs"),
-                "zim_rag_articles": info.get("zim_rag_articles"),
-                "username": sess.get("username"),
-                "ip": ip,
-            })
-            return self._json(200, info)
+                return self._json(400, {"error": str(e), "target": str(target)})
+            prev = read_index_knowledge_progress(DATA, pack_id)
+            if prev.get("status") in {"indexing", "starting"} and not prev.get("done"):
+                return self._json(
+                    202,
+                    {
+                        "ok": True,
+                        "status": "indexing",
+                        "id": pack_id,
+                        "message": prev.get("message")
+                        or "Indexing already in progress — this may take a minute",
+                    },
+                )
+            write_index_knowledge_progress(
+                DATA,
+                {
+                    "pack_id": pack_id,
+                    "status": "indexing",
+                    "phase": "starting",
+                    "done": False,
+                    "indeterminate": True,
+                    "message": "Indexing… this may take a minute (ZIM extract + knowledge ingest)",
+                },
+                pack_id,
+            )
+
+            def _do_index(m=manifest, tgt=target, pid=pack_id, user=sess.get("username"), client_ip=ip):
+                write_index_knowledge_progress(
+                    DATA,
+                    {
+                        "pack_id": pid,
+                        "status": "indexing",
+                        "phase": "extracting",
+                        "done": False,
+                        "indeterminate": True,
+                        "message": "Extracting ZIM articles and indexing for agents…",
+                    },
+                    pid,
+                )
+                try:
+                    info = reindex_knowledge_pack(m, tgt, DATA)
+                except PackError as e:
+                    write_index_knowledge_progress(
+                        DATA,
+                        {
+                            "pack_id": pid,
+                            "status": "error",
+                            "done": True,
+                            "error": str(e),
+                            "message": str(e),
+                        },
+                        pid,
+                    )
+                    audit_event({
+                        "event": "content.index_knowledge",
+                        "pack_id": pid,
+                        "result": "fail",
+                        "error": str(e),
+                        "username": user,
+                        "ip": client_ip,
+                    })
+                    return
+                except Exception as e:  # noqa: BLE001
+                    write_index_knowledge_progress(
+                        DATA,
+                        {
+                            "pack_id": pid,
+                            "status": "error",
+                            "done": True,
+                            "error": str(e),
+                            "message": str(e),
+                        },
+                        pid,
+                    )
+                    audit_event({
+                        "event": "content.index_knowledge",
+                        "pack_id": pid,
+                        "result": "fail",
+                        "error": str(e),
+                        "username": user,
+                        "ip": client_ip,
+                    })
+                    return
+                # Reload shared knowledge index so agents see new extracts immediately.
+                try:
+                    KS._load_index()
+                except Exception:
+                    pass
+                payload = {
+                    "pack_id": pid,
+                    "status": "ready",
+                    "done": True,
+                    "ok": True,
+                    "ingested_docs": info.get("ingested_docs"),
+                    "zim_rag_articles": info.get("zim_rag_articles"),
+                    "zim_rag": info.get("zim_rag"),
+                    "message": info.get("message")
+                    or (
+                        f"Indexed {info.get('ingested_docs') or 0} document(s) for agents"
+                        + (
+                            f" ({info.get('zim_rag_articles') or 0} from ZIM extract)"
+                            if info.get("zim_rag_articles")
+                            else ""
+                        )
+                    ),
+                    "percent": 100,
+                }
+                # Surface extract backend errors (e.g. zimdump missing) even when ingest ok.
+                zim_rag = info.get("zim_rag") if isinstance(info.get("zim_rag"), dict) else None
+                if zim_rag and zim_rag.get("error") and not int(zim_rag.get("extracted") or 0):
+                    payload["warning"] = str(zim_rag.get("error"))
+                    if not int(info.get("ingested_docs") or 0):
+                        payload["status"] = "error"
+                        payload["error"] = str(zim_rag.get("error"))
+                        payload["message"] = (
+                            f"Index finished with 0 docs: {zim_rag.get('error')}"
+                        )
+                write_index_knowledge_progress(DATA, payload, pid)
+                audit_event({
+                    "event": "content.index_knowledge",
+                    "pack_id": pid,
+                    "ingested_docs": info.get("ingested_docs"),
+                    "zim_rag_articles": info.get("zim_rag_articles"),
+                    "username": user,
+                    "ip": client_ip,
+                })
+
+            threading.Thread(target=_do_index, daemon=True).start()
+            return self._json(
+                202,
+                {
+                    "ok": True,
+                    "status": "indexing",
+                    "id": pack_id,
+                    "message": "Indexing… this may take a minute",
+                },
+            )
 
         if path == "/api/content/cancel-maps-fetch":
             if sess.get("role") not in {"owner", "admin"}:

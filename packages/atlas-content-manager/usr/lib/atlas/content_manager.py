@@ -1872,6 +1872,74 @@ def read_zim_fetch_progress(atlas_root: Path, pack_slug: str | None = None) -> d
         return {"downloaded": 0, "total": 0, "done": False, "status": "error", "percent": None}
 
 
+def index_knowledge_progress_path(atlas_root: Path, pack_id: str | None = None) -> Path:
+    """Progress marker for Command Centre “Index for agents” jobs."""
+    root = Path(atlas_root) / "knowledge"
+    root.mkdir(parents=True, exist_ok=True)
+    if pack_id:
+        safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", str(pack_id)).strip("._") or "pack"
+        return root / f".index-knowledge-progress-{safe}"
+    return root / ".index-knowledge-progress"
+
+
+def write_index_knowledge_progress(
+    atlas_root: Path, payload: dict[str, Any], pack_id: str | None = None
+) -> None:
+    data = dict(payload)
+    pid = pack_id or data.get("pack_id") or data.get("id")
+    if pid:
+        data["pack_id"] = pid
+        data["id"] = pid
+    data.setdefault("downloaded", 0)
+    data.setdefault("total", 0)
+    data["updated_at"] = time.time()
+    if data.get("started_at") is None and not data.get("done"):
+        data["started_at"] = data["updated_at"]
+    data = _enrich_fetch_progress(data)
+    path = index_knowledge_progress_path(atlas_root, str(pid) if pid else None)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    if pid:
+        index_knowledge_progress_path(atlas_root).write_text(
+            json.dumps(data, indent=2) + "\n", encoding="utf-8"
+        )
+
+
+def read_index_knowledge_progress(
+    atlas_root: Path, pack_id: str | None = None
+) -> dict[str, Any]:
+    path = index_knowledge_progress_path(atlas_root, pack_id)
+    if not path.is_file():
+        path = index_knowledge_progress_path(atlas_root)
+    if not path.is_file():
+        return {
+            "downloaded": 0,
+            "total": 0,
+            "done": False,
+            "status": "idle",
+            "percent": None,
+            "indeterminate": True,
+        }
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            # If caller asked for a specific pack, ignore stale global marker for another pack.
+            if pack_id and data.get("pack_id") and str(data.get("pack_id")) != str(pack_id):
+                if not index_knowledge_progress_path(atlas_root, pack_id).is_file():
+                    return {
+                        "downloaded": 0,
+                        "total": 0,
+                        "done": False,
+                        "status": "idle",
+                        "percent": None,
+                        "indeterminate": True,
+                    }
+            return _enrich_fetch_progress(data)
+        return {"downloaded": 0, "total": 0, "done": False, "status": "idle", "percent": None}
+    except (json.JSONDecodeError, OSError):
+        return {"downloaded": 0, "total": 0, "done": False, "status": "error", "percent": None}
+
+
 def request_cancel_zim_fetch(
     atlas_root: Path,
     pack_slug: str,
@@ -2483,6 +2551,60 @@ def extract_zim_html_articles(
     return lib_info
 
 
+def _write_zim_rag_marker(target: Path, marker: dict[str, Any]) -> None:
+    """Write .atlas-zim-rag.json at pack root and under extracted/ for easy discovery."""
+    text = json.dumps(marker, indent=2) + "\n"
+    for path in (Path(target) / ".atlas-zim-rag.json", Path(target) / "extracted" / ".atlas-zim-rag.json"):
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        except OSError:
+            pass
+
+
+def _find_pack_zim_paths(
+    manifest: dict[str, Any],
+    target: Path,
+    atlas_root: Path,
+    *,
+    zim_path: Path | None = None,
+) -> list[Path]:
+    """Locate ZIM binaries beside the pack and/or in the shared Kiwix library."""
+    found: list[Path] = []
+    seen: set[str] = set()
+
+    def _add(p: Path | None) -> None:
+        if not p or not p.is_file():
+            return
+        try:
+            key = str(p.resolve())
+        except OSError:
+            key = str(p)
+        if key in seen:
+            return
+        seen.add(key)
+        found.append(p)
+
+    _add(Path(zim_path) if zim_path else None)
+    if Path(target).is_dir():
+        for zim in sorted(Path(target).rglob("*.zim")):
+            _add(zim)
+    cfg = _zim_fetch_config(manifest)
+    want = str(cfg.get("filename") or "").strip()
+    if want and not want.lower().endswith(".zim"):
+        want = f"{want}.zim"
+    if want:
+        _add(Path(target) / want)
+        _add(Path(atlas_root) / "kiwix" / want)
+    # Fallback: any matching name already under kiwix/ (registered copy).
+    if not found and want:
+        kiwix = Path(atlas_root) / "kiwix"
+        if kiwix.is_dir():
+            for zim in sorted(kiwix.glob(want)):
+                _add(zim)
+    return found
+
+
 def maybe_extract_zim_html_for_rag(
     manifest: dict[str, Any],
     target: Path,
@@ -2500,27 +2622,46 @@ def maybe_extract_zim_html_for_rag(
     allowlist = cfg.get("allowlist") if isinstance(cfg.get("allowlist"), list) else None
     if allowlist is None and isinstance(cfg.get("seed_titles"), list):
         allowlist = cfg.get("seed_titles")
-    zims: list[Path] = []
-    if zim_path and Path(zim_path).is_file():
-        zims.append(Path(zim_path))
-    elif target.is_dir():
-        zims.extend(sorted(target.rglob("*.zim")))
+    zims = _find_pack_zim_paths(manifest, target, atlas_root, zim_path=zim_path)
+    out_dir = Path(target) / "extracted"
     if not zims:
         # Seed HTML (curated) still counts as selective RAG without a ZIM binary.
         seed = target / "rag-html" if target.is_dir() else None
         seeded = 0
         if seed and seed.is_dir():
-            extracted = target / "extracted"
-            extracted.mkdir(parents=True, exist_ok=True)
+            out_dir.mkdir(parents=True, exist_ok=True)
             for html_file in sorted(seed.glob("*.html"))[:max_articles]:
-                dest = extracted / html_file.name
+                dest = out_dir / html_file.name
                 if not dest.exists():
                     shutil.copy2(html_file, dest)
                 seeded += 1
-        return {"ok": True, "backend": "rag-html-seed", "extracted": seeded, "zim": None}
+        result: dict[str, Any] = {
+            "ok": seeded > 0,
+            "backend": "rag-html-seed",
+            "extracted": seeded,
+            "zim": None,
+            "zims": [],
+        }
+        if seeded == 0:
+            want = str(_zim_fetch_config(manifest).get("filename") or "").strip() or "wikipedia*.zim"
+            result["error"] = (
+                f"no_zim_found under {target} or {Path(atlas_root) / 'kiwix'} "
+                f"(expected {want}; and no rag-html seed). "
+                "Use Content → Retry ZIM, then Index for agents."
+            )
+            result["ok"] = False
+        marker = {
+            "pack_id": manifest.get("id"),
+            "extracted": seeded,
+            "backends": ["rag-html-seed"] if seeded else [],
+            "zims": [],
+            "error": result.get("error"),
+            "at": time.time(),
+        }
+        _write_zim_rag_marker(Path(target), marker)
+        return result
 
-    out_dir = Path(target) / "extracted"
-    combined = {"ok": True, "extracted": 0, "backends": [], "zims": []}
+    combined: dict[str, Any] = {"ok": True, "extracted": 0, "backends": [], "zims": []}
     for zim in zims[:3]:
         info = extract_zim_html_articles(
             zim, out_dir, max_articles=max_articles, allowlist=allowlist
@@ -2549,12 +2690,11 @@ def maybe_extract_zim_html_for_rag(
         "pack_id": manifest.get("id"),
         "extracted": combined["extracted"],
         "backends": combined["backends"],
+        "zims": combined["zims"],
+        "error": combined.get("error"),
         "at": time.time(),
     }
-    try:
-        (out_dir / ".atlas-zim-rag.json").write_text(json.dumps(marker, indent=2) + "\n", encoding="utf-8")
-    except OSError:
-        pass
+    _write_zim_rag_marker(Path(target), marker)
     return combined
 
 
@@ -2571,7 +2711,12 @@ def reindex_knowledge_pack(
     target = Path(target)
     atlas_root = Path(atlas_root)
     if not target.is_dir():
-        raise PackError(f"pack target missing: {target}")
+        raise PackError(
+            f"pack target missing: {target} "
+            f"(expected e.g. /srv/atlas/knowledge/packs/wikipedia-en-mini)"
+        )
+    if not (target / "manifest.json").is_file():
+        raise PackError(f"manifest_missing_on_target: {target / 'manifest.json'}")
     _workflow_knowledge_index(manifest, target, atlas_root)
     marker_path = target / ".atlas-indexed"
     zim_rag: dict[str, Any] | None = None
@@ -2584,12 +2729,40 @@ def reindex_knowledge_pack(
         except (OSError, json.JSONDecodeError, TypeError, ValueError):
             pass
     extracted = int((zim_rag or {}).get("extracted") or 0)
+    # ZIM-backed packs (Wikipedia etc.): never report silent success with 0 extract.
+    if _zim_fetch_config(manifest) and extracted == 0:
+        err = (zim_rag or {}).get("error")
+        if not err:
+            want = str(_zim_fetch_config(manifest).get("filename") or "").strip() or "wikipedia*.zim"
+            if not _find_pack_zim_paths(manifest, target, atlas_root):
+                err = (
+                    f"no_zim_found under {target} or {atlas_root / 'kiwix'} "
+                    f"(expected {want}). Use Content → Retry ZIM, then Index for agents."
+                )
+            else:
+                err = (
+                    "zim_extract_empty (install zim-tools/zimdump or python3-libzim, "
+                    "then retry Index for agents)"
+                )
+        raise PackError(
+            f"Index produced 0 ZIM articles for {manifest.get('id')}: {err} "
+            f"(check {target / '.atlas-zim-rag.json'})"
+        )
+    cfg = _zim_rag_config(manifest)
+    if cfg and cfg.get("enabled") is not False and extracted == 0 and ingested == 0:
+        err = (zim_rag or {}).get("error") or "zim_rag_extract_failed"
+        raise PackError(
+            f"Index produced 0 docs for {manifest.get('id')}: {err} "
+            f"(target={target}; look for .atlas-zim-rag.json beside the pack)"
+        )
     return {
         "ok": True,
         "pack_id": manifest.get("id"),
+        "target": str(target),
         "ingested_docs": ingested,
         "zim_rag_articles": extracted,
         "zim_rag": zim_rag,
+        "marker": str(target / ".atlas-zim-rag.json"),
         "message": (
             f"Indexed {ingested} document(s) for agents"
             + (f" ({extracted} from ZIM extract)" if extracted else "")

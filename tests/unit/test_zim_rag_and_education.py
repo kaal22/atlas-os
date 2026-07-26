@@ -55,6 +55,9 @@ def test_rag_html_seed_extract_without_zimdump():
         assert info.get("ok")
         assert int(info.get("extracted") or 0) >= 1
         assert (target / "extracted" / "Solar_System.html").is_file()
+        assert (target / ".atlas-zim-rag.json").is_file()
+        marker = json.loads((target / ".atlas-zim-rag.json").read_text(encoding="utf-8"))
+        assert int(marker.get("extracted") or 0) >= 1
 
 
 def test_extract_zim_html_articles_uses_zimdump_mock():
@@ -283,6 +286,70 @@ def test_extract_prefers_seed_titles_via_zimdump():
         assert any("Eiffel" in p.name for p in out.glob("*.html"))
 
 
+def test_no_zim_found_writes_root_marker():
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "pack"
+        target.mkdir()
+        atlas = Path(td) / "atlas"
+        (atlas / "kiwix").mkdir(parents=True)
+        manifest = {
+            "id": "atlas.knowledge.wikipedia-en-mini",
+            "name": "Wiki mini",
+            "meta": {
+                "zim_rag": {"enabled": True, "max_articles": 5},
+                "zim_fetch": {"filename": "wikipedia_en_all_mini.zim"},
+            },
+        }
+        info = maybe_extract_zim_html_for_rag(manifest, target, atlas)
+        assert info is not None
+        assert not info.get("ok")
+        assert "no_zim_found" in str(info.get("error") or "")
+        assert (target / ".atlas-zim-rag.json").is_file()
+
+
+def test_finds_zim_in_kiwix_library():
+    with tempfile.TemporaryDirectory() as td:
+        target = Path(td) / "pack"
+        target.mkdir()
+        atlas = Path(td) / "atlas"
+        zim = atlas / "kiwix" / "wikipedia_en_all_mini.zim"
+        zim.parent.mkdir(parents=True)
+        zim.write_bytes(b"FAKE-ZIM")
+        out_html = None
+
+        def fake_run(cmd, **kwargs):
+            class R:
+                returncode = 0
+                stdout = b""
+                stderr = b""
+
+            if cmd[1] == "list":
+                r = R()
+                r.stdout = "path: A/Gravity\n"
+                return r
+            if cmd[1] == "show":
+                r = R()
+                r.stdout = b"<html><body><h1>Gravity</h1></body></html>"
+                return r
+            return R()
+
+        manifest = {
+            "id": "atlas.knowledge.wikipedia-en-mini",
+            "meta": {
+                "zim_rag": {"enabled": True, "max_articles": 2},
+                "zim_fetch": {"filename": "wikipedia_en_all_mini.zim"},
+            },
+        }
+        with mock.patch("content_manager.shutil.which", return_value="/usr/bin/zimdump"), mock.patch(
+            "content_manager.subprocess.run", side_effect=fake_run
+        ):
+            info = maybe_extract_zim_html_for_rag(manifest, target, atlas)
+        assert info and info.get("ok")
+        assert int(info.get("extracted") or 0) >= 1
+        assert (target / ".atlas-zim-rag.json").is_file()
+        assert (target / "extracted" / ".atlas-zim-rag.json").is_file()
+
+
 if __name__ == "__main__":
     test_rag_html_seed_extract_without_zimdump()
     test_extract_zim_html_articles_uses_zimdump_mock()
@@ -291,4 +358,6 @@ if __name__ == "__main__":
     test_kolibri_prepare_writes_channel_lock()
     test_expand_resolves_file_url()
     test_zim_rag_defaults_on_for_zim_fetch_packs()
+    test_no_zim_found_writes_root_marker()
+    test_finds_zim_in_kiwix_library()
     print("OK test_zim_rag_and_education")

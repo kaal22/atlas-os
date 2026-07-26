@@ -310,7 +310,12 @@ def save_wizard_state(state: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def call_system_daemon(method: str, params: dict[str, Any] | None = None, ttl_sec: int = 60) -> dict[str, Any]:
+def call_system_daemon(
+    method: str,
+    params: dict[str, Any] | None = None,
+    ttl_sec: int = 60,
+    timeout_sec: float = 15,
+) -> dict[str, Any]:
     """JSON-line RPC to atlas-system-daemon over AF_UNIX."""
     import socket
 
@@ -320,7 +325,7 @@ def call_system_daemon(method: str, params: dict[str, Any] | None = None, ttl_se
     req = {"method": method, "token": token, "params": params or {}}
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-            sock.settimeout(15)
+            sock.settimeout(timeout_sec)
             sock.connect(str(SYSTEM_SOCK))
             sock.sendall((json.dumps(req) + "\n").encode("utf-8"))
             data = b""
@@ -2184,38 +2189,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(403, {"error": "path_not_allowed"})
             if not p.is_file():
                 return self._json(404, {"error": "bundle_not_found"})
-            import subprocess
-            helper = HERE / "atlas-apply-update.py"
-            result_file = Path("/srv/atlas/updates/staging/.apply-result.json")
-            result_file.unlink(missing_ok=True)
-            cmd = [
-                "systemd-run", "--wait", "--collect", "--pipe",
-                "-p", "ProtectSystem=false",
-                "-p", "ProtectHome=false",
-                "/usr/bin/python3", str(helper), str(p),
-            ]
-            try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-            except subprocess.TimeoutExpired:
-                return self._json(500, {"error": "apply timed out", "ok": False})
-            except OSError as e:
-                return self._json(500, {"error": f"apply spawn failed: {e}", "ok": False})
-            body = None
-            if result_file.is_file():
-                try:
-                    body = json.loads(result_file.read_text(encoding="utf-8"))
-                except json.JSONDecodeError:
-                    pass
-            if body is None:
-                out = (proc.stdout or "").strip()
-                if out:
-                    try:
-                        body = json.loads(out)
-                    except json.JSONDecodeError:
-                        pass
-            if body is None:
-                err = (proc.stderr or "").strip() or f"apply exited {proc.returncode}"
-                return self._json(500, {"error": err, "ok": False})
+            body = call_system_daemon(
+                "update.apply",
+                {"path": str(p), "timeout_sec": 600},
+                ttl_sec=700,
+                timeout_sec=650,
+            )
+            if body.get("error") in {"system_daemon_unavailable", "daemon_rpc_failed"}:
+                return self._json(503, {**body, "ok": False})
             result_ok = bool(body.get("ok"))
             audit_event({
                 "event": "update.apply",
@@ -2232,22 +2213,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, body)
 
         if path in {"/api/updates/os/check", "/api/updates/os/apply", "/api/updates/os/enable-source"}:
-            import subprocess
-
-            helper = HERE / "atlas-os-apt.py"
-            # Prefer packaged helper next to updater when running from source tree.
-            upd_helper = (
-                PACKAGES / "atlas-updater" / "usr" / "lib" / "atlas" / "atlas-os-apt.py"
-            )
-            if not helper.is_file() and upd_helper.is_file():
-                helper = upd_helper
-            if Path("/usr/lib/atlas/atlas-os-apt.py").is_file():
-                helper = Path("/usr/lib/atlas/atlas-os-apt.py")
-            result_file = Path("/srv/atlas/updates/staging/.os-apply-result.json")
-            result_file.unlink(missing_ok=True)
-            if path == "/api/updates/os/check":
-                helper_args = ["check"]
-            elif path == "/api/updates/os/enable-source":
+            op = path.rsplit("/", 1)[-1]
+            method = f"update.os.{op}"
+            params: dict[str, Any] = {"timeout_sec": 900}
+            if path == "/api/updates/os/enable-source":
                 repo = (data.get("path") or data.get("repo") or "").strip()
                 if not repo:
                     return self._json(400, {"error": "path_required"})
@@ -2266,19 +2235,11 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 if not any(resolved.startswith(p) for p in allowed_prefixes):
                     return self._json(403, {"error": "path_not_allowed"})
-                helper_args = ["enable-source", resolved]
-            else:
-                # apply
+                params["path"] = resolved
+            elif path == "/api/updates/os/apply":
                 full = bool(data.get("full_system"))
                 confirmed = bool(data.get("owner_confirmed"))
                 dry = bool(data.get("dry_run"))
-                helper_args = ["apply"]
-                if full:
-                    helper_args.append("--full")
-                if confirmed:
-                    helper_args.append("--owner-confirmed")
-                if dry:
-                    helper_args.append("--dry-run")
                 if full and not confirmed:
                     return self._json(
                         400,
@@ -2288,51 +2249,15 @@ class Handler(BaseHTTPRequestHandler):
                             "detail": "Full OS upgrade requires owner_confirmed=true.",
                         },
                     )
-            cmd = [
-                "systemd-run", "--wait", "--collect", "--pipe",
-                "-p", "ProtectSystem=false",
-                "-p", "ProtectHome=false",
-                "/usr/bin/python3", str(helper), *helper_args,
-            ]
-            try:
-                proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
-            except subprocess.TimeoutExpired:
-                return self._json(500, {"error": "os_update timed out", "ok": False})
-            except OSError as e:
-                # Dev environments without systemd-run: run helper directly.
-                try:
-                    proc = subprocess.run(
-                        ["/usr/bin/python3", str(helper), *helper_args],
-                        capture_output=True,
-                        text=True,
-                        timeout=900,
-                    )
-                except Exception as e2:
-                    return self._json(500, {"error": f"os_update spawn failed: {e}; {e2}", "ok": False})
-            body = None
-            if result_file.is_file():
-                try:
-                    body = json.loads(result_file.read_text(encoding="utf-8"))
-                except json.JSONDecodeError:
-                    pass
-            if body is None:
-                out = (proc.stdout or "").strip()
-                if out:
-                    # Last JSON object line
-                    for line in reversed(out.splitlines()):
-                        line = line.strip()
-                        if line.startswith("{"):
-                            try:
-                                body = json.loads(line)
-                                break
-                            except json.JSONDecodeError:
-                                continue
-            if body is None:
-                err = (proc.stderr or "").strip() or f"os_update exited {proc.returncode}"
-                return self._json(500, {"error": err, "ok": False})
+                params["full_system"] = full
+                params["owner_confirmed"] = confirmed
+                params["dry_run"] = dry
+            body = call_system_daemon(method, params, ttl_sec=1000, timeout_sec=950)
+            if body.get("error") in {"system_daemon_unavailable", "daemon_rpc_failed"}:
+                return self._json(503, {**body, "ok": False})
             audit_event({
                 "event": "update.os",
-                "op": path.rsplit("/", 1)[-1],
+                "op": op,
                 "ok": bool(body.get("ok", True)),
                 "username": sess["username"],
                 "scope": body.get("scope"),

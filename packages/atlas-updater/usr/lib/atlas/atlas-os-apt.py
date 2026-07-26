@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Privileged helper for Atlas APT / OS package updates.
 
-Invoked via systemd-run from Command Centre (ProtectSystem=false), same pattern
-as atlas-apply-update.py. Does not expose a network listener.
+Invoked via systemd-run from atlas-system-daemon (ProtectSystem=false), same
+pattern as atlas-apply-update.py. Does not expose a network listener.
 """
 from __future__ import annotations
 

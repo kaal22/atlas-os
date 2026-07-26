@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import socketserver
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -42,12 +43,26 @@ ALLOWED = {
     "update.os.status",
     "update.os.check",
     "update.os.apply",
+    "update.os.enable-source",
     "container.install",
     "container.start",
     "container.stop",
     "container.remove",
     "logs.bundle.create",
 }
+
+# Helpers live next to this module on the installed image; fall back for source-tree runs.
+APPLY_HELPER = Path("/usr/lib/atlas/atlas-apply-update.py")
+OS_APT_HELPER = Path("/usr/lib/atlas/atlas-os-apt.py")
+APPLY_RESULT = Path("/srv/atlas/updates/staging/.apply-result.json")
+OS_APPLY_RESULT = Path("/srv/atlas/updates/staging/.os-apply-result.json")
+ALLOWED_OS_SOURCE_PREFIXES = (
+    "/srv/atlas/",
+    "/usr/share/atlas/",
+    "/media/",
+    "/mnt/",
+    "/run/media/",
+)
 
 # Modes applied live with dry_run=False. Others remain dry-run unless owner confirms.
 LIVE_MODES = {"private_device"}
@@ -58,6 +73,101 @@ def audit(event: dict[str, Any]) -> None:
     event = {**event, "ts": datetime.now(timezone.utc).isoformat(), "source": "system_daemon"}
     with AUDIT_LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event) + "\n")
+
+
+def _resolve_helper(primary: Path, *fallbacks: Path) -> Path | None:
+    for candidate in (primary, *fallbacks):
+        if candidate.is_file():
+            return candidate
+    # Source-tree layout: packages/atlas-system-daemon/usr/lib/atlas → packages/
+    packages_root = Path(__file__).resolve().parents[4]
+    repo_upd = packages_root / "atlas-updater" / "usr" / "lib" / "atlas"
+    for name in (primary.name, *(p.name for p in fallbacks)):
+        cand = repo_upd / name
+        if cand.is_file():
+            return cand
+    return None
+
+
+def _parse_helper_stdout(stdout: str) -> dict[str, Any] | None:
+    out = (stdout or "").strip()
+    if not out:
+        return None
+    # Prefer last JSON object line (helpers may print progress then JSON).
+    for line in reversed(out.splitlines()):
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                return json.loads(line)
+            except json.JSONDecodeError:
+                continue
+    try:
+        return json.loads(out)
+    except json.JSONDecodeError:
+        return None
+
+
+def _run_privileged_helper(
+    helper: Path,
+    args: list[str],
+    *,
+    result_file: Path,
+    timeout_sec: int,
+) -> dict[str, Any]:
+    """Run update helper outside ProtectSystem=strict via systemd-run.
+
+    Command Centre must not import subprocess; the daemon owns this boundary.
+    """
+    result_file.unlink(missing_ok=True)
+    cmd = [
+        "systemd-run",
+        "--wait",
+        "--collect",
+        "--pipe",
+        "-p",
+        "ProtectSystem=false",
+        "-p",
+        "ProtectHome=false",
+        "/usr/bin/python3",
+        str(helper),
+        *args,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_sec)
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "helper timed out"}
+    except OSError as e:
+        # Dev environments without systemd-run: run helper directly.
+        try:
+            proc = subprocess.run(
+                ["/usr/bin/python3", str(helper), *args],
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+            )
+        except Exception as e2:
+            return {"ok": False, "error": f"helper spawn failed: {e}; {e2}"}
+
+    body: dict[str, Any] | None = None
+    if result_file.is_file():
+        try:
+            body = json.loads(result_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            body = None
+    if body is None:
+        body = _parse_helper_stdout(proc.stdout or "")
+    if body is None:
+        err = (proc.stderr or "").strip() or f"helper exited {proc.returncode}"
+        return {"ok": False, "error": err}
+    return body
+
+
+def _os_source_allowed(repo: str) -> bool:
+    try:
+        resolved = str(Path(repo).resolve())
+    except OSError:
+        resolved = repo
+    return any(resolved.startswith(p) for p in ALLOWED_OS_SOURCE_PREFIXES)
 
 
 def verify_token(token: str | None, capability: str) -> bool:
@@ -210,21 +320,94 @@ def handle(req: dict[str, Any]) -> dict[str, Any]:
             "persisted": (not dry_run) or mode == "private_device",
         }
 
+    if method == "update.apply":
+        raw_path = str(params.get("path") or "")
+        if not raw_path:
+            return {"ok": False, "error": "path_required"}
+        bundle = Path(raw_path)
+        if not str(bundle).endswith(".atlas-update"):
+            audit({"event": "update.apply", "result": "deny", "reason": "path_not_allowed"})
+            return {"ok": False, "error": "path_not_allowed"}
+        if not bundle.is_file():
+            return {"ok": False, "error": "bundle_not_found"}
+        helper = _resolve_helper(APPLY_HELPER, HERE / "atlas-apply-update.py")
+        if helper is None:
+            return {"ok": False, "error": "apply_helper_missing"}
+        body = _run_privileged_helper(
+            helper,
+            [str(bundle)],
+            result_file=APPLY_RESULT,
+            timeout_sec=int(params.get("timeout_sec") or 600),
+        )
+        audit({
+            "event": "update.apply",
+            "result": "allow" if body.get("ok") else "fail",
+            "path": str(bundle),
+            "ok": bool(body.get("ok")),
+            "rolled_back": body.get("rolled_back"),
+            "version": body.get("version"),
+        })
+        if not body.get("ok") and "error" not in body:
+            body["error"] = body.get("detail") or "apply failed"
+        return body
+
     if method.startswith("update.os."):
-        # Phase 1: Command Centre runs apt via systemd-run + atlas-os-apt.py
-        # (daemon ProtectSystem=strict cannot mutate apt state). Acknowledge
-        # capability tokens for future daemon-owned apt path.
-        audit({"event": "privileged", "result": "allow", "method": method, "via": "capability_ack"})
-        return {
-            "ok": True,
-            "accepted": True,
+        # Daemon ProtectSystem=strict cannot mutate apt state in-process;
+        # one-shot systemd-run relaxes ProtectSystem for atlas-os-apt.py only.
+        helper = _resolve_helper(OS_APT_HELPER, HERE / "atlas-os-apt.py")
+        if helper is None:
+            return {"ok": False, "error": "os_apt_helper_missing"}
+
+        if method == "update.os.check":
+            helper_args = ["check"]
+        elif method == "update.os.enable-source":
+            repo = str(params.get("path") or params.get("repo") or "").strip()
+            if not repo:
+                return {"ok": False, "error": "path_required"}
+            if not _os_source_allowed(repo):
+                audit({"event": "update.os", "result": "deny", "reason": "path_not_allowed", "path": repo})
+                return {"ok": False, "error": "path_not_allowed"}
+            try:
+                resolved = str(Path(repo).resolve())
+            except OSError:
+                resolved = repo
+            helper_args = ["enable-source", resolved]
+        elif method == "update.os.apply":
+            full = bool(params.get("full_system"))
+            confirmed = bool(params.get("owner_confirmed"))
+            dry = bool(params.get("dry_run"))
+            if full and not confirmed:
+                return {
+                    "ok": False,
+                    "error": "owner_confirmation_required",
+                    "detail": "Full OS upgrade requires owner_confirmed=true.",
+                }
+            helper_args = ["apply"]
+            if full:
+                helper_args.append("--full")
+            if confirmed:
+                helper_args.append("--owner-confirmed")
+            if dry:
+                helper_args.append("--dry-run")
+        elif method == "update.os.status":
+            helper_args = ["status"]
+        else:
+            return {"ok": False, "error": "unknown_method"}
+
+        body = _run_privileged_helper(
+            helper,
+            helper_args,
+            result_file=OS_APPLY_RESULT,
+            timeout_sec=int(params.get("timeout_sec") or 900),
+        )
+        audit({
+            "event": "update.os",
+            "result": "allow" if body.get("ok", True) else "fail",
             "method": method,
-            "delegate": "atlas-os-apt.py",
-            "detail": (
-                "APT apply runs through atlas-os-apt.py via systemd-run from Command Centre; "
-                "see docs/updates/OS_UPDATES.md"
-            ),
-        }
+            "ok": bool(body.get("ok", True)),
+            "scope": body.get("scope"),
+        })
+        return body
 
     if method.startswith("container."):
         audit({"event": "privileged", "result": "allow", "method": method, "params": params})

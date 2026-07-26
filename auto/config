@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-# live-build auto/config for Atlas OS (Debian 13 / trixie)
+# live-build auto/config for Arcalium OS (Debian 13 / trixie)
 
 lb config noauto \
 	--mode debian \
@@ -12,10 +12,10 @@ lb config noauto \
 	--debian-installer none \
 	--firmware-binary true \
 	--firmware-chroot true \
-	--iso-application "Atlas OS" \
-	--iso-preparer "Atlas OS builders" \
-	--iso-publisher "Atlas OS" \
-	--iso-volume "ATLAS_OS" \
+	--iso-application "Arcalium OS" \
+	--iso-preparer "Arcalium OS builders" \
+	--iso-publisher "Arcalium OS" \
+	--iso-volume "ARCALIUM_OS" \
 	--memtest none \
 	--win32-loader false \
 	--apt-indices false \

@@ -455,6 +455,7 @@ Release artifacts and publish messaging use `arcalium-os-*.iso` without breaking
 ### Work items
 
 - [x] Change `ISO_NAME` pattern → `arcalium-os-${VERSION}-amd64.iso`
+- [x] `auto/config` ISO metadata → application/preparer/publisher "Arcalium OS", volume `ARCALIUM_OS`
 - [x] Update publish-release titles: `Arcalium OS v…`
 - [ ] Update CI artifact names if uploaded
 - [ ] Decide version policy: brand-only cut can keep `0.1.0-alpha` or tag `0.1.1-alpha` for clarity

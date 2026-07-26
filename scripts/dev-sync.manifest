@@ -97,7 +97,7 @@ config/includes.chroot/usr/share/wallpapers/Atlas/metadata.json|/usr/share/wallp
 # Plymouth theme (hot-sync for VM file checks; initramfs still needs rebuild for real boot splash)
 config/includes.chroot/usr/share/plymouth/themes/arcalium/arcalium.plymouth|/usr/share/plymouth/themes/arcalium/arcalium.plymouth|
 config/includes.chroot/usr/share/plymouth/themes/arcalium/arcalium.script|/usr/share/plymouth/themes/arcalium/arcalium.script|
-config/includes.chroot/usr/share/plymouth/themes/arcalium/background.jpg|/usr/share/plymouth/themes/arcalium/background.jpg|
+config/includes.chroot/usr/share/plymouth/themes/arcalium/background.png|/usr/share/plymouth/themes/arcalium/background.png|
 config/includes.chroot/usr/share/plymouth/themes/arcalium/password_dot.png|/usr/share/plymouth/themes/arcalium/password_dot.png|
 config/includes.chroot/usr/share/plymouth/themes/arcalium/password_dot16.png|/usr/share/plymouth/themes/arcalium/password_dot16.png|
 config/includes.chroot/usr/share/plymouth/themes/arcalium/password_field.png|/usr/share/plymouth/themes/arcalium/password_field.png|
@@ -105,6 +105,7 @@ config/includes.chroot/usr/share/plymouth/themes/arcalium/password_field16.png|/
 config/includes.chroot/etc/plymouth/plymouthd.conf|/etc/plymouth/plymouthd.conf|
 config/includes.chroot/etc/default/grub.d/atlas.cfg|/etc/default/grub.d/atlas.cfg|
 packages/atlas-agent-runtime/usr/share/atlas/agents/atlas.guide.json|/usr/share/atlas/agents/atlas.guide.json|
+packages/atlas-agent-runtime/usr/share/atlas/agents/atlas.research.json|/usr/share/atlas/agents/atlas.research.json|
 packages/atlas-command-centre/usr/share/applications/atlas-command-centre.desktop|/usr/share/applications/atlas-command-centre.desktop|
 packages/atlas-shell/usr/share/applications/atlas-launcher.desktop|/usr/share/applications/atlas-launcher.desktop|
 packages/atlas-shell/usr/share/applications/atlas-gpu-setup.desktop|/usr/share/applications/atlas-gpu-setup.desktop|

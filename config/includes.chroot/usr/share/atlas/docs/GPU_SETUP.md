@@ -1,4 +1,4 @@
-# GPU & AI acceleration setup (Atlas OS)
+# GPU & AI acceleration setup (Arcalium OS)
 
 Local AI (Ollama) works on CPU without drivers, but it will feel slow on larger models.
 If your PC has an NVIDIA GPU, install proprietary drivers so Ollama can use the GPU.

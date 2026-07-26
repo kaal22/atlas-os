@@ -78,10 +78,10 @@ Version: $version
 Section: misc
 Priority: optional
 Architecture: all
-Maintainer: Atlas OS Builders <builders@atlas-os.local>
+Maintainer: Arcalium OS Builders <builders@arcalium.local>
 Installed-Size: $size
 Depends: $depends
-Description: Atlas OS package $name
+Description: Arcalium OS package $name
 EOF
 
   # Fix permissions for scripts

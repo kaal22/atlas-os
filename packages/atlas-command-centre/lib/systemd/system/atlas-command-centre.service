@@ -1,5 +1,5 @@
 [Unit]
-Description=Atlas Command Centre
+Description=Arcalium Command Centre
 After=network.target atlas-firstboot.service local-fs.target
 Wants=atlas-firstboot.service
 

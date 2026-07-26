@@ -1,5 +1,5 @@
 [Unit]
-Description=Atlas System Daemon
+Description=Arcalium System Daemon
 After=local-fs.target
 
 [Service]

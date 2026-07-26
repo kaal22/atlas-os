@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atlas Command Centre — local API + UI on 127.0.0.1:8787."""
+"""Arcalium Command Centre — local API + UI on 127.0.0.1:8787."""
 from __future__ import annotations
 
 import json
@@ -2475,7 +2475,7 @@ def main() -> None:
     UPDATE_INCOMING.mkdir(parents=True, exist_ok=True)
     (DATA / "snapshots").mkdir(parents=True, exist_ok=True)
     server = ThreadingHTTPServer((HOST, PORT), Handler)
-    print(f"Atlas Command Centre on http://{HOST}:{PORT}/", flush=True)
+    print(f"Arcalium Command Centre on http://{HOST}:{PORT}/", flush=True)
     server.serve_forever()
 
 

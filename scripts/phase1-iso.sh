@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Full clean Phase 1 hybrid ISO rebuild (Debian 13 + live-build).
 # Produces a normal-style USB image:
-#   - Install Atlas OS  (default — live session + Calamares)
-#   - Try Atlas OS      (live desktop only)
+#   - Install Arcalium OS  (default — live session + Calamares)
+#   - Try Arcalium OS      (live desktop only)
 #   - UEFI GRUB + BIOS isolinux hybrid boot
 set -euo pipefail
 
@@ -29,7 +29,7 @@ apt-get install -y \
 
 VERSION="$(cat "$ROOT/VERSION")"
 OUT="$ROOT/dist"
-ISO="$OUT/atlas-os-${VERSION}-amd64.iso"
+ISO="$OUT/arcalium-os-${VERSION}-amd64.iso"
 
 echo "=== Full clean Phase 1 rebuild ==="
 echo "Version: $VERSION"
@@ -121,5 +121,5 @@ echo "USB flash example:"
 echo "  sudo dd if=$ISO of=/dev/sdX bs=4M status=progress oflag=sync"
 echo
 echo "Boot menu:"
-echo "  Install Atlas OS  — default, opens Calamares after live desktop starts"
-echo "  Try Atlas OS      — live desktop only (no installer autostart)"
+echo "  Install Arcalium OS  — default, opens Calamares after live desktop starts"
+echo "  Try Arcalium OS      — live desktop only (no installer autostart)"

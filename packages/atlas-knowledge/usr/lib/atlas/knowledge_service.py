@@ -590,7 +590,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory() as td:
         ks = KnowledgeService(Path(td), keyword_only=True)
         p = Path(td) / "sample.md"
-        p.write_text("Atlas OS is an offline-first AI operating environment.", encoding="utf-8")
+        p.write_text("Arcalium OS is an offline-first AI operating environment.", encoding="utf-8")
         ks.ingest_file("u1", p)
         print(ks.search("u1", "offline AI"))
         assert ks.search("u2", "offline AI") == []

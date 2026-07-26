@@ -33,14 +33,14 @@ Rectangle {
         width: parent.width * 0.8
 
         Text {
-            text: "Atlas OS"
+            text: "Arcalium OS"
             color: "#ffffff"
             font.pixelSize: 34
             font.bold: true
             anchors.horizontalCenter: parent.horizontalCenter
         }
         Text {
-            text: "Private offline AI and knowledge environment"
+            text: "Your intelligence. Your knowledge. Anywhere."
             color: "#a8b2c1"
             font.pixelSize: 15
             wrapMode: Text.WordWrap

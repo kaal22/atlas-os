@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish an Atlas OS release to GitHub Releases.
+# Publish an Arcalium OS release to GitHub Releases.
 # Usage:
 #   ./scripts/publish-release.sh --from 0.1.0 --to 0.1.1 --channel stable
 #   [--sign|--no-sign] [--key PATH] [--notes 'text']
@@ -50,7 +50,7 @@ BUNDLE_SHA256=$(sha256sum "$BUNDLE_PATH" | awk '{print $1}')
 BUNDLE_SIZE=$(stat -c%s "$BUNDLE_PATH" 2>/dev/null || stat -f%z "$BUNDLE_PATH")
 
 if [[ -z "$NOTES" ]]; then
-  NOTES="Atlas OS v${TO_VER} update from v${FROM_VER}."
+  NOTES="Arcalium OS v${TO_VER} update from v${FROM_VER}."
 fi
 
 PUBLISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -75,7 +75,7 @@ EOF
 echo ""
 echo "==> Publishing GitHub Release v${TO_VER}..."
 gh release create "v${TO_VER}" \
-  --title "Atlas OS v${TO_VER}" \
+  --title "Arcalium OS v${TO_VER}" \
   --notes "$NOTES" \
   "$BUNDLE_PATH" \
   "$OUT_DIR/channel.json"

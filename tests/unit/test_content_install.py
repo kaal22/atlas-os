@@ -102,7 +102,7 @@ def test_compat_rejects_high_os_version():
         }
         compat = check_compatibility(manifest, atlas)
         assert not compat["ok"]
-        assert any("Atlas OS" in e for e in compat["errors"])
+        assert any("Arcalium OS" in e for e in compat["errors"])
 
 
 def test_checksum_mismatch_raises():

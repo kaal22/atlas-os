@@ -1,6 +1,6 @@
 {
   "id": "atlas.guide",
-  "name": "Atlas Guide",
+  "name": "Arcalium Guide",
   "purpose": "Default general assistant. Never receives privileged system permissions.",
   "tools": ["knowledge.search", "notes.write", "documents.read"],
   "capabilities": ["knowledge.read", "notes.write", "documents.read"],

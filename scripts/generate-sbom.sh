@@ -6,12 +6,12 @@ mkdir -p "$OUT"
 VERSION="$(cat "$ROOT/VERSION")"
 python3 - <<PY
 import json, pathlib, datetime
-out = pathlib.Path(r"$OUT") / f"atlas-os-$VERSION-sbom.spdx.json"
+out = pathlib.Path(r"$OUT") / f"arcalium-os-$VERSION-sbom.spdx.json"
 doc = {
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "name": f"atlas-os-$VERSION",
+  "name": f"arcalium-os-$VERSION",
   "creationInfo": {
     "created": datetime.datetime.utcnow().isoformat() + "Z",
     "creators": ["Tool: atlas-generate-sbom"]

@@ -411,7 +411,7 @@ class AgentRuntime:
         has_sources = bool(task.sources)
 
         system = (
-            f"You are {agent.name}, an Atlas OS local assistant. "
+            f"You are {agent.name}, an Arcalium OS local assistant. "
             f"Purpose: {agent.purpose}. "
             "Stay offline-first. Do not claim to have network or root access. "
             "Be concise and helpful.\n"
@@ -480,12 +480,12 @@ class AgentRuntime:
                 detail = str(e)
                 hint = (
                     "Ollama chat failed. If a model finished downloading, try Chat again — "
-                    "Atlas will use any installed chat model. Detail: " + detail[:400]
+                    "Arcalium will use any installed chat model. Detail: " + detail[:400]
                 )
                 if "llama-server" in detail.lower():
                     hint = (
                         "Ollama is incomplete on this install (llama-server binary missing). "
-                        "Repair with the Atlas host tarball: "
+                        "Repair with the Arcalium host tarball: "
                         "curl the ollama-runtime-cpu.tar.zst, then "
                         "sudo bash scripts/repair-ollama-runtime.sh /tmp/ollama-runtime-cpu.tar.zst "
                         "(or rebuild the ISO). Detail: " + detail[:300]
@@ -531,7 +531,7 @@ if __name__ == "__main__":
     rt = AgentRuntime(dry_run=True)
     guide = AgentManifest(
         id="atlas.guide",
-        name="Atlas Guide",
+        name="Arcalium Guide",
         purpose="General assistant",
         tools=["knowledge.search", "notes.write"],
         capabilities=["knowledge.read", "notes.write"],
@@ -540,6 +540,6 @@ if __name__ == "__main__":
         approval_rules={},
     )
     rt.register_agent(guide)
-    t = rt.create_task("atlas.guide", "What is Atlas OS?")
+    t = rt.create_task("atlas.guide", "What is Arcalium OS?")
     print(rt.plan(t.id))
     print(rt.run_step(t.id))

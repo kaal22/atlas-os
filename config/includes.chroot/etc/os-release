@@ -1,10 +1,10 @@
-PRETTY_NAME="Atlas OS 0.1.0-alpha"
-NAME="Atlas OS"
+PRETTY_NAME="Arcalium OS 0.1.0-alpha"
+NAME="Arcalium OS"
 VERSION_ID="0.1"
 VERSION="0.1.0-alpha"
 VERSION_CODENAME=alpha
-ID=atlas
+ID=arcalium
 ID_LIKE=debian
-HOME_URL="https://atlas-os.local/"
-SUPPORT_URL="https://atlas-os.local/support"
-BUG_REPORT_URL="https://atlas-os.local/issues"
+HOME_URL="https://arcalium.local/"
+SUPPORT_URL="https://arcalium.local/support"
+BUG_REPORT_URL="https://arcalium.local/issues"

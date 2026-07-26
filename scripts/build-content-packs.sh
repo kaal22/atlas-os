@@ -220,7 +220,7 @@ if [[ "$MAPS_ONLY" -eq 0 ]]; then
 }
 EOF
   echo "Creative Commons Attribution 4.0 — Atlas curated home-learning lessons." > "$STAGE/licences/CC-BY-4.0.txt"
-  echo "Atlas OS curated education content (original short lessons)." > "$STAGE/attribution/ATLAS.txt"
+  echo "Arcalium OS curated education content (original short lessons)." > "$STAGE/attribution/ATLAS.txt"
   build_one "$STAGE" "$OUT/atlas-education-kids-home.atlas-pack"
   rm -rf "$STAGE"
 
@@ -237,7 +237,7 @@ EOF
   "version": "2026.07",
   "type": "atlas.content.education",
   "name": "${title}",
-  "description": "Locked Kolibri Studio channel for Atlas Education. Channel media is not in the ISO — install prepares import metadata and opens a one-click path in Command Centre (online Kolibri import or USB export).",
+  "description": "Locked Kolibri Studio channel for Arcalium Education. Channel media is not in the ISO — install prepares import metadata and opens a one-click path in Command Centre (online Kolibri import or USB export).",
   "size_bytes": 4096,
   "minimum_os_version": "0.1.0",
   "architectures": ["all"],
@@ -484,7 +484,7 @@ PY
     cat > "$stage/payload/README.md" <<EOF
 # ${name}
 
-Stub pack: downloads the Kiwix ZIM on install and registers it with Atlas Library
+Stub pack: downloads the Kiwix ZIM on install and registers it with Arcalium Library
 (Kiwix Serve). Do not commit the ZIM into git.
 
 Default URL: ${zim_url}
@@ -549,7 +549,7 @@ PY
   build_library_zim_sku \
     "atlas.knowledge.medicine-en" "medicine-en" \
     "Medical / first aid (EN)" \
-    "English Wikipedia medicine mini ZIM (~155 MB) for Atlas Library (Kiwix). Offline medical and first-aid reference." \
+    "English Wikipedia medicine mini ZIM (~155 MB) for Arcalium Library (Kiwix). Offline medical and first-aid reference." \
     "155000000" "medium" \
     "https://download.kiwix.org/zim/wikipedia/wikipedia_en_medicine_mini_2026-04.zim" \
     "wikipedia_en_medicine_mini.zim" \
@@ -559,7 +559,7 @@ PY
   build_library_zim_sku \
     "atlas.knowledge.howto-ifixit-en" "howto-ifixit-en" \
     "DIY repair / how-to (iFixit EN)" \
-    "iFixit English repair guides ZIM (~3.3 GB) for Atlas Library. Large download — confirm free disk before install." \
+    "iFixit English repair guides ZIM (~3.3 GB) for Arcalium Library. Large download — confirm free disk before install." \
     "3300000000" "large" \
     "https://download.kiwix.org/zim/ifixit/ifixit_en_all_2025-12.zim" \
     "ifixit_en_all.zim" \
@@ -570,7 +570,7 @@ PY
   build_library_zim_sku \
     "atlas.knowledge.gutenberg-en" "gutenberg-en" \
     "Project Gutenberg books (EN literature)" \
-    "Project Gutenberg English literature slice (LCC PN, ~3 GB) for Atlas Library. Full English Gutenberg (~206 GB) is OEM/external only." \
+    "Project Gutenberg English literature slice (LCC PN, ~3 GB) for Arcalium Library. Full English Gutenberg (~206 GB) is OEM/external only." \
     "3000000000" "large" \
     "https://download.kiwix.org/zim/gutenberg/gutenberg_en_lcc-pn_2026-03.zim" \
     "gutenberg_en_lcc-pn.zim" \
@@ -834,7 +834,7 @@ wiki_skus = [
         "id": "atlas.knowledge.medicine-en",
         "name": "Medical / first aid (EN)",
         "description": (
-            "English Wikipedia medicine mini ZIM (~155 MB) for Atlas Library (Kiwix). "
+            "English Wikipedia medicine mini ZIM (~155 MB) for Arcalium Library (Kiwix). "
             "Offline medical and first-aid reference."
         ),
         "size_hint_bytes": 155_000_000,
@@ -852,7 +852,7 @@ wiki_skus = [
         "id": "atlas.knowledge.howto-ifixit-en",
         "name": "DIY repair / how-to (iFixit EN)",
         "description": (
-            "iFixit English repair guides ZIM (~3.3 GB) for Atlas Library. "
+            "iFixit English repair guides ZIM (~3.3 GB) for Arcalium Library. "
             "Large download — confirm free disk before install."
         ),
         "size_hint_bytes": 3_300_000_000,
@@ -871,7 +871,7 @@ wiki_skus = [
         "id": "atlas.knowledge.gutenberg-en",
         "name": "Project Gutenberg books (EN literature)",
         "description": (
-            "Project Gutenberg English literature slice (LCC PN, ~3 GB) for Atlas Library. "
+            "Project Gutenberg English literature slice (LCC PN, ~3 GB) for Arcalium Library. "
             "Full English Gutenberg (~206 GB) is OEM/external only."
         ),
         "size_hint_bytes": 3_000_000_000,

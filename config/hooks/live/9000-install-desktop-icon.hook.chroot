@@ -11,7 +11,7 @@ rm -f /etc/atlas/firstboot-pending /etc/atlas/firstboot-done
 rm -f /etc/xdg/autostart/atlas-launcher.desktop \
       /etc/skel/.config/autostart/atlas-launcher.desktop
 
-# Live desktop: Install only (Atlas OS + Command Centre icons are for the installed system).
+# Live desktop: Install only (Arcalium OS + Command Centre icons are for the installed system).
 rm -f /etc/skel/Desktop/atlas-launcher.desktop \
       /etc/skel/Desktop/atlas-command-centre.desktop
 
@@ -45,7 +45,7 @@ chmod 755 /usr/lib/atlas/maybe-autostart-installer.sh
 cat > /etc/xdg/autostart/atlas-install-autostart.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Atlas Install Autostart
+Name=Arcalium Install Autostart
 Exec=/usr/lib/atlas/maybe-autostart-installer.sh
 Terminal=false
 NoDisplay=true
@@ -61,10 +61,10 @@ cat > /etc/skel/Desktop/install-atlas-os.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Install Atlas OS
-GenericName=Atlas OS Installer
+Name=Install Arcalium OS
+GenericName=Arcalium OS Installer
 Exec=atlas-install
-Comment=Install Atlas OS on this computer
+Comment=Install Arcalium OS on this computer
 Keywords=calamares;system;install;atlas;installer
 Icon=system-software-install
 Terminal=false

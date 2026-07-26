@@ -18,19 +18,19 @@ SOURCES = [
     {
         "name": "notes.md",
         "path": "/home/u/Documents/notes.md",
-        "text": "Atlas OS keeps AI local and private on your device.",
+        "text": "Arcalium OS keeps AI local and private on your device.",
         "chunk_index": 0,
     }
 ]
 
 
 def test_detects_bullet_source_dump():
-    dump = "- notes.md (chunk 0): Atlas OS keeps AI local\n- other.md (chunk 1): more text"
+    dump = "- notes.md (chunk 0): Arcalium OS keeps AI local\n- other.md (chunk 1): more text"
     assert _looks_like_source_dump(dump, SOURCES) is True
 
 
 def test_accepts_prose_summary():
-    prose = "According to notes.md, Atlas OS is designed to keep AI local and private on your device."
+    prose = "According to notes.md, Arcalium OS is designed to keep AI local and private on your device."
     assert _looks_like_source_dump(prose, SOURCES) is False
 
 

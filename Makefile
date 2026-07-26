@@ -8,7 +8,7 @@ OUT_DIR ?= $(CURDIR)/dist
 	test-unit test-integration test-install test-security clean sbom sign dev-serve dev-push
 
 help:
-	@echo "Atlas OS $(VERSION) — targets:"
+	@echo "Arcalium OS $(VERSION) — targets:"
 	@echo "  deps            Install build dependencies (Debian host)"
 	@echo "  catalog         Validate sources.catalog.yaml"
 	@echo "  lock-refresh    Resolve digests / hashes (requires network)"

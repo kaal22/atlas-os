@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Atlas GPU & AI Setup
+Name=Arcalium GPU & AI Setup
 Comment=Check GPU drivers and open the offline setup guide
 Exec=atlas-gpu-setup --guide
 Icon=atlas

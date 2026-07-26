@@ -1,4 +1,4 @@
-# Atlas OS 1.0 release criteria checklist
+# Arcalium OS 1.0 release criteria checklist
 
 Track against product §45. Mark when automated or manual verification lands.
 

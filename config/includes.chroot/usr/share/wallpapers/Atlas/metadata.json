@@ -2,12 +2,12 @@
     "KPlugin": {
         "Authors": [
             {
-                "Name": "Atlas OS"
+                "Name": "Arcalium OS"
             }
         ],
         "Id": "Atlas",
         "License": "Proprietary",
-        "Name": "Atlas OS",
-        "Description": "Atlas OS — dark geometric wallpaper with blue and amber accents"
+        "Name": "Arcalium OS",
+        "Description": "Arcalium OS — Your intelligence. Your knowledge. Anywhere."
     }
 }

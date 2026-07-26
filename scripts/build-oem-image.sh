@@ -6,7 +6,7 @@ OUT="${2:-$ROOT/dist}"
 CACHE="${1:-$ROOT/build-cache}"
 mkdir -p "$OUT"
 VERSION="$(cat "$ROOT/VERSION")"
-IMG="$OUT/atlas-os-${VERSION}-oem-amd64.img"
+IMG="$OUT/arcalium-os-${VERSION}-oem-amd64.img"
 # Compact placeholder for pipeline wiring (real OEM uses virt-make-fs of golden disk)
 python3 - <<PY
 from pathlib import Path

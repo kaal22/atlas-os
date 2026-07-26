@@ -1,6 +1,6 @@
 # Arcalium OS — staged rebrand plan (Atlas OS → Arcalium OS)
 
-> **Status:** Plan only — do not implement until this document is approved.  
+> **Status:** Milestone A implemented in-tree (26 July 2026) — user-visible Arcalium OS strings; Milestone B still deferred.  
 > **Date:** 26 July 2026  
 > **Repo inventory baseline:** `/home/kaal/Desktop/atlas-os` (excludes generated `chroot/`, `build/`, ISO binaries)  
 > **Canonical product name:** **Arcalium** (short) / **Arcalium OS** (full)  
@@ -126,8 +126,8 @@ Establish slogan, meta tags, logo/wallpaper ownership, and where new Arcalium as
 - [ ] Produce (or commission) logo mark for CC/Calamares/SDDM; place under:
   - Source: `assets/arcalium-logo.png` (+ SVG if available)
   - Runtime (Milestone A): still install as `/usr/lib/atlas/atlas-logo.png` **or** dual-ship `arcalium-logo.png` and point UI at new path without renaming the directory
-- [ ] Wire slogan into Welcome wizard + About surface
-- [ ] Add HTML `<title>` + `<meta name="description">` (+ optional `og:title` / `og:description`) using exact meta strings
+- [x] Wire slogan into Welcome wizard + About surface
+- [x] Add HTML `<title>` + `<meta name="description">` (+ optional `og:title` / `og:description`) using exact meta strings
 - [ ] Note Plymouth: still absent — Stage 2 can stub theme name `arcalium` when implemented
 
 ### Risks / migrations
@@ -137,8 +137,8 @@ Establish slogan, meta tags, logo/wallpaper ownership, and where new Arcalium as
 
 ### Done-when
 
-- [ ] Slogan and meta strings appear in at least one shipped HTML surface
-- [ ] Wallpaper Plasma package displays **Arcalium OS** in chooser
+- [x] Slogan and meta strings appear in at least one shipped HTML surface
+- [x] Wallpaper Plasma package displays **Arcalium OS** in chooser
 - [ ] Asset ownership documented (who regenerates 1080p/1440p/4k)
 
 ### Order
@@ -169,10 +169,10 @@ Plasma wallpaper labels, icons, `.desktop` Names, SDDM greeter background labeli
 
 ### Work items
 
-- [ ] Update Plasma wallpaper Name/Description → Arcalium OS + slogan-aware description
-- [ ] Desktop `Name=` / `GenericName=` / `Comment=`: Command Centre, Service Check, GPU Setup, Installer → Arcalium wording (filenames may stay `atlas-*.desktop` in Milestone A)
-- [ ] Launcher HTML title + H1 → **Arcalium OS**; inject meta description
-- [ ] `os-release`: `NAME` / `PRETTY_NAME` → Arcalium OS; **keep `ID=atlas` in Milestone A** (or set `ID=arcalium` only if tooling does not key off it — verify live-build / apt Origin first). Prefer: `NAME="Arcalium OS"`, `ID=arcalium`, `ID_LIKE=debian`, update HOME/SUPPORT URLs to placeholder `arcalium.local` or real domain when known
+- [x] Update Plasma wallpaper Name/Description → Arcalium OS + slogan-aware description
+- [x] Desktop `Name=` / `GenericName=` / `Comment=`: Command Centre, Service Check, GPU Setup, Installer → Arcalium wording (filenames may stay `atlas-*.desktop` in Milestone A)
+- [x] Launcher HTML title + H1 → **Arcalium OS**; inject meta description
+- [x] `os-release`: `NAME` / `PRETTY_NAME` → Arcalium OS; `ID=arcalium`, `ID_LIKE=debian`, HOME/SUPPORT URLs → `arcalium.local`
 - [ ] SDDM: no text brand today beyond wallpaper — ensure wallpaper is Arcalium art; optional future theme rename
 - [ ] Icon theme: Milestone A can keep icon *names* `atlas` (desktop `Icon=atlas`) if artwork is replaced in place; Milestone B renames to `arcalium`
 - [ ] Plymouth (optional stub): add theme package later; not blocking Milestone A
@@ -184,9 +184,9 @@ Plasma wallpaper labels, icons, `.desktop` Names, SDDM greeter background labeli
 
 ### Done-when
 
-- [ ] Fresh session: wallpaper chooser + desktop icons say Arcalium
-- [ ] Service Check / launcher page shows Arcalium OS
-- [ ] `cat /etc/os-release` shows Arcalium OS pretty name
+- [x] Fresh session: wallpaper chooser + desktop icons say Arcalium (in-tree; ISO confirm still open)
+- [x] Service Check / launcher page shows Arcalium OS
+- [x] `cat /etc/os-release` shows Arcalium OS pretty name (in-tree source)
 
 ### Order
 
@@ -216,14 +216,14 @@ Live ISO, Calamares, boot menu, installer launchers, and first-run Welcome copy 
 
 ### Work items
 
-- [ ] Boot menu labels → **Try Arcalium OS** / **Install Arcalium OS** (GRUB + syslinux sections of `9050` hook)
-- [ ] Installer `.desktop` Name/Comment → Install Arcalium OS
-- [ ] Calamares `branding.desc`: `productName`, `shortProductName`, `versionedName`, `bootloaderEntryName` → Arcalium OS / Arcalium
-- [ ] Slideshow QML text “Atlas OS” → “Arcalium OS”
+- [x] Boot menu labels → **Try Arcalium OS** / **Install Arcalium OS** (GRUB + syslinux sections of `9050` hook)
+- [x] Installer `.desktop` Name/Comment → Install Arcalium OS
+- [x] Calamares `branding.desc`: `productName`, `shortProductName`, `versionedName`, `bootloaderEntryName` → Arcalium OS / Arcalium
+- [x] Slideshow QML text “Atlas OS” → “Arcalium OS”
 - [ ] Optional Milestone A: live `hostname=arcalium-live` (keep `username=atlas` unless skel updated)
-- [ ] Wizard Welcome: “Welcome to Arcalium”; body mentions Arcalium; show slogan under hero
-- [ ] Home banner “Welcome to Atlas” → Arcalium
-- [ ] Firstboot systemd `Description=` strings → Arcalium OS …
+- [x] Wizard Welcome: “Welcome to Arcalium”; body mentions Arcalium; show slogan under hero
+- [x] Home banner “Welcome to Atlas” → Arcalium
+- [x] Firstboot systemd `Description=` strings → Arcalium OS …
 - [ ] Calamares `componentName: atlas` — **keep in Milestone A** (module path); rename folder in Milestone B with settings.conf update
 
 ### Risks / migrations
@@ -233,10 +233,10 @@ Live ISO, Calamares, boot menu, installer launchers, and first-run Welcome copy 
 
 ### Done-when
 
-- [ ] ISO boot menu shows Install/Try Arcalium OS
-- [ ] Calamares welcome shows Arcalium OS
-- [ ] First-run Welcome step shows Arcalium + slogan
-- [ ] No user-facing “Install Atlas OS” on live desktop
+- [x] ISO boot menu shows Install/Try Arcalium OS (hook updated; rebuild ISO to confirm)
+- [x] Calamares welcome shows Arcalium OS (in-tree)
+- [x] First-run Welcome step shows Arcalium + slogan
+- [x] No user-facing “Install Atlas OS” on live desktop (source strings updated)
 
 ### Order
 
@@ -264,15 +264,15 @@ Command Centre, Maps, Library, Education, agents’ *display* names, and About c
 
 ### Work items
 
-- [ ] CC `<title>` → meta title: **Arcalium OS | Private Offline AI Operating System** (or shorter in-app: **Arcalium Command Centre** with meta description set separately)
-- [ ] Add `<meta name="description" content="…">` exact meta description
-- [ ] Sidebar wordmark → **Arcalium OS** / Command Centre
-- [ ] “Atlas Library” → “Arcalium Library” (or “Library” + powered-by line)
-- [ ] “Atlas Education” → “Arcalium Education”
-- [ ] “Atlas Maps” → “Arcalium Maps”
-- [ ] “Atlas Guide” **display** → “Arcalium Guide” (keep `value="atlas.guide"`)
-- [ ] Chat empty state / wizard agent copy
-- [ ] Maps viewer HTML titles/NOTICE user-facing lines
+- [x] CC `<title>` → meta title: **Arcalium OS | Private Offline AI Operating System** (or shorter in-app: **Arcalium Command Centre** with meta description set separately)
+- [x] Add `<meta name="description" content="…">` exact meta description
+- [x] Sidebar wordmark → **Arcalium OS** / Command Centre
+- [x] “Atlas Library” → “Arcalium Library” (or “Library” + powered-by line)
+- [x] “Atlas Education” → “Arcalium Education”
+- [x] “Atlas Maps” → “Arcalium Maps”
+- [x] “Atlas Guide” **display** → “Arcalium Guide” (keep `value="atlas.guide"`)
+- [x] Chat empty state / wizard agent copy
+- [x] Maps viewer HTML titles/NOTICE user-facing lines
 - [ ] APT Origin / publisher display strings in updater UI if shown
 
 ### Risks / migrations
@@ -282,9 +282,9 @@ Command Centre, Maps, Library, Education, agents’ *display* names, and About c
 
 ### Done-when
 
-- [ ] Grep of user-facing HTML/JS for `Atlas OS`, `Atlas Library`, `Atlas Maps`, `Welcome to Atlas` is clean (allow comments / test fixtures with care)
-- [ ] Agents still run with `atlas.*` IDs
-- [ ] Meta title + description present in CC head
+- [x] Grep of user-facing HTML/JS for `Atlas OS`, `Atlas Library`, `Atlas Maps`, `Welcome to Atlas` is clean (allow comments / test fixtures with care)
+- [x] Agents still run with `atlas.*` IDs
+- [x] Meta title + description present in CC head
 
 ### Order
 
@@ -369,10 +369,10 @@ User-facing catalogue/update/publisher names say Arcalium; stable IDs and on-dis
 
 ### Work items
 
-- [ ] Milestone A: `scripts/build-release-update.sh` publisher + release notes → Arcalium OS
-- [ ] Milestone A: APT `Origin: Arcalium OS` in `scripts/build-apt-repo.sh`
-- [ ] Milestone A: Maintainer strings in generated debs
-- [ ] Document pack-ID freeze in BACKLOG / this plan
+- [x] Milestone A: `scripts/build-release-update.sh` publisher + release notes → Arcalium OS
+- [x] Milestone A: APT `Origin: Arcalium OS` in `scripts/build-apt-repo.sh`
+- [x] Milestone A: Maintainer strings in generated debs
+- [x] Document pack-ID freeze in BACKLOG / this plan
 - [ ] Milestone B design: content-manager alias table `atlas.*` ↔ `arcalium.*`
 - [ ] Do **not** wholesale-rename `.atlas-pack` on USB media without a migration tool
 
@@ -384,8 +384,8 @@ User-facing catalogue/update/publisher names say Arcalium; stable IDs and on-dis
 
 ### Done-when
 
-- [ ] New update notes say Arcalium OS
-- [ ] Existing packs still install by `atlas.*` id
+- [x] New update notes say Arcalium OS
+- [x] Existing packs still install by `atlas.*` id
 - [ ] Written decision: pack IDs frozen through at least next major
 
 ### Order
@@ -412,12 +412,12 @@ Spec, user docs, backlog, and README speak Arcalium; implementation status notes
 
 ### Work items
 
-- [ ] Rewrite product header: working title **Arcalium OS**; keep historical “derived from N.O.M.A.D.” language
-- [ ] §53 / BACKLOG: add rebrand checklist pointer to this plan; retitle polish items
-- [ ] README H1 + blurb + slogan
-- [ ] User GETTING_STARTED: Install Arcalium OS
-- [ ] Legal attribution: “Arcalium OS is based on Debian…”
-- [ ] CI workflow display name
+- [x] Rewrite product header: working title **Arcalium OS**; keep historical “derived from N.O.M.A.D.” language
+- [x] §53 / BACKLOG: add rebrand checklist pointer to this plan; retitle polish items
+- [x] README H1 + blurb + slogan
+- [x] User GETTING_STARTED: Install Arcalium OS
+- [x] Legal attribution: “Arcalium OS is based on Debian…”
+- [x] CI workflow display name
 - [ ] Optional: website meta tags (exact strings from brand assets)
 - [ ] Note deferred: GitHub repo rename `atlas-os` → `arcalium-os` (breaks clone URLs, badges, update endpoint defaults that point at GitHub Releases)
 
@@ -428,8 +428,8 @@ Spec, user docs, backlog, and README speak Arcalium; implementation status notes
 
 ### Done-when
 
-- [ ] Top-level docs say Arcalium OS
-- [ ] This plan linked from BACKLOG / PLAN
+- [x] Top-level docs say Arcalium OS
+- [x] This plan linked from BACKLOG / PLAN
 - [ ] Repo rename listed as deferred with owners
 
 ### Order
@@ -454,8 +454,8 @@ Release artifacts and publish messaging use `arcalium-os-*.iso` without breaking
 
 ### Work items
 
-- [ ] Change `ISO_NAME` pattern → `arcalium-os-${VERSION}-amd64.iso`
-- [ ] Update publish-release titles: `Arcalium OS v…`
+- [x] Change `ISO_NAME` pattern → `arcalium-os-${VERSION}-amd64.iso`
+- [x] Update publish-release titles: `Arcalium OS v…`
 - [ ] Update CI artifact names if uploaded
 - [ ] Decide version policy: brand-only cut can keep `0.1.0-alpha` or tag `0.1.1-alpha` for clarity
 - [ ] Refresh sha256/sha512 generation paths
@@ -468,8 +468,8 @@ Release artifacts and publish messaging use `arcalium-os-*.iso` without breaking
 
 ### Done-when
 
-- [ ] `make iso` (or phase script) emits `arcalium-os-*.iso` + checksums
-- [ ] GitHub Release title uses Arcalium OS
+- [x] `make iso` (or phase script) emits `arcalium-os-*.iso` + checksums (script-side; rebuild to produce artifact)
+- [x] GitHub Release title uses Arcalium OS
 - [ ] Smoke: UEFI boot → Install Arcalium OS → desktop brand check
 
 ### Order

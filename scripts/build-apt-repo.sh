@@ -51,7 +51,7 @@ if command -v apt-ftparchive >/dev/null 2>&1; then
   apt-ftparchive packages "$OUT/pool/$COMPONENT" > "$BIN_DIR/Packages"
   gzip -9c "$BIN_DIR/Packages" > "$BIN_DIR/Packages.gz"
   apt-ftparchive \
-    -o "APT::FTPArchive::Release::Origin=Atlas OS" \
+    -o "APT::FTPArchive::Release::Origin=Arcalium OS" \
     -o "APT::FTPArchive::Release::Label=Atlas" \
     -o "APT::FTPArchive::Release::Suite=$SUITE" \
     -o "APT::FTPArchive::Release::Codename=$SUITE" \
@@ -81,7 +81,7 @@ PY
   done
   gzip -9c "$BIN_DIR/Packages" > "$BIN_DIR/Packages.gz"
   cat > "$OUT/dists/$SUITE/Release" <<EOF
-Origin: Atlas OS
+Origin: Arcalium OS
 Label: Atlas
 Suite: $SUITE
 Codename: $SUITE

@@ -10,7 +10,7 @@ cat > /etc/skel/Desktop/atlas-launcher.desktop <<'EOF'
 Type=Application
 Version=1.0
 Name=Service Check
-GenericName=Atlas Service Check
+GenericName=Arcalium Service Check
 Comment=Check Kiwix, Ollama, NOMAD and other local services
 Exec=/usr/bin/atlas-launcher
 TryExec=/usr/bin/atlas-launcher
@@ -49,8 +49,8 @@ cat > /etc/skel/Desktop/atlas-command-centre.desktop <<'EOF'
 Type=Application
 Version=1.0
 Name=Command Centre
-GenericName=Atlas Command Centre
-Comment=Open Atlas Command Centre (AI, models, agents)
+GenericName=Arcalium Command Centre
+Comment=Open Arcalium Command Centre (AI, models, agents)
 Exec=/usr/bin/atlas-open-command-centre
 TryExec=/usr/bin/atlas-open-command-centre
 Icon=atlas
@@ -90,8 +90,8 @@ mkdir -p /etc/skel/.config/autostart
 cat > /etc/skel/.config/autostart/atlas-trust-desktop.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Atlas Trust Desktop Launchers
-Comment=Mark Atlas desktop icons as launchable (Plasma)
+Name=Arcalium Trust Desktop Launchers
+Comment=Mark Arcalium desktop icons as launchable (Plasma)
 Exec=/usr/lib/atlas/trust-desktop-launchers.sh
 Terminal=false
 NoDisplay=true

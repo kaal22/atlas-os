@@ -1,5 +1,5 @@
 [Unit]
-Description=Atlas OS offline payload import (after Docker)
+Description=Arcalium OS offline payload import (after Docker)
 After=docker.service
 Wants=docker.service
 ConditionPathExists=/etc/atlas/payload-enabled

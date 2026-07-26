@@ -36,7 +36,7 @@ EOF
 # System-wide hint for Qt apps when a stray Wayland session appears
 mkdir -p /etc/environment.d
 cat > /etc/environment.d/10-atlas-x11.conf <<'EOF'
-# Atlas OS: prefer X11/xcb unless the user explicitly starts a Wayland session
+# Arcalium OS: prefer X11/xcb unless the user explicitly starts a Wayland session
 QT_QPA_PLATFORM=xcb
 EOF
 
@@ -45,7 +45,7 @@ mkdir -p /usr/share/atlas/docs
 cat > /usr/share/atlas/docs/X11_DEFAULT.md <<'EOF'
 # Atlas display server policy
 
-Atlas OS defaults to **X11** (Plasma on Xorg via SDDM).
+Arcalium OS defaults to **X11** (Plasma on Xorg via SDDM).
 
 Wayland Plasma session entries are disabled at image build time because:
 

@@ -77,7 +77,7 @@ def test_guide_manifest_tool_not_on_manifest_denied():
     rt.register_agent(
         AgentManifest(
             id="atlas.guide",
-            name="Atlas Guide",
+            name="Arcalium Guide",
             purpose="guide",
             tools=["knowledge.search"],
             capabilities=["knowledge.read"],

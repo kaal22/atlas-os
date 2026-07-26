@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Atlas Wallpaper
-Comment=Set the Atlas glowing-triangle desktop wallpaper
+Name=Arcalium Wallpaper
+Comment=Set the Arcalium glowing-triangle desktop wallpaper
 Exec=/usr/lib/atlas/set-wallpaper.sh
 OnlyShowIn=KDE;
 X-KDE-autostart-after=panel

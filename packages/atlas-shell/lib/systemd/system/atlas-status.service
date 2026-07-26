@@ -1,5 +1,5 @@
 [Unit]
-Description=Atlas local services status page (127.0.0.1:8791)
+Description=Arcalium local services status page (127.0.0.1:8791)
 After=network.target
 ConditionKernelCommandLine=!boot=live
 

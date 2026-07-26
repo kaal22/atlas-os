@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect Phase 6 content-pack evidence on an installed Atlas OS system.
+# Collect Phase 6 content-pack evidence on an installed Arcalium OS system.
 set -euo pipefail
 
 OUT="${1:-/srv/atlas/logs/phase6-evidence.txt}"

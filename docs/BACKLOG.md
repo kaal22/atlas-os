@@ -1,4 +1,4 @@
-# Atlas OS — backlog
+# Arcalium OS — backlog
 
 Actionable leftovers after recent main-line work. Check boxes as items land.
 
@@ -30,8 +30,8 @@ On a live or installed Plasma session:
 - [ ] `/usr/lib/atlas/set-wallpaper.sh` is executable; assets exist under `/usr/share/backgrounds/atlas/*.png`
 - [ ] Plasma package tree `/usr/share/wallpapers/Atlas/contents/images/` has 1920×1080 (and optional 1440p/4k)
 - [ ] Autostart: `/etc/xdg/autostart/atlas-wallpaper.desktop` and skel copy
-- [ ] SDDM: `/usr/share/sddm/themes/breeze/theme.conf.user` `background=` points at Atlas PNG (hook `9030-atlas-wallpaper`)
-- [ ] After login, desktop shows Atlas wallpaper (or run `/usr/lib/atlas/set-wallpaper.sh` and check `/tmp/atlas-wallpaper.log`)
+- [ ] SDDM: `/usr/share/sddm/themes/breeze/theme.conf.user` `background=` points at Arcalium PNG (hook `9030-atlas-wallpaper`)
+- [ ] After login, desktop shows Arcalium wallpaper (or run `/usr/lib/atlas/set-wallpaper.sh` and check `/tmp/atlas-wallpaper.log`)
 
 ## What's left
 
@@ -48,17 +48,18 @@ On a live or installed Plasma session:
 
 ### Desktop polish & branding
 
+- [x] **Milestone A user-visible rebrand → Arcalium OS** — strings, meta, wallpaper labels, Calamares/boot/desktop, CC chrome, ISO `arcalium-os-*.iso` naming; pack/agent IDs and `/srv/atlas` paths frozen — see [`docs/ARCALIUM_REBRAND_PLAN.md`](ARCALIUM_REBRAND_PLAN.md)
 - [x] **Wallpaper wiring (M1)** — helper, hook, SDDM `theme.conf.user`, autostart; ISO visual confirm still open
 - [ ] **Wallpaper confirmed on ISO** — verify Plasma wallpaper applies live + installed (checklist above)
-- [ ] **Theme polish** — Plasma look-and-feel, Command Centre UI, and shell (`atlas-launcher`) visual polish so the desktop reads as Atlas, not stock Breeze
-- [ ] **Custom splash screens** — brand boot / login surfaces (Atlas today uses SDDM + Breeze + wallpaper symlink; no custom Plymouth theme yet):
+- [ ] **Theme polish** — Plasma look-and-feel, Command Centre UI, and shell (`atlas-launcher`) visual polish so the desktop reads as Arcalium, not stock Breeze
+- [ ] **Custom splash screens** — brand boot / login surfaces (Arcalium today uses SDDM + Breeze + wallpaper symlink; no custom Plymouth theme yet):
 
   | Surface | Current | Paths / notes |
   |---------|---------|---------------|
-  | SDDM greeter | Theme `breeze` + `theme.conf.user` Atlas background | `config/includes.chroot/etc/sddm.conf.d/10-atlas.conf`; hook `9030-atlas-wallpaper.hook.chroot` |
-  | Plasma session wallpaper | Helper + Atlas wallpaper package | `/usr/lib/atlas/set-wallpaper.sh`, `/usr/share/backgrounds/atlas/*.png` |
+  | SDDM greeter | Theme `breeze` + `theme.conf.user` Arcalium background | `config/includes.chroot/etc/sddm.conf.d/10-atlas.conf`; hook `9030-atlas-wallpaper.hook.chroot` |
+  | Plasma session wallpaper | Helper + Arcalium wallpaper package | `/usr/lib/atlas/set-wallpaper.sh`, `/usr/share/backgrounds/atlas/*.png` |
   | Live / installed GRUB | Menu labels + `os-release` | `9050-atlas-boot-menu.hook.binary`, `/etc/default/grub.d/atlas.cfg` |
-  | Calamares installer | Atlas branding | `/usr/share/atlas/calamares/branding/atlas` |
+  | Calamares installer | Arcalium branding | `/usr/share/atlas/calamares/branding/atlas` |
   | Plymouth (boot splash) | Not customised | Add branded Plymouth theme if desired for installed boot |
 
 ### Updates (production path)

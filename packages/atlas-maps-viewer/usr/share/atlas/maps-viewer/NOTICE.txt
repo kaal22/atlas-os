@@ -1,4 +1,4 @@
-Atlas Maps viewer (offline MapLibre)
+Arcalium Maps viewer (offline MapLibre)
 
 Vendored browser libraries were extracted from the pinned Project NOMAD v1.33.0
 container image (already in Atlas build-cache), not fetched at runtime:

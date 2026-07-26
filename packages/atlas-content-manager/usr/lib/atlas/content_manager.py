@@ -350,7 +350,7 @@ def _resolve_target(manifest: dict[str, Any], atlas_root: Path) -> Path:
 def check_compatibility(manifest: dict[str, Any], atlas_root: Path) -> dict[str, Any]:
     errors: list[str] = []
     if not _version_ok(str(manifest.get("minimum_os_version", "0"))):
-        errors.append(f"needs Atlas OS {manifest.get('minimum_os_version')} or newer")
+        errors.append(f"needs Arcalium OS {manifest.get('minimum_os_version')} or newer")
     if not _arch_ok(manifest):
         errors.append("not compatible with this CPU architecture")
     installed = {p["id"]: p for p in load_installed(atlas_root).get("packs", [])}
@@ -2427,7 +2427,7 @@ def _workflow_education_kolibri_prepare(
     (target / "IMPORT.txt").write_text(
         "\n".join(
             [
-                f"Atlas Education — {lock['channel_name']}",
+                f"Arcalium Education — {lock['channel_name']}",
                 f"Locked channel_id: {channel_id}",
                 "",
                 lock["online_hint"],

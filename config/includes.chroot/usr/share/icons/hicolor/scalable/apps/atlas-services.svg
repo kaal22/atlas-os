@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Service Check icon: gear/cog (Atlas OS triangle stays Icon=atlas). -->
+<!-- Service Check icon: gear/cog (Arcalium OS triangle stays Icon=atlas). -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
   <defs>
     <filter id="soft" x="-15%" y="-15%" width="130%" height="130%">

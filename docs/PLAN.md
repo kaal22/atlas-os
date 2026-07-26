@@ -1,4 +1,4 @@
-# Atlas OS — phased plan (working summary)
+# Arcalium OS — phased plan (working summary)
 
 Canonical backlog checkboxes: [`docs/BACKLOG.md`](BACKLOG.md).
 
@@ -33,10 +33,12 @@ Canonical backlog checkboxes: [`docs/BACKLOG.md`](BACKLOG.md).
 - [x] Kids expand URL pinned on-device + GitHub raw fallback
 - [x] `.atlas-update` honors `restart_services` + `reboot_required` (CC messaging)
 - [x] APT OS-update **phase 1** scaffold (local/USB `atlas-*` repo + CC `/api/updates/os/*`) — see `docs/updates/OS_UPDATES.md`
+- [x] **Arcalium OS Milestone A** — user-visible rebrand (display strings / ISO name); internals stay `atlas-*` — [`docs/ARCALIUM_REBRAND_PLAN.md`](ARCALIUM_REBRAND_PLAN.md)
 - Plymouth / deeper theme polish  
 - APT **phase 2** — hosted signed mirror + full Debian security upgrades (owner-gated)  
 - Production `atlas-update-metadata` / APT keyring ceremony (dev signing path already ships; see SIGNING_PLAN)  
 - Final ISO cut (`scripts/phase7-iso.sh`) with full boot checklist  
+- **Milestone B** (later) — package/path/unit rename with migration shims
 
 ## Related product phases
 

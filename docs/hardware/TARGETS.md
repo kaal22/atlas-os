@@ -1,4 +1,4 @@
-# Atlas OS hardware targets (Phase 0)
+# Arcalium OS hardware targets (Phase 0)
 
 ## Minimum supported tier
 

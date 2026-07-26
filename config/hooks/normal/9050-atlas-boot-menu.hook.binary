@@ -1,17 +1,17 @@
 #!/bin/sh
 set -e
-# Debian-style boot menu: Try Atlas OS (live) + Install Atlas OS (Calamares).
+# Debian-style boot menu: Try Arcalium OS (live) + Install Arcalium OS (Calamares).
 # Both entries keep GRUB/syslinux intact; Install appends atlas-install for autostart.
 
 label_live_grub() {
   f="$1"
   [ -f "$f" ] || return 0
   sed -i \
-    -e 's/Live system (amd64 fail-safe mode)/Try Atlas OS (fail-safe)/g' \
-    -e 's/Live system (amd64)/Try Atlas OS/g' \
-    -e 's/Live system (autodetect fail-safe mode)/Try Atlas OS (fail-safe)/g' \
-    -e 's/Live system (autodetect)/Try Atlas OS/g' \
-    -e 's/menuentry "Live system/menuentry "Try Atlas OS/g' \
+    -e 's/Live system (amd64 fail-safe mode)/Try Arcalium OS (fail-safe)/g' \
+    -e 's/Live system (amd64)/Try Arcalium OS/g' \
+    -e 's/Live system (autodetect fail-safe mode)/Try Arcalium OS (fail-safe)/g' \
+    -e 's/Live system (autodetect)/Try Arcalium OS/g' \
+    -e 's/menuentry "Live system/menuentry "Try Arcalium OS/g' \
     "$f"
 
   python3 - "$f" <<'PY'
@@ -23,14 +23,14 @@ text = path.read_text(encoding="utf-8")
 
 # Drop any prior Install entry from a previous hook run
 text = re.sub(
-    r'\nmenuentry "Install Atlas OS"[^{]*\{.*?\n\}',
+    r'\nmenuentry "Install Arcalium OS"[^{]*\{.*?\n\}',
     '',
     text,
     flags=re.M | re.S,
 )
 
 m = re.search(
-    r'^menuentry "Try Atlas OS"(?! \(fail-safe\))[^{]*\{.*?\n\}',
+    r'^menuentry "Try Arcalium OS"(?! \(fail-safe\))[^{]*\{.*?\n\}',
     text,
     re.M | re.S,
 )
@@ -43,7 +43,7 @@ if not m:
 try_block = m.group(0)
 install = re.sub(
     r'^menuentry[^\n]*',
-    'menuentry "Install Atlas OS" --hotkey=i {',
+    'menuentry "Install Arcalium OS" --hotkey=i {',
     try_block,
     count=1,
     flags=re.M,
@@ -86,9 +86,9 @@ label_live_syslinux() {
   f="$1"
   [ -f "$f" ] || return 0
   sed -i \
-    -e 's/\^Live system (amd64)/Try Atlas OS/g' \
-    -e 's/Live system (amd64 fail-safe mode)/Try Atlas OS (fail-safe)/g' \
-    -e 's/Live system (amd64)/Try Atlas OS/g' \
+    -e 's/\^Live system (amd64)/Try Arcalium OS/g' \
+    -e 's/Live system (amd64 fail-safe mode)/Try Arcalium OS (fail-safe)/g' \
+    -e 's/Live system (amd64)/Try Arcalium OS/g' \
     "$f"
 
   python3 - "$f" <<'PY'
@@ -107,7 +107,7 @@ if not m:
 block = m.group(1)
 install = block
 install = re.sub(r'^label\s+\S+', 'label install-atlas', install, count=1, flags=re.M)
-install = re.sub(r'menu label\s+.*', 'menu label ^Install Atlas OS', install, count=1)
+install = re.sub(r'menu label\s+.*', 'menu label ^Install Arcalium OS', install, count=1)
 if "atlas-install" not in install:
     install = re.sub(
         r'(append\s+[^\n]+)$',
@@ -138,4 +138,4 @@ for f in binary/isolinux/live.cfg binary/isolinux/menu.cfg; do
   label_live_syslinux "$f"
 done
 
-echo "Boot menu: Install Atlas OS (default) + Try Atlas OS (live)."
+echo "Boot menu: Install Arcalium OS (default) + Try Arcalium OS (live)."

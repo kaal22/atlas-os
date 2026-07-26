@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 VERSION="$(cat VERSION)"
 OUT="$ROOT/dist"
-ISO_NAME="atlas-os-${VERSION}-amd64.iso"
+ISO_NAME="arcalium-os-${VERSION}-amd64.iso"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Re-executing with sudo..."
@@ -30,7 +30,7 @@ cp "$OUT/debs"/atlas-*.deb "$ROOT/config/packages.chroot/"
 # inside the chroot at the correct time. Stale packages.list without Packages
 # makes lb binary fail during early apt update.
 
-echo "=== Inject Install Atlas OS launcher into chroot ==="
+echo "=== Inject Install Arcalium OS launcher into chroot ==="
 install -d \
   "$ROOT/chroot/usr/bin" \
   "$ROOT/chroot/usr/lib/atlas" \
@@ -50,10 +50,10 @@ cat > "$ROOT/chroot/usr/share/applications/calamares-install-debian.desktop" <<'
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Install Atlas OS
-GenericName=Atlas OS Installer
+Name=Install Arcalium OS
+GenericName=Arcalium OS Installer
 Exec=atlas-install
-Comment=Install Atlas OS on this computer
+Comment=Install Arcalium OS on this computer
 Keywords=calamares;system;install;atlas;installer
 Icon=system-software-install
 Terminal=false
@@ -97,7 +97,7 @@ chmod 755 "$ROOT/chroot/usr/lib/atlas/maybe-autostart-installer.sh"
 cat > "$ROOT/chroot/etc/xdg/autostart/atlas-install-autostart.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=Atlas Install Autostart
+Name=Arcalium Install Autostart
 Exec=/usr/lib/atlas/maybe-autostart-installer.sh
 Terminal=false
 NoDisplay=true
@@ -190,4 +190,4 @@ fi
 echo
 echo "OK: $OUT/$ISO_NAME"
 ls -lh "$OUT/$ISO_NAME"
-echo "Default USB boot entry should be: Install Atlas OS"
+echo "Default USB boot entry should be: Install Arcalium OS"

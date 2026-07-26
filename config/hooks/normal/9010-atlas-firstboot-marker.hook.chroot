@@ -10,21 +10,21 @@ rm -f /etc/atlas/firstboot-pending /etc/atlas/firstboot-done
 
 # Public OS identity (Plymouth/login/grub tooling read /etc/os-release).
 cat > /etc/os-release <<'EOF'
-PRETTY_NAME="Atlas OS 0.1.0-alpha"
-NAME="Atlas OS"
+PRETTY_NAME="Arcalium OS 0.1.0-alpha"
+NAME="Arcalium OS"
 VERSION_ID="0.1"
 VERSION="0.1.0-alpha"
 VERSION_CODENAME=alpha
-ID=atlas
+ID=arcalium
 ID_LIKE=debian
-HOME_URL="https://atlas-os.local/"
-SUPPORT_URL="https://atlas-os.local/support"
-BUG_REPORT_URL="https://atlas-os.local/issues"
+HOME_URL="https://arcalium.local/"
+SUPPORT_URL="https://arcalium.local/support"
+BUG_REPORT_URL="https://arcalium.local/issues"
 EOF
 cp -f /etc/os-release /etc/atlas/os-release
 
 mkdir -p /etc/default/grub.d
 cat > /etc/default/grub.d/atlas.cfg <<'EOF'
-GRUB_DISTRIBUTOR="Atlas"
+GRUB_DISTRIBUTOR="Arcalium"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet"
 EOF

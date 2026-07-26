@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect Phase 3 identity/security evidence on an installed Atlas OS system (or VM).
+# Collect Phase 3 identity/security evidence on an installed Arcalium OS system (or VM).
 # Usage: sudo ./scripts/collect-phase3-evidence.sh [outdir]
 set -euo pipefail
 

@@ -1,4 +1,4 @@
-# Atlas OS package updates (APT) vs application bundles
+# Arcalium OS package updates (APT) vs application bundles
 
 Status: Phase 1 scaffold (2026-07-25)  
 Related: [`docs/signing/SIGNING_PLAN.md`](../signing/SIGNING_PLAN.md), [`docs/BACKLOG.md`](../BACKLOG.md)

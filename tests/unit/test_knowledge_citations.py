@@ -39,7 +39,7 @@ def test_ask_returns_sources_for_owner_only():
         rt.register_agent(
             AgentManifest(
                 id="atlas.guide",
-                name="Atlas Guide",
+                name="Arcalium Guide",
                 purpose="General assistant",
                 tools=["knowledge.search", "notes.write"],
                 capabilities=["knowledge.read", "notes.write"],

@@ -1,5 +1,5 @@
 [Unit]
-Description=Atlas nginx reverse proxy (loopback Command Centre)
+Description=Arcalium nginx reverse proxy (loopback Command Centre)
 After=network.target atlas-command-centre.service
 Wants=atlas-command-centre.service
 ConditionKernelCommandLine=!boot=live

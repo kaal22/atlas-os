@@ -2,8 +2,8 @@
 Type=Application
 Version=1.0
 Name=Command Centre
-GenericName=Atlas Command Centre
-Comment=Open Atlas Command Centre (AI, models, agents)
+GenericName=Arcalium Command Centre
+Comment=Open Arcalium Command Centre (AI, models, agents)
 Exec=/usr/bin/atlas-open-command-centre
 TryExec=/usr/bin/atlas-open-command-centre
 Icon=atlas

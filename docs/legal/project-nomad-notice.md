@@ -5,9 +5,9 @@ This product includes software derived from Project N.O.M.A.D.
 - Copyright: Crosstalk Solutions and contributors
 - Licence: Apache License 2.0
 - Upstream: https://github.com/Crosstalk-Solutions/project-nomad
-- Baseline release for Atlas OS alpha: v1.33.0
+- Baseline release for Arcalium OS alpha: v1.33.0
 
-Atlas OS applies a controlled patch set and adapter layer stored under
+Arcalium OS applies a controlled patch set and adapter layer stored under
 `upstream/patches/` and `upstream/adapter/`. Atlas branding does not imply
 endorsement by Crosstalk Solutions.
 

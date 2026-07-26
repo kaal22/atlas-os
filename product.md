@@ -1,6 +1,6 @@
-# Atlas OS — Product Specification
+# Arcalium OS — Product Specification
 
-> **Working title:** Atlas OS  
+> **Working title:** Arcalium OS  
 > **Document:** `product.md`  
 > **Version:** 0.3.0  
 > **Status:** Living product specification — alpha implemented in-tree; see §53 Implementation status  
@@ -16,7 +16,7 @@
 
 ## 1. Executive Summary
 
-Atlas OS is a secure, offline-first operating system that turns a compatible computer into a private AI workstation, knowledge server and multi-agent digital assistant.
+Arcalium OS is a secure, offline-first operating system that turns a compatible computer into a private AI workstation, knowledge server and multi-agent digital assistant.
 
 It combines:
 
@@ -31,9 +31,9 @@ It combines:
 - Signed operating system, application and content updates.
 - Optional online and cloud-model capabilities that remain disabled until the user explicitly enables them.
 
-Atlas OS is derived in part from the open-source Project N.O.M.A.D. platform, but it is not intended to be a cosmetic rebrand. Project N.O.M.A.D. supplies useful offline content-management and application capabilities. Atlas OS adds the operating system, installer, identity and permissions layer, agent runtime, hardware detection, model routing, security boundary, update infrastructure, recovery system, commercial packaging and end-user experience.
+Arcalium OS is derived in part from the open-source Project N.O.M.A.D. platform, but it is not intended to be a cosmetic rebrand. Project N.O.M.A.D. supplies useful offline content-management and application capabilities. Arcalium OS adds the operating system, installer, identity and permissions layer, agent runtime, hardware detection, model routing, security boundary, update infrastructure, recovery system, commercial packaging and end-user experience.
 
-The product should feel like a dedicated appliance rather than a Linux distribution assembled from unrelated components. A non-technical customer must be able to install Atlas OS, choose a use profile, select recommended AI and content packs, and begin using the system without opening a terminal.
+The product should feel like a dedicated appliance rather than a Linux distribution assembled from unrelated components. A non-technical customer must be able to install Arcalium OS, choose a use profile, select recommended AI and content packs, and begin using the system without opening a terminal.
 
 **Implementation note (25 July 2026):** Phases 1–7 of the build plan are substantially landed in the monorepo (ISO tooling, Command Centre on `:8787`, agents, knowledge/RAG, content packs, maps, education, signed `.atlas-update` bundles, backup). Remaining work is primarily polish, production signing/ceremony, deeper content, CI hardening, and final ISO verification — see **§53 Implementation status**.
 
@@ -47,11 +47,11 @@ The product should feel like a dedicated appliance rather than a Linux distribut
 
 ### 2.2 Product promise
 
-Atlas OS keeps the user’s AI, documents, maps, learning resources, notes and essential knowledge available locally. Core functionality continues to work without an internet connection and without an active subscription.
+Arcalium OS keeps the user’s AI, documents, maps, learning resources, notes and essential knowledge available locally. Core functionality continues to work without an internet connection and without an active subscription.
 
 ### 2.3 Positioning
 
-Atlas OS is not positioned as:
+Arcalium OS is not positioned as:
 
 - Another general-purpose Linux distribution.
 - A survival-themed collection of downloaded files.
@@ -60,7 +60,7 @@ Atlas OS is not positioned as:
 - A replacement for professional medical, legal or emergency services.
 - A cloud-first SaaS product that happens to offer an offline mode.
 
-Atlas OS is positioned as:
+Arcalium OS is positioned as:
 
 > A private offline AI and knowledge operating environment for travel, remote living, education, field work, personal knowledge and resilient computing.
 
@@ -78,7 +78,7 @@ Project N.O.M.A.D. proves demand for a self-contained offline knowledge and AI p
 - Content, models and tools can have different hardware and licensing requirements.
 - The customer is responsible for installation, networking, security, updates and recovery.
 
-Atlas OS turns those components into a reproducible commercial product.
+Arcalium OS turns those components into a reproducible commercial product.
 
 The defensible value is not the existence of an installation script. The defensible value is:
 
@@ -148,7 +148,7 @@ Project N.O.M.A.D. integration should be maintained through a controlled upstrea
 
 1. Produce a signed x86-64 hybrid ISO that can boot in UEFI systems and install onto supported laptops, desktops and mini PCs.
 2. Provide a polished live environment and Calamares-based graphical installation flow.
-3. Start Atlas OS into a guided first-run experience after installation.
+3. Start Arcalium OS into a guided first-run experience after installation.
 4. Automatically detect hardware and recommend appropriate local AI profiles.
 5. Provide a private multi-agent workspace powered by local models.
 6. Integrate offline document search, Kiwix libraries, offline maps and Kolibri learning content.
@@ -442,7 +442,7 @@ A later secondary product:
 atlas-install.run
 ```
 
-This installs the Atlas application and agent stack on a supported Debian-family system but does not provide the full appliance guarantees of Atlas OS.
+This installs the Atlas application and agent stack on a supported Debian-family system but does not provide the full appliance guarantees of Arcalium OS.
 
 ---
 
@@ -515,7 +515,7 @@ Technical detail remains available in an Advanced section and downloadable diagn
 └───────────────────────────────┬────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼────────────────────────────────┐
-│                     Atlas Command Centre                      │
+│                     Arcalium Command Centre                      │
 │ Home, agents, knowledge, maps, content, backups, settings      │
 └──────────────┬────────────────┬────────────────┬───────────────┘
                │                │                │
@@ -569,7 +569,7 @@ Atlas supports three presentation modes:
 
 Default for ordinary users.
 
-- Atlas Command Centre launches at login.
+- Arcalium Command Centre launches at login.
 - Desktop icons are minimal.
 - System settings are curated.
 - Advanced Linux administration is hidden but not removed.
@@ -801,7 +801,7 @@ Atlas branding must not imply endorsement by Crosstalk Solutions.
 
 ## 16. Core Atlas Services
 
-### 16.1 Atlas Command Centre
+### 16.1 Arcalium Command Centre
 
 Purpose:
 
@@ -1090,7 +1090,7 @@ limits:
 
 ### 17.3 Built-in launch agents
 
-#### Atlas Guide
+#### Arcalium Guide
 
 The default general assistant.
 
@@ -1474,7 +1474,7 @@ The interface presents capability profiles rather than raw model names. Runtime 
 | Profile / role | Ollama tag | Notes |
 |----------------|------------|--------|
 | Tiny / Starter (CPU) | `qwen2.5:1.5b` | Low-RAM VMs |
-| Light / Balanced (default) | `qwen3:4b` | Default Atlas Guide chat model |
+| Light / Balanced (default) | `qwen3:4b` | Default Arcalium Guide chat model |
 | Embedding | `nomic-embed-text` | Knowledge / RAG |
 | Advanced (GPU) | `qwen3:14b` | Needs capable NVIDIA GPU |
 | Vision / multimodal (optional) | `gemma4:e4b` | “Multimodal / higher RAM (~16 GB)”; GPU or high-RAM systems |
@@ -2074,7 +2074,7 @@ Network mode is applied via the System Daemon; inactive `ufw` soft-fails with pe
 
 #### Step 6: Agents
 
-Enable / select initial default agent (e.g. Atlas Guide).
+Enable / select initial default agent (e.g. Arcalium Guide).
 
 #### Step 7: Recovery
 
@@ -2994,7 +2994,7 @@ Exit criteria:
 
 ### Phase 4 — Agent runtime
 
-**Status: Done (in-tree)** — agent manifests, task flow, model router, policy gateway, Atlas Guide / Research and related launch agents.
+**Status: Done (in-tree)** — agent manifests, task flow, model router, policy gateway, Arcalium Guide / Research and related launch agents.
 
 Deliverables:
 
@@ -3004,7 +3004,7 @@ Deliverables:
 - Policy Gateway.
 - Tool Registry.
 - Approval UI.
-- Atlas Guide and Research Agent.
+- Arcalium Guide and Research Agent.
 - Memory scopes.
 
 Exit criteria:
@@ -3216,7 +3216,7 @@ The first internal alpha must include:
 - One suitable redistributable local chat model.
 - One embedding model.
 - Qdrant.
-- Atlas Guide agent.
+- Arcalium Guide agent.
 - Research Agent.
 - Tool Policy Gateway.
 - Local document import.
@@ -3235,7 +3235,7 @@ The alpha is not commercially releasable until Docker-socket exposure, update si
 
 ## 45. Version 1 Release Criteria
 
-Atlas OS 1.0 may ship only when:
+Arcalium OS 1.0 may ship only when:
 
 1. The ISO installs without internet.
 2. The installed system generates unique secrets.
@@ -3402,7 +3402,7 @@ To prevent the project from stalling in architecture debate, use these defaults 
 - Core ISO under 10 GB where achievable.
 - Models and large content delivered as separate signed packs.
 - Three built-in agents in alpha: Guide, Research and System Steward.
-- Working product name “Atlas OS” stored only in branding configuration to permit later rename.
+- Working product name **Arcalium OS** (Milestone A user-visible rebrand). Internal package/path IDs remain `atlas-*` until Milestone B — see `docs/ARCALIUM_REBRAND_PLAN.md`.
 
 ---
 
@@ -3487,7 +3487,7 @@ The implementation should periodically revalidate these upstream assumptions bec
 
 ## 51. Final Product Definition
 
-Atlas OS is complete when a non-technical customer can:
+Arcalium OS is complete when a non-technical customer can:
 
 1. Install it from a USB stick.
 2. Encrypt the computer.
@@ -3521,7 +3521,7 @@ That lifecycle is what turns an open-source offline server project into a suppor
 
 ### 52.1 Purpose
 
-The build agent must not infer, browse for, or opportunistically install the components required by Atlas OS while creating a release.
+The build agent must not infer, browse for, or opportunistically install the components required by Arcalium OS while creating a release.
 
 All external inputs are controlled by three files:
 
@@ -4070,7 +4070,7 @@ Approximate target: 64–256 GB.
 
 Contains:
 
-- Installed Atlas OS.
+- Installed Arcalium OS.
 - Starter and advanced model options.
 - English Wikipedia package selected for the hardware SKU.
 - Regional maps.
@@ -4202,7 +4202,7 @@ Reconciled from `docs/BACKLOG.md` + `docs/PLAN.md` (verify before treating as do
 
 #### P1 — Desktop polish & branding
 
-- Theme polish (Plasma look-and-feel, Command Centre UI, `atlas-launcher` shell) so the desktop reads as Atlas, not stock Breeze.
+- Theme polish (Plasma look-and-feel, Command Centre UI, `atlas-launcher` shell) so the desktop reads as Arcalium, not stock Breeze.
 - Custom splash screens (Plymouth boot splash; deeper SDDM branding beyond wallpaper).
 - Wallpaper **verification on real live/ISO boot** (in-tree wiring exists; checklist in BACKLOG).
 

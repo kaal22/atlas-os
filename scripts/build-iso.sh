@@ -35,7 +35,7 @@ if ! command -v lb >/dev/null 2>&1; then
   echo "live-build (lb) not found. Generating ISO build evidence stub for CI hosts without lb."
   EVIDENCE="$ROOT/tests/installer/evidence"
   mkdir -p "$EVIDENCE" "$OUT"
-  ISO_NAME="atlas-os-${VERSION}-amd64.iso"
+  ISO_NAME="arcalium-os-${VERSION}-amd64.iso"
   python3 - "$OUT/$ISO_NAME" <<'PY'
 import pathlib, sys, time
 path = pathlib.Path(sys.argv[1])
@@ -83,7 +83,7 @@ for f in live-image-*.hybrid.iso *.hybrid.iso *.iso; do
   if head -c 20 "$f" 2>/dev/null | grep -q ATLAS_OS_ISO_STUB; then
     continue
   fi
-  dest="$OUT/atlas-os-${VERSION}-amd64.iso"
+  dest="$OUT/arcalium-os-${VERSION}-amd64.iso"
   mv -f "$f" "$dest"
   (cd "$OUT" && sha256sum "$(basename "$dest")" | tee "$(basename "$dest").sha256")
   (cd "$OUT" && sha512sum "$(basename "$dest")" | tee "$(basename "$dest").sha512")

@@ -8,17 +8,17 @@ windowSize: 900px,650px
 windowPlacement: center
 
 strings:
-    productName:         Atlas OS
-    shortProductName:    Atlas
+    productName:         Arcalium OS
+    shortProductName:    Arcalium
     version:             0.1.0-alpha
     shortVersion:        0.1
-    versionedName:       Atlas OS 0.1.0-alpha
-    shortVersionedName:  Atlas 0.1
-    bootloaderEntryName: Atlas
-    productUrl:          https://atlas-os.local/
-    supportUrl:          https://atlas-os.local/support
-    knownIssuesUrl:      https://atlas-os.local/issues
-    releaseNotesUrl:     https://atlas-os.local/notes
+    versionedName:       Arcalium OS 0.1.0-alpha
+    shortVersionedName:  Arcalium 0.1
+    bootloaderEntryName: Arcalium
+    productUrl:          https://arcalium.local/
+    supportUrl:          https://arcalium.local/support
+    knownIssuesUrl:      https://arcalium.local/issues
+    releaseNotesUrl:     https://arcalium.local/notes
     donateUrl:           ""
 
 sidebar: widget

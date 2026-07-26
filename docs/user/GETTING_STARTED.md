@@ -1,9 +1,9 @@
-# Atlas OS user documentation (Phase 8)
+# Arcalium OS user documentation (Phase 8)
 
 ## Install
 
 1. Write the hybrid ISO to USB (balenaEtcher, `dd`, or Rufus in DD mode).
-2. Boot UEFI, choose **Install Atlas OS**.
+2. Boot UEFI, choose **Install Arcalium OS**.
 3. Prefer full-disk encryption when prompted.
 4. Reboot into the installed system.
 

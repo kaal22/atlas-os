@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Atlas Command Centre</title>
+<title>Arcalium OS | Private Offline AI Operating System</title>
+<meta name="description" content="Arcalium OS is a private, offline-first AI operating system with local agents, document search, maps, knowledge libraries and tools that work without the cloud."/>
+<meta property="og:title" content="Arcalium OS | Private Offline AI Operating System"/>
+<meta property="og:description" content="Arcalium OS is a private, offline-first AI operating system with local agents, document search, maps, knowledge libraries and tools that work without the cloud."/>
 <style>
-/* Atlas Command Centre — premium dark design system */
+/* Arcalium Command Centre — premium dark design system */
 :root{
   --bg-0:#0a0b10;--bg-1:#10121a;--bg-2:#161925;
   --surface-0:#151822;--surface-1:#1b1f2c;--surface-2:#232836;--surface-3:#2b3142;
@@ -423,8 +426,8 @@ textarea{min-height:100px;resize:vertical}
 <div id="authScreen" class="auth-screen">
   <div class="auth-wrap">
     <div class="auth-brand">
-      <img class="mark" src="/assets/atlas-logo.png" alt="Atlas OS" width="42" height="42" />
-      <div class="wordmark"><strong>Atlas OS</strong>Command Centre</div>
+      <img class="mark" src="/assets/atlas-logo.png" alt="Arcalium OS" width="42" height="42" />
+      <div class="wordmark"><strong>Arcalium OS</strong>Command Centre</div>
     </div>
     <div id="gate">
       <h1>Create owner account</h1>
@@ -452,7 +455,7 @@ textarea{min-height:100px;resize:vertical}
 <div id="modalBackdrop" class="modal-backdrop hidden" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalBox" role="dialog" aria-modal="true" aria-labelledby="modalTitle"></div>
 </div>
-<noscript><p style="color:#fff;padding:2rem;text-align:center">JavaScript is required for Atlas Command Centre.</p></noscript>
+<noscript><p style="color:#fff;padding:2rem;text-align:center">JavaScript is required for Arcalium Command Centre.</p></noscript>
 <script>
 function csrf(){
   const m=document.cookie.match(/(?:^|; )atlas_csrf=([^;]*)/);
@@ -515,7 +518,7 @@ function showBootstrapGate(status){
 function showLoginGate(status){
   showAuth();
   gate.innerHTML=`<h1>Sign in</h1>
-      <p>Enter your Atlas owner credentials to open the Command Centre.</p>
+      <p>Enter your Arcalium owner credentials to open the Command Centre.</p>
       <span id="gateStatus">${escapeHtml(status||'')}</span>
       <div id="gateForm" class="gate-form">
         <input id="u" placeholder="Username" autocomplete="username" />
@@ -667,7 +670,7 @@ const KIWIX_URL='http://127.0.0.1:8080/';
 const KOLIBRI_URL='http://127.0.0.1:8083/';
 const ATLAS_LOGO='/assets/atlas-logo.png';
 function brandMark(){
-  return `<img class="mark" src="${ATLAS_LOGO}" alt="Atlas OS" width="34" height="34" />`;
+  return `<img class="mark" src="${ATLAS_LOGO}" alt="Arcalium OS" width="34" height="34" />`;
 }
 
 function chip(text,kind,live){
@@ -696,10 +699,10 @@ function actionTile(href,title,desc,iconChar,external){
   </${tag}>`;
 }
 const SVC_DESC={
-  kiwix:'Atlas Library — offline ZIM reader (Kiwix Serve)',
-  kolibri:'Atlas Education — offline courses (Kolibri)',
+  kiwix:'Arcalium Library — offline ZIM reader (Kiwix Serve)',
+  kolibri:'Arcalium Education — offline courses (Kolibri)',
   qdrant:'Vector database for hybrid knowledge search',
-  nomad:'Optional map tile engine (view maps in Atlas → Maps)',
+  nomad:'Optional map tile engine (view maps in Arcalium → Maps)',
   ollama:'Local LLM inference for chat and agents',
 };
 function serviceCard(s){
@@ -715,7 +718,7 @@ function serviceCard(s){
   </div>`;
 }
 function renderNav(active){
-  let html=`<div class="sidebar-brand">${brandMark()}<div class="wordmark"><strong>Atlas OS</strong>Command Centre</div></div>`;
+  let html=`<div class="sidebar-brand">${brandMark()}<div class="wordmark"><strong>Arcalium OS</strong>Command Centre</div></div>`;
   let lastSection='';
   NAV.forEach(n=>{
     if(n.section!==lastSection){
@@ -799,8 +802,9 @@ async function page(){
   if(id==='home'){
     renderTopbar(id);
     view.innerHTML=`<div class="hero"><div class="hero-inner">
-      <p class="hero-eyebrow">Atlas Command Centre</p>
-      <h1>${escapeHtml(_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Atlas')}</h1>
+      <p class="hero-eyebrow">Arcalium Command Centre</p>
+      <h1>${escapeHtml(_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Arcalium')}</h1>
+      <p class="hero-eyebrow" style="text-transform:none;letter-spacing:.02em;font-size:.95rem;margin:.35rem 0 .75rem">Your intelligence. Your knowledge. Anywhere.</p>
       <p class="hero-desc" style="color:var(--text-3)">Loading system overview…</p>
     </div></div>
     <div class="metric-grid" style="opacity:.6">
@@ -830,7 +834,7 @@ async function page(){
       const svcList=sv.services||[];
       const svcOnline=svcList.filter(s=>s.ok).length;
       renderTopbar(id,{modelReady:!!m.ready,sysOk:h.status==='ok'});
-      const welcome=_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Atlas';
+      const welcome=_sessionUser?`Welcome back, ${_sessionUser}`:'Welcome to Arcalium';
       const setupDone=!!setup.completed;
       const heroCta=!setupDone
         ?`<button class="btn" onclick="location.hash='#/setup'">Continue setup</button>
@@ -859,7 +863,7 @@ async function page(){
         metricCard('AI model',m.ready?'Ready':'Not installed',m.profile||'No profile',m.ready?'ok':'bad'),
         metricCard('Documents',docCount,'Indexed in knowledge base',searchReady?'ok':'warn'),
         metricCard('Services',svcOnline+'/'+svcList.length,'Local loopback services',svcOnline===svcList.length&&svcList.length?'ok':'bad'),
-        metricCard('Version',h.version||'?','Installed Atlas release'),
+        metricCard('Version',h.version||'?','Installed Arcalium release'),
         metricCard('Search mode',searchReady?(kbMode==='hybrid'?'hybrid':'keyword'):'not ready','Knowledge retrieval',searchReady?(kbMode==='hybrid'?'ok':'ok'):'warn'),
       ].join('');
       const services=(svcList.length?svcList.map(serviceCard).join(''):emptyState('No services probed yet','Services appear once local daemons start.'));
@@ -888,8 +892,9 @@ async function page(){
       view.innerHTML=`
         <div class="hero">
           <div class="hero-inner">
-            <p class="hero-eyebrow">Atlas Command Centre</p>
+            <p class="hero-eyebrow">Arcalium Command Centre</p>
             <h1>${escapeHtml(welcome)}</h1>
+      <p class="hero-eyebrow" style="text-transform:none;letter-spacing:.02em;font-size:.95rem;margin:.35rem 0 .75rem">Your intelligence. Your knowledge. Anywhere.</p>
             <p class="hero-desc">Your private offline-first AI environment. Inference, knowledge, and agents run locally on this device — nothing leaves unless you allow it.</p>
             <div class="hero-actions">${heroCta}</div>
             <div class="hero-status">${heroStatus}</div>
@@ -947,7 +952,7 @@ async function page(){
       <div class="chat-page-shell">
         <div class="chat-toolbar">
           <select id=agent onchange="newChatForAgent()">
-            <option value="atlas.guide">Atlas Guide</option>
+            <option value="atlas.guide">Arcalium Guide</option>
             <option value="atlas.research">Research Agent</option>
             <option value="atlas.document">Document Agent</option>
             <option value="atlas.system-steward">System Steward</option>
@@ -997,7 +1002,7 @@ async function page(){
         <button class="btn" style="margin-top:.5rem" onclick="useAgentInChat(decodeURIComponent('${jsQuote(ag.id)}'))">Use in Chat</button>
       </div>`;
     }).join('');
-    view.innerHTML=`<p class="page-intro">Installed assistants on this Atlas device. Pick one in <a href="#/ask">Chat</a> to talk.</p>
+    view.innerHTML=`<p class="page-intro">Installed assistants on this Arcalium device. Pick one in <a href="#/ask">Chat</a> to talk.</p>
       ${cards||emptyState('No agents installed','Agent manifests will appear here once the runtime is configured.')}`;
     return;
   }
@@ -1011,7 +1016,7 @@ async function page(){
       +(searchReady?'':' · index empty')
       +(st.embed_ready?' · embeddings ready':' · embeddings not installed')
       +(st.qdrant?' · Qdrant up':' · Qdrant down');
-    view.innerHTML=`<p class="page-intro">Add your notes and documents so Atlas can search them locally. Wikipedia / Library packs also feed this index after install (bounded ZIM extract).</p>
+    view.innerHTML=`<p class="page-intro">Add your notes and documents so Arcalium can search them locally. Wikipedia / Library packs also feed this index after install (bounded ZIM extract).</p>
       <p style="font-size:.9rem;color:var(--muted)">${modeLine}</p>
       ${kbHint}
       <div class="grid-2">
@@ -1105,7 +1110,7 @@ async function page(){
         <div class="stat-row"><span>Installed</span><span>v${curVer}</span></div>
         <p style="color:var(--accent);margin-top:.75rem">You're up to date.</p>`;
     }
-    view.innerHTML=`<p class="page-intro">Hardware profile, encrypted backups, and offline updates for this Atlas device.</p>
+    view.innerHTML=`<p class="page-intro">Hardware profile, encrypted backups, and offline updates for this Arcalium device.</p>
       ${warn}
       <div class="grid-2">
         <div class="card">
@@ -1122,7 +1127,7 @@ async function page(){
       </div>
       <div class="card">
         <h3>Encrypted backup</h3>
-        <p>Backs up Atlas config, databases, knowledge, content manifests, and user data. Keep your passphrase somewhere safe — it cannot be recovered.</p>
+        <p>Backs up Arcalium config, databases, knowledge, content manifests, and user data. Keep your passphrase somewhere safe — it cannot be recovered.</p>
         <div class="inline-form">
           <input id=bakPass type=password placeholder="Choose a backup passphrase" autocomplete="new-password" />
           <button class=btn onclick="createFullBackup()">Create backup</button>
@@ -1155,7 +1160,7 @@ async function page(){
       </div>
       <details class="card" style="cursor:pointer">
         <summary style="font-weight:600">Advanced — Import update file</summary>
-        <p style="margin-top:.75rem">Select a signed <code>.atlas-update</code> bundle. Atlas takes a snapshot first; failed health checks roll back automatically. Stable/release channels refuse unsigned placeholders.</p>
+        <p style="margin-top:.75rem">Select a signed <code>.atlas-update</code> bundle. Arcalium takes a snapshot first; failed health checks roll back automatically. Stable/release channels refuse unsigned placeholders.</p>
         <div class="file-browser" style="max-height:200px">${updRows||emptyState('No update bundles found','Copy bundles to /srv/atlas/updates/incoming or plug in a USB drive.')}</div>
         <div id=updPreview style="margin-top:.75rem;display:none"></div>
         <div id=updMsg style="margin-top:.5rem"></div>
@@ -1578,7 +1583,7 @@ async function renderContent(){
   const packs=cat.packs||[];
   const groups=[
     {key:'maps',title:'Offline maps by country',hint:'Install downloads Protomaps/OSM PMTiles online (ODbL), then works offline. When tiles are ready, open Maps (country picker; UK is default when installed).'},
-    {key:'knowledge',title:'Library ZIMs (Kiwix)',hint:'Wikipedia, medical, how-to, and Gutenberg packs download ZIMs on install and register with Atlas Library (Kiwix Serve on 127.0.0.1:8080). Large packs ask for confirm.'},
+    {key:'knowledge',title:'Library ZIMs (Kiwix)',hint:'Wikipedia, medical, how-to, and Gutenberg packs download ZIMs on install and register with Arcalium Library (Kiwix Serve on 127.0.0.1:8080). Large packs ask for confirm.'},
     {key:'education',title:'Education packs',hint:'Kids Home Learning installs offline Markdown for tutors. Kolibri video channels land here when locked channel packs ship.'},
     {key:'models',title:'Models',hint:'Offline model import packs.'},
     {key:'other',title:'Other packs',hint:''},
@@ -1739,10 +1744,10 @@ async function renderLibrary(){
   const statusCard=kiwix.ok
     ?`<div class="callout"><strong>Library is online</strong>
         <p>Kiwix Serve is answering on <code>127.0.0.1:8080</code>. Install ZIM packs below, then browse here or in a new tab.</p>
-        <p class="powered-by">Atlas Library is powered by Kiwix — content stays on this device.</p>
+        <p class="powered-by">Arcalium Library is powered by Kiwix — content stays on this device.</p>
       </div>`
     :`<div class="callout warn"><strong>Library service offline</strong>
-        <p>Atlas starts Kiwix with the core compose stack after first boot. If it stays down, from a terminal on this device:</p>
+        <p>Arcalium starts Kiwix with the core compose stack after first boot. If it stays down, from a terminal on this device:</p>
         <p><code>sudo docker compose -f /srv/atlas/compose/atlas-core.yml up -d kiwix</code></p>
         <p class="powered-by">ZIMs live under <code>/srv/atlas/kiwix</code> once installed from Content.</p>
       </div>`;
@@ -1760,7 +1765,7 @@ async function renderLibrary(){
       <h3>Viewer</h3>
       <p style="font-size:.85rem;color:var(--text-2)">Embedded when the service is up. If the frame stays blank (browser frame policy), use <strong>Open Library viewer</strong>.</p>
       ${kiwix.ok
-        ?`<div class="viewer-frame-wrap"><iframe class="viewer-frame" title="Atlas Library (Kiwix)" src="${KIWIX_URL}" referrerpolicy="no-referrer"></iframe></div>`
+        ?`<div class="viewer-frame-wrap"><iframe class="viewer-frame" title="Arcalium Library (Kiwix)" src="${KIWIX_URL}" referrerpolicy="no-referrer"></iframe></div>`
         :emptyState('Viewer unavailable','Start Kiwix, then refresh this page.')}
     </div>`;
   restoreContentFetchPanel();
@@ -1781,10 +1786,10 @@ async function renderEducation(){
   const statusCard=kolibri.ok
     ?`<div class="callout"><strong>Education platform is online</strong>
         <p>Kolibri is answering on <code>127.0.0.1:8083</code>. Open the viewer for courses, exercises, and progress tracking.</p>
-        <p class="powered-by">Atlas Education is powered by Kolibri — Learning Equality. Not NOMAD setup.</p>
+        <p class="powered-by">Arcalium Education is powered by Kolibri — Learning Equality. Not NOMAD setup.</p>
       </div>`
     :`<div class="callout warn"><strong>Education service offline</strong>
-        <p>Kolibri is part of the Atlas core compose stack. Start it on this device with:</p>
+        <p>Kolibri is part of the Arcalium core compose stack. Start it on this device with:</p>
         <p><code>sudo docker compose -f /srv/atlas/compose/atlas-core.yml up -d kolibri</code></p>
         <p>Data directory: <code>/srv/atlas/kolibri</code>. Command Centre cannot start Docker itself (security boundary).</p>
       </div>`;
@@ -1824,7 +1829,7 @@ async function renderEducation(){
     const label=r.state==='live'?'Live':(r.state==='available'?'Install':'Pending');
     return `<div class="stat-row"><span><strong>${escapeHtml(r.title)}</strong><br/><span style="font-size:.8rem;color:var(--muted)">${escapeHtml(r.note)}</span></span><span>${chip(label,chipKind)}</span></div>`;
   }).join('');
-  view.innerHTML=`<p class="page-intro">Interactive offline learning with video courses and exercises on this device. Atlas runs Kolibri locally — you do not need NOMAD’s admin UI.</p>
+  view.innerHTML=`<p class="page-intro">Interactive offline learning with video courses and exercises on this device. Arcalium runs Kolibri locally — you do not need NOMAD’s admin UI.</p>
     ${statusCard}
     <div class="btn-group" style="margin:.75rem 0">
       <a class="btn" href="${KOLIBRI_URL}" target="_blank" rel="noopener">Open Education viewer</a>
@@ -1851,7 +1856,7 @@ async function renderEducation(){
       <h3>Viewer</h3>
       <p style="font-size:.85rem;color:var(--text-2)">Embedded when Kolibri is up. Prefer a new tab if the frame is blocked.</p>
       ${kolibri.ok
-        ?`<div class="viewer-frame-wrap"><iframe class="viewer-frame" title="Atlas Education (Kolibri)" src="${KOLIBRI_URL}" referrerpolicy="no-referrer"></iframe></div>`
+        ?`<div class="viewer-frame-wrap"><iframe class="viewer-frame" title="Arcalium Education (Kolibri)" src="${KOLIBRI_URL}" referrerpolicy="no-referrer"></iframe></div>`
         :emptyState('Viewer unavailable','Start Kolibri with the compose command above, then refresh.')}
     </div>`;
   restoreContentFetchPanel();
@@ -1918,7 +1923,7 @@ async function pollZimFetch(installResult){
     totalHint:installResult.zim_size_hint_bytes||0,
     startMessage:'Downloading Library ZIM…',
     failPrefix:'Pack installed, but ZIM download failed',
-    okMessage:'ZIM ready for Atlas Library (Kiwix)',
+    okMessage:'ZIM ready for Arcalium Library (Kiwix)',
   });
 }
 async function pollExpandFetch(installResult){
@@ -2072,7 +2077,7 @@ async function renderMaps(params){
       <button type="button" class="btn secondary" id="atlasMapsRefreshBtn">Retry embed</button>
       <p class="maps-hint">Redirecting to <code>${fullUrl}</code>… If this page stays, click Open Maps or open <code>/maps/diag</code>.</p>
     </div>
-    <div id="atlasMapsHost" class="maps-frame-wrap" role="region" aria-label="Atlas Maps">
+    <div id="atlasMapsHost" class="maps-frame-wrap" role="region" aria-label="Arcalium Maps">
       <div style="padding:1.25rem;color:var(--text-3)">Opening <a href="${fullUrl}">${fullUrl}</a>…</div>
     </div>
   </div>`;
@@ -2339,7 +2344,7 @@ function renderChatLog(msgs,thinking){
     return body;
   }).join('');
   if(thinking) html+=`<div class="bubble system"><span class="spinner"></span> Thinking…</div>`;
-  if(!html) html='<div class="bubble system">Say hello — Atlas Guide runs on your local model.</div>';
+  if(!html) html='<div class="bubble system">Say hello — Arcalium Guide runs on your local model.</div>';
   log.innerHTML=html;
   log.scrollTop=log.scrollHeight;
 }
@@ -2363,7 +2368,7 @@ async function renderModels(){
     <p>Size ~${rec.size_gb} GB · tag <code>${rec.tag}</code>
       ${rec.installed?'· <span style="color:var(--accent)">Installed</span>':''}</p>
     ${rec.installed?'':`<button class="btn dl-btn" data-tag="${rec.tag}" onclick="pullModel('${rec.tag}',this)">Download recommended</button>`}
-    <p style="font-size:.9rem">Needs internet once. Afterwards Atlas stays offline.</p>
+    <p style="font-size:.9rem">Needs internet once. Afterwards Arcalium stays offline.</p>
   </div>`:`<p>No compatible beginner model for this hardware.</p>`;
   const rows=(m.catalogue||[]).map(c=>{
     const status=c.installed?'Installed':(c.compatible?'Available':'Not suitable');
@@ -2377,7 +2382,7 @@ async function renderModels(){
       <td>${btn}</td>
     </tr>`;
   }).join('');
-  view.innerHTML=`<p class="page-intro">Atlas checked this machine: <strong>${hw.ram_gb||'?'} GB RAM</strong>,
+  view.innerHTML=`<p class="page-intro">Arcalium checked this machine: <strong>${hw.ram_gb||'?'} GB RAM</strong>,
       GPU <strong>${hw.gpu||'none'}</strong>,
       profile <strong>${m.profile||'?'}</strong>.
       Ollama: <strong>${m.ollama_reachable?'running':'not running'}</strong>.</p>
@@ -2579,7 +2584,7 @@ let _restorePath='';
 function openRestoreModal(path,name){
   _restorePath=path;
   showModal(`<h3 id="modalTitle">Restore backup</h3>
-    <p>Restoring <strong>${escapeHtml(name||'backup')}</strong> will overwrite Atlas data on this device.</p>
+    <p>Restoring <strong>${escapeHtml(name||'backup')}</strong> will overwrite Arcalium data on this device.</p>
     <input id=restorePass type=password placeholder="Backup passphrase" autocomplete="current-password" />
     <div class="btn-group" style="margin-top:.75rem">
       <button class="btn danger" onclick="confirmRestore()">Restore now</button>
@@ -2739,7 +2744,7 @@ async function previewUpdate(path){
 }
 async function applyUpdateBundle(path){
   showModal(`<h3 id="modalTitle">Apply update?</h3>
-    <p>Atlas will take a snapshot before applying this bundle. If health checks fail afterwards, changes roll back automatically.</p>
+    <p>Arcalium will take a snapshot before applying this bundle. If health checks fail afterwards, changes roll back automatically.</p>
     <div class="btn-group">
       <button class="btn" onclick="closeModal();applyUpdateConfirmed(decodeURIComponent('${jsQuote(path)}'))">Apply update</button>
       <button class="btn secondary" onclick="closeModal()">Cancel</button>
@@ -2838,7 +2843,7 @@ async function confirmApplyOsUpdates(){
     return;
   }
   _osUpgradable=[];
-  showMsg('osUpdateMsg',r.detail==='nothing_to_upgrade'?'Already up to date.':'Atlas packages upgraded.','ok');
+  showMsg('osUpdateMsg',r.detail==='nothing_to_upgrade'?'Already up to date.':'Arcalium packages upgraded.','ok');
   await refreshOsUpdateStatus();
 }
 async function applyDefaultAgentFromSetup(){
@@ -2913,8 +2918,9 @@ async function renderSetupWizard(){
 
 function wizardStepHtml(current,st,live){
   if(current==='welcome'){
-    return `<h2>Welcome to Atlas</h2>
-      <p>Atlas is local-first: AI, knowledge, and agents run on this device. Internet is only needed when you choose to download models or packs.</p>
+    return `<h2>Welcome to Arcalium</h2>
+      <p class="hero-eyebrow" style="margin-bottom:.35rem;text-transform:none;letter-spacing:.02em">Your intelligence. Your knowledge. Anywhere.</p>
+      <p>Arcalium is local-first: AI, knowledge, and agents run on this device. Internet is only needed when you choose to download models or packs.</p>
       <p>This short wizard configures your device, AI model, optional content, network sharing, default agent, and a recovery backup.</p>`;
   }
   if(current==='device'){
@@ -2926,7 +2932,7 @@ function wizardStepHtml(current,st,live){
     const profile=rec.profile||hw.profile||'?';
     const gpuName=(gpu.gpus&&gpu.gpus[0]&&gpu.gpus[0].name)||gpu.name||rec.gpu||'none detected';
     return `<h2>Your device</h2>
-      <p>Atlas probed this machine so recommendations stay realistic.</p>
+      <p>Arcalium probed this machine so recommendations stay realistic.</p>
       <div class="stat-row"><span>RAM</span><span><strong>${escapeHtml(String(ram))} GB</strong></span></div>
       <div class="stat-row"><span>GPU</span><span><strong>${escapeHtml(String(gpuName))}</strong></span></div>
       ${vram!=null?`<div class="stat-row"><span>VRAM</span><span><strong>${escapeHtml(String(vram))} GB</strong></span></div>`:''}
@@ -2984,11 +2990,11 @@ function wizardStepHtml(current,st,live){
     const opts=[
       ['private_device','This device only','Loopback / private — strongest default.'],
       ['trusted_lan','Trusted LAN','Share on your local network when you trust it.'],
-      ['private_hotspot','Private hotspot','Expose Atlas via a controlled hotspot profile.'],
+      ['private_hotspot','Private hotspot','Expose Arcalium via a controlled hotspot profile.'],
       ['later','Decide later','Keep the firstboot default; change anytime in System.'],
     ];
     return `<h2>Network sharing</h2>
-      <p>Current mode: <strong>${escapeHtml(liveMode)}</strong>. Pick how Atlas should be reachable.</p>
+      <p>Current mode: <strong>${escapeHtml(liveMode)}</strong>. Pick how Arcalium should be reachable.</p>
       ${opts.map(([id,title,desc])=>
         `<button type="button" class="wiz-choice ${cur===id?'selected':''}" onclick="wizardPickNetwork('${id}',this)">
           <strong>${escapeHtml(title)}</strong><span>${escapeHtml(desc)}</span>
@@ -2998,7 +3004,7 @@ function wizardStepHtml(current,st,live){
     const agents=live.agents||[];
     const cur=_wizardDraft.default_agent||'atlas.guide';
     if(!agents.length){
-      return `<h2>Default agent</h2><p>No agents loaded yet — Atlas Guide will be used by default.</p>`;
+      return `<h2>Default agent</h2><p>No agents loaded yet — Arcalium Guide will be used by default.</p>`;
     }
     return `<h2>Default agent</h2>
       <p>Choose which assistant opens first in Chat.</p>
@@ -3009,7 +3015,7 @@ function wizardStepHtml(current,st,live){
   }
   if(current==='recovery'){
     return `<h2>Recovery backup</h2>
-      <p>Create an encrypted backup of Atlas data before you finish. You can skip and back up later from System.</p>
+      <p>Create an encrypted backup of Arcalium data before you finish. You can skip and back up later from System.</p>
       <div class="inline-form">
         <input id="wizBakPass" type="password" placeholder="Backup passphrase" autocomplete="new-password" />
         <button type="button" class="btn secondary" onclick="wizardCreateBackup()">Create backup</button>

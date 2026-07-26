@@ -12,7 +12,7 @@ Pacific, Atlantic, Indian, Southern (Antarctic), Arctic.
 - A map is a drawing of a place from above.
 - Compass directions: North, East, South, West (remember: Never Eat Soggy Wheat).
 - A key / legend explains symbols; a scale helps measure real distance.
-- Atlas OS offline maps can show your country without the internet.
+- Arcalium OS offline maps can show your country without the internet.
 
 ## Places and people
 - Capital city: the main city for government of a country.

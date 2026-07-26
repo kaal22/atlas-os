@@ -39,7 +39,7 @@ CATALOGUE: list[dict[str, Any]] = [
         "id": "recommended-cpu",
         "tag": "qwen3:4b",
         "title": "Recommended (CPU)",
-        "blurb": "Default Atlas Guide model. Good balance for most PCs without a GPU.",
+        "blurb": "Default Arcalium Guide model. Good balance for most PCs without a GPU.",
         "size_gb": 2.5,
         "min_ram_gb": 8,
         "min_vram_gb": 0,
@@ -196,7 +196,7 @@ def model_setup_status(host: str = "http://127.0.0.1:11434") -> dict[str, Any]:
         "hint": (
             "Download the recommended model once (needs internet). After that, Atlas works offline."
             if not chat_ready
-            else "A chat model is installed. You can ask Atlas Guide."
+            else "A chat model is installed. You can ask Arcalium Guide."
         ),
         "embed_hint": (
             None

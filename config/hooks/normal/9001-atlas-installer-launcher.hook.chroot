@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-# Brand Calamares as Atlas OS — single launcher, correct branding paths.
+# Brand Calamares as Arcalium OS — single launcher, correct branding paths.
 
 cat > /usr/bin/atlas-install <<'EOF'
 #!/bin/sh
@@ -13,10 +13,10 @@ cat > /usr/share/applications/calamares-install-debian.desktop <<'EOF'
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Install Atlas OS
-GenericName=Atlas OS Installer
+Name=Install Arcalium OS
+GenericName=Arcalium OS Installer
 Exec=atlas-install
-Comment=Install Atlas OS on this computer
+Comment=Install Arcalium OS on this computer
 Keywords=calamares;system;install;atlas;installer
 Icon=system-software-install
 Terminal=false
@@ -45,7 +45,7 @@ rm -f /etc/xdg/autostart/calamares-desktop-icon.desktop
 if [ -f /usr/bin/add-calamares-desktop-icon ]; then
   cat > /usr/bin/add-calamares-desktop-icon <<'EOF'
 #!/bin/sh
-# Atlas OS: desktop icon is shipped via /etc/skel/Desktop — do not duplicate.
+# Arcalium OS: desktop icon is shipped via /etc/skel/Desktop — do not duplicate.
 exit 0
 EOF
   chmod 755 /usr/bin/add-calamares-desktop-icon

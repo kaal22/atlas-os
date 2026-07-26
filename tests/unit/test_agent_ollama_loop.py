@@ -30,7 +30,7 @@ def test_guide_completes_bounded_task():
         rt.register_agent(
             AgentManifest(
                 id="atlas.guide",
-                name="Atlas Guide",
+                name="Arcalium Guide",
                 purpose="General assistant",
                 tools=["knowledge.search", "notes.write"],
                 capabilities=["knowledge.read", "notes.write"],
@@ -40,12 +40,12 @@ def test_guide_completes_bounded_task():
                 model_profile="tiny",
             )
         )
-        task = rt.create_task("atlas.guide", "What is Atlas OS?", user_id="tester")
+        task = rt.create_task("atlas.guide", "What is Arcalium OS?", user_id="tester")
         rt.plan(task.id)
         result = rt.run_step(task.id)
         assert task.state == "completed", (task.state, result)
         assert result.get("answer"), result
-        assert "Atlas Guide" in result["answer"] or "dry-run" in result["answer"]
+        assert "Arcalium Guide" in result["answer"] or "dry-run" in result["answer"]
 
 
 def test_child_cannot_escalate_capabilities():
@@ -107,7 +107,7 @@ def test_greeting_skips_knowledge_search():
         rt.register_agent(
             AgentManifest(
                 id="atlas.guide",
-                name="Atlas Guide",
+                name="Arcalium Guide",
                 purpose="General assistant",
                 tools=["knowledge.search", "notes.write"],
                 capabilities=["knowledge.read", "notes.write"],

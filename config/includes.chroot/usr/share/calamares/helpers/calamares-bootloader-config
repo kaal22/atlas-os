@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline-safe bootloader prep for Atlas OS (replaces Debian network apt install).
+# Offline-safe bootloader prep for Arcalium OS (replaces Debian network apt install).
 # Runs inside the live session against the Calamares target chroot.
 set -e
 

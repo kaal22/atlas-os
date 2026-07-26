@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Collect Phase 5 knowledge/RAG evidence on an installed Atlas OS system.
+# Collect Phase 5 knowledge/RAG evidence on an installed Arcalium OS system.
 set -euo pipefail
 
 OUT="${1:-/srv/atlas/logs/phase5-evidence.txt}"

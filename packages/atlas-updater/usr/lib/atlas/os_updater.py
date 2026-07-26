@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atlas OS package updates via APT (phase 1: atlas-* from signed/local repo).
+"""Arcalium OS package updates via APT (phase 1: atlas-* from signed/local repo).
 
 Distinct from .atlas-update file-copy bundles — see docs/updates/OS_UPDATES.md.
 """
@@ -383,7 +383,7 @@ def enable_local_source(
         # Local/USB MVP: trusted file repo until ceremony ships keyring.
         line = f"deb [trusted=yes] {uri} atlas main\n"
     body = (
-        "# Managed by Atlas OS updates (phase 1). See /usr/share/atlas/docs/OS_UPDATES.md\n"
+        "# Managed by Arcalium OS updates (phase 1). See /usr/share/atlas/docs/OS_UPDATES.md\n"
         + line
     )
     if write_sources:

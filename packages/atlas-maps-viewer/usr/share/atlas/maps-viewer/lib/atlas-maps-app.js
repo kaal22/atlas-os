@@ -1,5 +1,5 @@
 /**
- * Atlas Maps — MapLibre + PMTiles boot (standalone /maps/ and Command Centre).
+ * Arcalium Maps — MapLibre + PMTiles boot (standalone /maps/ and Command Centre).
  *
  * Paint-first strategy (never fail silently):
  * 1. Default style: solid sky background + GeoJSON bbox fill/outline (MapLibre-only)
@@ -488,7 +488,7 @@
     var empty = document.createElement("div");
     empty.className = "atlas-maps-empty";
     empty.innerHTML =
-      "<div><h1 style=\"margin:0 0 .5rem;font-weight:600\">Atlas Maps</h1>" +
+      "<div><h1 style=\"margin:0 0 .5rem;font-weight:600\">Arcalium Maps</h1>" +
       '<p class="atlas-maps-empty-msg" style="color:#9aa8b5;max-width:28rem;line-height:1.45"></p>' +
       '<p><a class="atlas-maps-cc" href="/#/content" style="color:#3d8bfd">Open Content</a></p></div>';
     // No inline display:grid here — that previously defeated [hidden] and covered #map forever.

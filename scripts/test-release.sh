@@ -7,7 +7,7 @@ MODE="${1:-install}"
 VERSION="$(cat "$ROOT/VERSION")"
 OUT="$ROOT/dist"
 EVIDENCE="$ROOT/tests/installer/evidence"
-ISO="$OUT/atlas-os-${VERSION}-amd64.iso"
+ISO="$OUT/arcalium-os-${VERSION}-amd64.iso"
 mkdir -p "$EVIDENCE"
 
 if [[ ! -f "$ISO" ]]; then

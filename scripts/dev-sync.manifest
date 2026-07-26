@@ -94,3 +94,8 @@ config/includes.chroot/usr/share/wallpapers/Atlas/contents/images/1024x576.png|/
 config/includes.chroot/usr/share/wallpapers/Atlas/contents/images/1920x1080.png|/usr/share/wallpapers/Atlas/contents/images/1920x1080.png|
 config/includes.chroot/usr/share/wallpapers/Atlas/contents/images/2560x1440.png|/usr/share/wallpapers/Atlas/contents/images/2560x1440.png|
 config/includes.chroot/usr/share/wallpapers/Atlas/contents/images/3840x2160.png|/usr/share/wallpapers/Atlas/contents/images/3840x2160.png|
+config/includes.chroot/usr/share/wallpapers/Atlas/metadata.json|/usr/share/wallpapers/Atlas/metadata.json|
+packages/atlas-agent-runtime/usr/share/atlas/agents/atlas.guide.json|/usr/share/atlas/agents/atlas.guide.json|
+packages/atlas-command-centre/usr/share/applications/atlas-command-centre.desktop|/usr/share/applications/atlas-command-centre.desktop|
+packages/atlas-shell/usr/share/applications/atlas-launcher.desktop|/usr/share/applications/atlas-launcher.desktop|
+packages/atlas-shell/usr/share/applications/atlas-gpu-setup.desktop|/usr/share/applications/atlas-gpu-setup.desktop|

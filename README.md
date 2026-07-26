@@ -1,8 +1,10 @@
-# Atlas OS
+# Arcalium OS
+
+Your intelligence. Your knowledge. Anywhere.
 
 Offline-first AI agent operating environment and knowledge appliance.
 
-Built on Debian 13 Stable (x86-64) with **KDE Plasma** + SDDM. Product specification: see `product.md` (Atlas OS product v0.2).
+Built on Debian 13 Stable (x86-64) with **KDE Plasma** + SDDM. Product specification: see `product.md` (Arcalium OS product v0.2).
 
 ## Quick start
 
@@ -38,4 +40,4 @@ make test-install  # QEMU UEFI boot + install smoke test
 
 ## Licence
 
-Atlas OS packaging and original code: see `docs/legal/`. Upstream Project N.O.M.A.D. is Apache-2.0; attribution is required.
+Arcalium OS packaging and original code: see `docs/legal/`. Upstream Project N.O.M.A.D. is Apache-2.0; attribution is required.

@@ -1,5 +1,5 @@
 [Unit]
-Description=Atlas OS first-boot provisioning
+Description=Arcalium OS first-boot provisioning
 After=local-fs.target network-online.target docker.service
 Wants=docker.service
 ConditionPathExists=/etc/atlas/firstboot-pending

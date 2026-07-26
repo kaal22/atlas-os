@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Atlas Trust Desktop Launchers
-Comment=Mark Atlas desktop icons as launchable (Plasma)
+Name=Arcalium Trust Desktop Launchers
+Comment=Mark Arcalium desktop icons as launchable (Plasma)
 Exec=/usr/lib/atlas/trust-desktop-launchers.sh
 Terminal=false
 NoDisplay=true

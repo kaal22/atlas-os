@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=Service Check
-GenericName=Atlas Service Check
+GenericName=Arcalium Service Check
 Comment=Check Kiwix, Ollama, NOMAD and other local services
 Exec=/usr/bin/atlas-launcher
 TryExec=/usr/bin/atlas-launcher

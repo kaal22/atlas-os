@@ -81,7 +81,7 @@ cat > "$STAGING/update.json" <<EOF
   "to_version": "$TO_VER",
   "version": "$TO_VER",
   "channel": "$CHANNEL",
-  "publisher": "Atlas OS",
+  "publisher": "Arcalium OS",
   "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
   "components": $COMPONENTS,
   "health_urls": ["http://127.0.0.1:8787/"],
@@ -91,7 +91,7 @@ cat > "$STAGING/update.json" <<EOF
 EOF
 
 cat > "$STAGING/RELEASE_NOTES.txt" <<EOF
-Atlas OS $TO_VER (from $FROM_VER)
+Arcalium OS $TO_VER (from $FROM_VER)
 
 See https://github.com/kaal22/atlas-os/releases/tag/v$TO_VER for full changelog.
 EOF

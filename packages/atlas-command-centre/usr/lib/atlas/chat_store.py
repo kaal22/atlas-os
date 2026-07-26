@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local chat thread storage for Atlas Command Centre."""
+"""Local chat thread storage for Arcalium Command Centre."""
 from __future__ import annotations
 
 import json

@@ -1,4 +1,4 @@
-# Atlas OS Threat Model (Phase 0)
+# Arcalium OS Threat Model (Phase 0)
 
 Status: foundation document  
 Aligned with product §24.1  

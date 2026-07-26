@@ -1590,25 +1590,42 @@ async function renderContent(){
   ];
   function packCategory(p){
     if(p.category) return p.category;
-    if((p.type||'').includes('map')) return 'maps';
-    if((p.type||'').includes('education')) return 'education';
-    if((p.type||'').includes('model')) return 'models';
-    if((p.type||'').includes('knowledge')) return 'knowledge';
+    const id=String(p.id||'');
+    if(id.startsWith('atlas.maps.')||(p.type||'').includes('map')) return 'maps';
+    if(id.startsWith('atlas.education.')||(p.type||'').includes('education')) return 'education';
+    if(id.startsWith('atlas.model.')||(p.type||'').includes('model')) return 'models';
+    if(id.startsWith('atlas.knowledge.')||(p.type||'').includes('knowledge')) return 'knowledge';
     return 'other';
+  }
+  function isKnowledgePack(p){
+    return packCategory(p)==='knowledge'||String(p.id||'').startsWith('atlas.knowledge.')||(p.type||'').includes('knowledge');
+  }
+  /** Wikipedia / ZIM Library packs — Index for agents must show whenever installed. */
+  function isZimKnowledgePack(p){
+    if(!isKnowledgePack(p)) return false;
+    if(p.can_index_for_agents||p.has_zim||p.zim_fetch||p.download_on_install||p.zim_rag) return true;
+    return String(p.id||'').startsWith('atlas.knowledge.');
   }
   function packRows(list){
     if(!list.length) return '';
     return `<table class="data-table">
       <thead><tr><th>Pack</th><th>Version</th><th>Status</th><th></th></tr></thead>
       <tbody>${list.map(p=>{
+        const cat=packCategory(p);
         const avail=!!p.bundle_file||p.installed;
         let st;
-        if(p.installed&&p.category==='maps'){
+        if(p.installed&&cat==='maps'){
           const ts=p.tiles_status||'stub';
           if(ts==='ready') st=`<span class="pill-sm ok">tiles ready</span>`;
           else if(ts==='fetching') st=`<span class="pill-sm wait">downloading tiles…</span>`;
           else if(ts==='error') st=`<span class="pill-sm bad">tiles failed</span>`;
           else st=`<span class="pill-sm wait">stub — wait for tiles</span>`;
+        }else if(p.installed&&isZimKnowledgePack(p)){
+          const extracted=Number(p.zim_rag_extracted||0);
+          if(p.zim_status==='fetching') st=`<span class="pill-sm wait">downloading ZIM…</span>`;
+          else if(p.has_zim&&extracted>0) st=`<span class="pill-sm ok">installed · ${extracted} indexed</span>`;
+          else if(p.has_zim) st=`<span class="pill-sm wait">installed · ZIM ready — index for agents</span>`;
+          else st=`<span class="pill-sm ok">installed ${escapeHtml(p.installed_version||'')}</span>`;
         }else if(p.installed){
           st=`<span class="pill-sm ok">installed ${escapeHtml(p.installed_version||'')}</span>`;
         }else if(avail){
@@ -1619,7 +1636,7 @@ async function renderContent(){
         let btn='';
         if(p.installed){
           const retries=[];
-          if(p.category==='maps'){
+          if(cat==='maps'){
             if(p.tiles_status!=='ready'){
               retries.push(`<button class="btn" onclick="retryFetchTiles('${escapeHtml(p.id)}','${escapeHtml(p.country||'')}')">Download tiles</button>`);
             }else{
@@ -1632,17 +1649,17 @@ async function renderContent(){
               retries.push(`<button class="btn secondary" onclick="openAtlasMap('${cc}')" title="Tiles must finish downloading first">Maps</button>`);
             }
           }
-          if(p.category==='knowledge'&&(p.zim_fetch||p.download_on_install)){
+          if(isZimKnowledgePack(p)){
             retries.push(`<button class="btn secondary" onclick="retryFetchZim('${escapeHtml(p.id)}')">Retry ZIM</button>`);
-            retries.push(`<button class="btn" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
+            retries.push(`<button class="btn" type="button" title="Build bounded ZIM extract for agent search (works even if extracted=0)" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
             retries.push(`<button class="btn" onclick="window.open(KIWIX_URL,'_blank','noopener')">Open Library</button>`);
-          } else if(p.category==='knowledge'&&p.installed){
-            retries.push(`<button class="btn" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
+          } else if(isKnowledgePack(p)){
+            retries.push(`<button class="btn" type="button" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">Index for agents</button>`);
           }
-          if(p.category==='education'&&p.expand_fetch){
+          if(cat==='education'&&p.expand_fetch){
             retries.push(`<button class="btn secondary" onclick="retryFetchExpand('${escapeHtml(p.id)}')">Retry expand</button>`);
           }
-          if(p.category==='education'){
+          if(cat==='education'){
             retries.push(`<button class="btn" onclick="location.hash='#/education'">Education</button>`);
           }
           btn=`<div class="btn-group">${retries.join('')}<button class="btn danger" onclick="uninstallPack('${escapeHtml(p.id)}')">Remove</button></div>`;
@@ -1653,9 +1670,9 @@ async function renderContent(){
         }
         const country=p.country?` · ${escapeHtml(String(p.country).toUpperCase())}`:'';
         let sizeBits='';
-        if(p.category==='maps'&&p.size_hint_bytes){
+        if(cat==='maps'&&p.size_hint_bytes){
           sizeBits=` · ~${formatContentBytes(p.size_hint_bytes)} tiles${p.size_class==='large'?' (large)':''}`;
-        }else if((p.category==='knowledge'||p.category==='education')&&p.size_hint_bytes){
+        }else if((cat==='knowledge'||cat==='education')&&p.size_hint_bytes){
           sizeBits=` · ~${formatContentBytes(p.size_hint_bytes)}${p.download_on_install?' download':''}${p.size_class==='large'?' (large)':''}`;
         }
         const warn=p.size_warning?`<br/><span style="color:var(--warn,#b45309);font-size:.8rem">${escapeHtml(p.size_warning)}</span>`:'';

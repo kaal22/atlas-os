@@ -3392,6 +3392,40 @@ def merge_catalogue_status(catalogue: dict[str, Any], atlas_root: Path) -> dict[
                     row["zim_status"] = "ready"
                 elif zprog.get("status") == "error" and zprog.get("done"):
                     row["zim_status"] = "error"
+            # Knowledge / ZIM packs: surface Index-for-agents affordances even when
+            # extracted=0 (UI uses has_zim / can_index_for_agents, not zim_rag alone).
+            pack_id = str(row.get("id") or inst.get("id") or "")
+            is_knowledge = (
+                row.get("category") == "knowledge"
+                or "knowledge" in str(row.get("type") or "")
+                or pack_id.startswith("atlas.knowledge.")
+            )
+            if is_knowledge:
+                target = Path(str(inst.get("target") or ""))
+                zim_names = _list_zim_files(target) if target.is_dir() else []
+                # Match catalogue zim_fetch.filename in shared Kiwix library if pack target is empty.
+                want = ""
+                zf = row.get("zim_fetch") if isinstance(row.get("zim_fetch"), dict) else {}
+                if isinstance(zf, dict):
+                    want = str(zf.get("filename") or "").strip()
+                if want and not zim_names:
+                    kiwix_hit = Path(atlas_root) / "kiwix" / want
+                    if kiwix_hit.is_file():
+                        zim_names = [want]
+                row["has_zim"] = bool(zim_names)
+                row["zim_files"] = zim_names
+                extracted = 0
+                marker_path = target / ".atlas-indexed" if target.is_dir() else None
+                if marker_path and marker_path.is_file():
+                    try:
+                        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+                        zim_rag = marker.get("zim_rag") if isinstance(marker.get("zim_rag"), dict) else {}
+                        extracted = int(zim_rag.get("extracted") or 0)
+                    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                        extracted = 0
+                row["zim_rag_extracted"] = extracted
+                # Always allow Index for agents on installed knowledge packs (curated + ZIM extract).
+                row["can_index_for_agents"] = True
         packs.append(row)
     out["packs"] = packs
     return out

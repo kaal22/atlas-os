@@ -17,6 +17,7 @@ packages/atlas-command-centre/usr/lib/atlas/atlas-logo.png|/usr/lib/atlas/atlas-
 packages/atlas-auth/usr/lib/atlas/auth_store.py|/usr/lib/atlas/auth_store.py|
 packages/atlas-policy-gateway/usr/lib/atlas/policy_gateway.py|/usr/lib/atlas/policy_gateway.py|
 packages/atlas-agent-runtime/usr/lib/atlas/agent_runtime.py|/usr/lib/atlas/agent_runtime.py|
+packages/atlas-agent-runtime/usr/lib/atlas/tool_registry.py|/usr/lib/atlas/tool_registry.py|
 packages/atlas-model-manager/usr/lib/atlas/model_router.py|/usr/lib/atlas/model_router.py|
 packages/atlas-model-manager/usr/lib/atlas/model_catalog.py|/usr/lib/atlas/model_catalog.py|
 packages/atlas-knowledge/usr/lib/atlas/knowledge_service.py|/usr/lib/atlas/knowledge_service.py|

@@ -492,8 +492,19 @@ def probe_services() -> dict[str, Any]:
 
 
 UI_PATH = HERE / "command_centre_ui.html"
-UI = UI_PATH.read_text(encoding="utf-8")
+# Fallback if the on-disk HTML is briefly missing during a hot-sync.
+UI = UI_PATH.read_text(encoding="utf-8") if UI_PATH.is_file() else ""
 LOGO_PATH = HERE / "atlas-logo.png"
+
+
+def _load_ui_html() -> str:
+    """Prefer live file on disk so a successful restart/pull always serves latest UI."""
+    try:
+        if UI_PATH.is_file():
+            return UI_PATH.read_text(encoding="utf-8")
+    except OSError:
+        pass
+    return UI
 
 VIEWER_CANDIDATES = [
     Path("/usr/share/atlas/maps-viewer"),
@@ -986,10 +997,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
         path = urlparse(self.path).path
         if path in ("/", "/index.html"):
-            body = UI.encode()
+            body = _load_ui_html().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
+            # Never sticky-cache Command Centre shell — soft refresh after
+            # dev-pull must pick up "Index for agents" and other UI changes.
+            self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+            self.send_header("Pragma", "no-cache")
             self.end_headers()
             self.wfile.write(body)
             return

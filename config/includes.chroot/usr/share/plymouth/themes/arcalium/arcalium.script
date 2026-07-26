@@ -1,0 +1,240 @@
+# arcalium.script — full-bleed splash with basic message/password support
+# Master art: assets/plymouthsplash.png (installed as background.jpg @ 1920×1080)
+
+Window.SetBackgroundTopColor(0.02, 0.02, 0.04);
+Window.SetBackgroundBottomColor(0.02, 0.02, 0.04);
+
+window_max_width = Window.GetX() * 2 + Window.GetWidth();
+window_max_height = Window.GetY() * 2 + Window.GetHeight();
+screen_ratio = window_max_width / window_max_height;
+
+bg_image = Image("background.jpg");
+bg_image_ratio = bg_image.GetWidth() / bg_image.GetHeight();
+if (screen_ratio > bg_image_ratio)
+    bg_scale_factor = window_max_width / bg_image.GetWidth();
+else
+    bg_scale_factor = window_max_height / bg_image.GetHeight();
+scaled_bg_image = bg_image.Scale(bg_image.GetWidth() * bg_scale_factor,
+                                 bg_image.GetHeight() * bg_scale_factor);
+bg_sprite = Sprite(scaled_bg_image);
+bg_sprite.SetPosition(Window.GetX() + Window.GetWidth() / 2 - scaled_bg_image.GetWidth() / 2,
+                      Window.GetY() + Window.GetHeight() / 2 - scaled_bg_image.GetHeight() / 2,
+                      -10000);
+
+text_colour.red = 0.95;
+text_colour.green = 0.95;
+text_colour.blue = 0.97;
+
+action_text_colour.red = 1.0;
+action_text_colour.green = 1.0;
+action_text_colour.blue = 1.0;
+
+prompt_active = 0;
+message_notification[0].image = Image.Text("", text_colour.red, text_colour.green, text_colour.blue);
+message_notification[1].image = Image.Text("", action_text_colour.red, action_text_colour.green, action_text_colour.blue);
+
+bits_per_pixel = Window.GetBitsPerPixel();
+if (bits_per_pixel == 4) {
+    password_dot_filename = "password_dot16.png";
+    password_field_filename = "password_field16.png";
+} else {
+    password_dot_filename = "password_dot.png";
+    password_field_filename = "password_field.png";
+}
+
+first_line_height = Image.Text("AfpqtM", text_colour.red, text_colour.green, text_colour.blue).GetHeight();
+
+fun ImageToText(text) {
+    return Image.Text(text, text_colour.red, text_colour.green, text_colour.blue);
+}
+
+fun ImageToActionText(text) {
+    return Image.Text(text, action_text_colour.red, action_text_colour.green, action_text_colour.blue);
+}
+
+fun StringString(string, substring) {
+    start = 0;
+    while (String(string).CharAt(start)) {
+        walk = 0;
+        while (String(substring).CharAt(walk) == String(string).CharAt(start + walk)) {
+            walk++;
+            if (!String(substring).CharAt(walk)) return start;
+        }
+        start++;
+    }
+    return NULL;
+}
+
+fun StringLength(string) {
+    index = 0;
+    while (String(string).CharAt(index)) index++;
+    return index;
+}
+
+fun StringCopy(source, beginning, end) {
+    local.destination = "";
+    for (index = beginning; (((end == NULL) || (index <= end)) && (String(source).CharAt(index))); index++) {
+        local.destination += String(source).CharAt(index);
+    }
+    return local.destination;
+}
+
+fun TextYOffset() {
+    # Messages sit in the lower third so they do not cover the splash art.
+    return Window.GetY() + (Window.GetHeight() * 3) / 4;
+}
+
+fun get_message_label(label, is_fake, is_action_line) {
+    local.message_label;
+    if (is_fake)
+        local.message_image = ImageToText("This is a fake message");
+    else
+        local.message_image = (is_action_line) && ImageToActionText(label) || ImageToText(label);
+
+    message_label.width = message_image.GetWidth();
+    message_label.height = message_image.GetHeight();
+    message_label.x = Window.GetX() + Window.GetWidth() / 2 - message_label.width / 2;
+    message_label.y = TextYOffset();
+    if (is_action_line)
+        message_label.y = message_label.y + (first_line_height * 2);
+    return message_label;
+}
+
+fun setup_message(message_text, x, y, z, index) {
+    global.message_notification[index].image = (index) && ImageToActionText(message_text) || ImageToText(message_text);
+    message_notification[index].x = x;
+    message_notification[index].y = y;
+    message_notification[index].z = z;
+    message_notification[index].sprite = Sprite();
+    message_notification[index].sprite.SetImage(message_notification[index].image);
+    message_notification[index].sprite.SetX(message_notification[index].x);
+    message_notification[index].sprite.SetY(message_notification[index].y);
+    message_notification[index].sprite.SetZ(message_notification[index].z);
+}
+
+fun show_message(index) {
+    if (global.message_notification[index].sprite) global.message_notification[index].sprite.SetOpacity(1);
+}
+
+fun hide_message(index) {
+    if (global.message_notification[index].sprite) global.message_notification[index].sprite.SetOpacity(0);
+}
+
+fun message_callback(message) {
+    is_fake = 0;
+    if (!message || (message == "")) is_fake = 1;
+
+    local.substring = "keys:";
+    local.keys = StringString(message, local.substring);
+    local.is_action_line = (keys != NULL);
+    if (keys != NULL)
+        message = StringCopy(message, keys + StringLength(local.substring), NULL);
+
+    substring = "fsckd-cancel-msg:";
+    keys = StringString(message, substring);
+    if (keys != NULL)
+        message = StringCopy(message, keys + StringLength(substring), NULL);
+
+    label = get_message_label(message, is_fake, is_action_line);
+    label.z = 10000;
+    setup_message(message, label.x, label.y, label.z, is_action_line);
+    if (prompt_active && local.is_action_line)
+        hide_message(is_action_line);
+    else
+        show_message(is_action_line);
+}
+
+fun password_dialogue_setup(message_label) {
+    local.entry;
+    local.bullet_image;
+
+    bullet_image = Image(password_dot_filename);
+    entry.image = Image(password_field_filename);
+
+    prompt_active = 1;
+    if (message_notification[1].sprite) hide_message(1);
+
+    label = get_message_label(message_label, 0, 1);
+    label.z = 10000;
+    setup_message(message_label, label.x, label.y, label.z, 2);
+    show_message(2);
+
+    entry.sprite = Sprite();
+    entry.sprite.SetImage(entry.image);
+    entry.x = Window.GetX() + Window.GetWidth() / 2 - entry.image.GetWidth() / 2;
+    entry.y = message_notification[2].y + label.height + 8;
+    entry.z = 10000;
+    entry.sprite.SetX(entry.x);
+    entry.sprite.SetY(entry.y);
+    entry.sprite.SetZ(entry.z);
+
+    global.password_dialogue = local;
+}
+
+fun password_dialogue_opacity(opacity) {
+    global.password_dialogue.opacity = opacity;
+    local = global.password_dialogue;
+    entry.sprite.SetOpacity(opacity);
+    if (label.sprite) label.sprite.SetOpacity(opacity);
+    if (bullets) {
+        for (index = 0; bullets[index]; index++) {
+            bullets[index].sprite.SetOpacity(opacity);
+        }
+    }
+}
+
+fun display_password_callback(prompt, bullets) {
+    global.status = "password";
+    if (!global.password_dialogue) password_dialogue_setup(prompt);
+    password_dialogue_opacity(1);
+    bullet_width = password_dialogue.bullet_image.GetWidth();
+    bullet_y = password_dialogue.entry.y +
+               password_dialogue.entry.image.GetHeight() / 2 -
+               password_dialogue.bullet_image.GetHeight() / 2;
+    margin = bullet_width;
+    spaces = Math.Int((password_dialogue.entry.image.GetWidth() - (margin * 2)) / (bullet_width / 2));
+    bullets_area.width = margin + spaces * (bullet_width / 2);
+    bullets_area.x = Window.GetX() + Window.GetWidth() / 2 - bullets_area.width / 2;
+    if (bullets > spaces)
+        bullets = spaces;
+    for (index = 0; password_dialogue.bullets[index] || index < bullets; index++) {
+        if (!password_dialogue.bullets[index]) {
+            password_dialogue.bullets[index].sprite = Sprite();
+            password_dialogue.bullets[index].sprite.SetImage(password_dialogue.bullet_image);
+            password_dialogue.bullets[index].x = bullets_area.x + index * bullet_width / 2;
+            password_dialogue.bullets[index].sprite.SetX(password_dialogue.bullets[index].x);
+            password_dialogue.bullets[index].y = bullet_y;
+            password_dialogue.bullets[index].sprite.SetY(password_dialogue.bullets[index].y);
+            password_dialogue.bullets[index].z = password_dialogue.entry.z + 1;
+            password_dialogue.bullets[index].sprite.SetZ(password_dialogue.bullets[index].z);
+        }
+        password_dialogue.bullets[index].sprite.SetOpacity(0);
+        if (index < bullets)
+            password_dialogue.bullets[index].sprite.SetOpacity(1);
+    }
+}
+
+fun display_normal_callback() {
+    global.status = "normal";
+    if (global.password_dialogue) {
+        password_dialogue_opacity(0);
+        global.password_dialogue = NULL;
+        if (message_notification[2].sprite) hide_message(2);
+        prompt_active = 0;
+    }
+    if (message_notification[1].sprite) show_message(1);
+}
+
+fun refresh_callback() {
+    # Keep background sprite alive; no animation required.
+}
+
+fun quit_callback() {
+    # Leave splash visible through shutdown/quit.
+}
+
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+Plymouth.SetMessageFunction(message_callback);
+Plymouth.SetDisplayNormalFunction(display_normal_callback);
+Plymouth.SetRefreshFunction(refresh_callback);
+Plymouth.SetQuitFunction(quit_callback);

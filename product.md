@@ -2938,7 +2938,7 @@ Exit criteria:
 
 ### Phase 1 — Bootable branded OS
 
-**Status: Done (in-tree)** — Debian live-build, KDE Plasma + SDDM, Calamares Atlas branding, hybrid ISO scripts (`phase1-iso.sh` … `phase7-iso.sh`). Wallpaper wiring + SDDM `theme.conf.user` shipped; **visual confirm on real live/ISO boot still open**. Custom Plymouth splash not yet.
+**Status: Done (in-tree)** — Debian live-build, KDE Plasma + SDDM, Calamares Atlas branding, hybrid ISO scripts (`phase1-iso.sh` … `phase7-iso.sh`). Wallpaper wiring + SDDM `theme.conf.user` shipped; **visual confirm on real live/ISO boot still open**. Plymouth MVP theme `arcalium` from `assets/plymouthsplash.png` shipped (ISO rebuild needed to verify).
 
 Deliverables:
 
@@ -4203,7 +4203,7 @@ Reconciled from `docs/BACKLOG.md` + `docs/PLAN.md` (verify before treating as do
 #### P1 — Desktop polish & branding
 
 - Theme polish (Plasma look-and-feel, Command Centre UI, `atlas-launcher` shell) so the desktop reads as Arcalium, not stock Breeze.
-- Custom splash screens (Plymouth boot splash; deeper SDDM branding beyond wallpaper).
+- Custom splash screens (deeper SDDM branding beyond wallpaper; Plymouth MVP theme `arcalium` is in-tree).
 - Wallpaper **verification on real live/ISO boot** (in-tree wiring exists; checklist in BACKLOG).
 
 #### P3 — Deeper content
@@ -4222,7 +4222,7 @@ Reconciled from `docs/BACKLOG.md` + `docs/PLAN.md` (verify before treating as do
 - HSM / air-gapped **production** release keys (`atlas-update-metadata`, APT keyring ceremony) — never invent secrets in-tree.
 - Hosted **signed APT** mirror + APT phase 2 (full Debian security upgrades, owner-gated).
 - Production **Secure Boot** keys.
-- Full branded **Plymouth** theme.
+- Full branded **Plymouth** theme polish beyond the MVP `arcalium` splash.
 - Recovery ISO / clean-hardware restore proof; V1 criterion #11 (update rollback automated tests).
 
 ### 53.3 Explicitly not claimed as done

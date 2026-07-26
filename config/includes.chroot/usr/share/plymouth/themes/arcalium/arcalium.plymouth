@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Arcalium
+Description=Arcalium OS boot and shutdown splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/arcalium
+ScriptFile=/usr/share/plymouth/themes/arcalium/arcalium.script

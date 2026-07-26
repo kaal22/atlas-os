@@ -26,5 +26,5 @@ cp -f /etc/os-release /etc/atlas/os-release
 mkdir -p /etc/default/grub.d
 cat > /etc/default/grub.d/atlas.cfg <<'EOF'
 GRUB_DISTRIBUTOR="Arcalium"
-GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 EOF

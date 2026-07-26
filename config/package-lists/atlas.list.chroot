@@ -58,3 +58,7 @@ docker-compose
 containerd
 # Phase 3 reverse proxy (loopback only)
 nginx
+# Boot/shutdown splash (Arcalium Plymouth theme)
+plymouth
+plymouth-label
+plymouth-themes

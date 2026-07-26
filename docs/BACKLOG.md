@@ -52,15 +52,15 @@ On a live or installed Plasma session:
 - [x] **Wallpaper wiring (M1)** — helper, hook, SDDM `theme.conf.user`, autostart; ISO visual confirm still open
 - [ ] **Wallpaper confirmed on ISO** — verify Plasma wallpaper applies live + installed (checklist above)
 - [ ] **Theme polish** — Plasma look-and-feel, Command Centre UI, and shell (`atlas-launcher`) visual polish so the desktop reads as Arcalium, not stock Breeze
-- [ ] **Custom splash screens** — brand boot / login surfaces (Arcalium today uses SDDM + Breeze + wallpaper symlink; no custom Plymouth theme yet):
+- [ ] **Custom splash screens** — brand boot / login surfaces:
 
   | Surface | Current | Paths / notes |
   |---------|---------|---------------|
   | SDDM greeter | Theme `breeze` + `theme.conf.user` Arcalium background | `config/includes.chroot/etc/sddm.conf.d/10-atlas.conf`; hook `9030-atlas-wallpaper.hook.chroot` |
   | Plasma session wallpaper | Helper + Arcalium wallpaper package | `/usr/lib/atlas/set-wallpaper.sh`, `/usr/share/backgrounds/atlas/*.png` |
-  | Live / installed GRUB | Menu labels + `os-release` | `9050-atlas-boot-menu.hook.binary`, `/etc/default/grub.d/atlas.cfg` |
+  | Live / installed GRUB | Menu labels + `os-release`; `quiet splash` | `9050-atlas-boot-menu.hook.binary`, `/etc/default/grub.d/atlas.cfg` |
   | Calamares installer | Arcalium branding | `/usr/share/atlas/calamares/branding/atlas` |
-  | Plymouth (boot splash) | Not customised | Add branded Plymouth theme if desired for installed boot |
+  | Plymouth (boot/shutdown) | **MVP done** — theme `arcalium`, master `assets/plymouthsplash.png` → `background.jpg` (1920×1080) | `config/includes.chroot/usr/share/plymouth/themes/arcalium/`; hook `9045-atlas-plymouth`; `scripts/install-plymouth-assets.sh`; needs ISO rebuild / initramfs for full effect |
 
 ### Updates (production path)
 

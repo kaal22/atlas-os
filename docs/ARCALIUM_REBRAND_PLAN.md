@@ -67,7 +67,7 @@ Slogan and meta title/description are fixed assets (see header). Apply slogan on
 | **Live hostname** | `hostname=atlas-live`, `username=atlas` | `auto/config` `--bootappend-live` |
 | **Wallpaper / icons** | Plasma package `wallpapers/Atlas`; backgrounds `…/backgrounds/atlas/` (`arcalium-default.png` + sized `arcalium-wallpaper-*.png`); icons `atlas.png` / `atlas-services.*` | `config/includes.chroot/usr/share/wallpapers/Atlas/`, `assets/arcaliumos.png` |
 | **SDDM** | Breeze theme + Atlas background via hook; config `10-atlas.conf` | `config/includes.chroot/etc/sddm.conf.d/10-atlas.conf`; hook `9030-atlas-wallpaper` |
-| **Plymouth** | **Not customised** (stock) | noted in `docs/BACKLOG.md` / `product.md` §53.2 |
+| **Plymouth** | Theme `arcalium` (script) — splash from `assets/plymouthsplash.png` | `config/includes.chroot/usr/share/plymouth/themes/arcalium/`; hook `9045-atlas-plymouth`; `scripts/install-plymouth-assets.sh` |
 | **Calamares branding** | Component `atlas`; product strings “Atlas OS” / “Atlas” | `calamares/branding/atlas/`, packaged via `atlas-branding` → `/usr/share/atlas/calamares/` |
 | **Ports (keep)** | CC `:8787`, Kiwix `:8080`, Ollama, etc. — **not brand** | `network_modes.py`, `atlas.conf` |
 | **Meta title/description** | **Missing** today — CC title is `Atlas Command Centre`; no og/meta description | CC HTML, launcher HTML |
@@ -128,7 +128,7 @@ Establish slogan, meta tags, logo/wallpaper ownership, and where new Arcalium as
   - Runtime (Milestone A): still install as `/usr/lib/atlas/atlas-logo.png` **or** dual-ship `arcalium-logo.png` and point UI at new path without renaming the directory
 - [x] Wire slogan into Welcome wizard + About surface
 - [x] Add HTML `<title>` + `<meta name="description">` (+ optional `og:title` / `og:description`) using exact meta strings
-- [ ] Note Plymouth: still absent — Stage 2 can stub theme name `arcalium` when implemented
+- [x] Note Plymouth: MVP theme `arcalium` uses `assets/plymouthsplash.png` (via `scripts/install-plymouth-assets.sh`)
 
 ### Risks / migrations
 
@@ -175,7 +175,7 @@ Plasma wallpaper labels, icons, `.desktop` Names, SDDM greeter background labeli
 - [x] `os-release`: `NAME` / `PRETTY_NAME` → Arcalium OS; `ID=arcalium`, `ID_LIKE=debian`, HOME/SUPPORT URLs → `arcalium.local`
 - [ ] SDDM: no text brand today beyond wallpaper — ensure wallpaper is Arcalium art; optional future theme rename
 - [ ] Icon theme: Milestone A can keep icon *names* `atlas` (desktop `Icon=atlas`) if artwork is replaced in place; Milestone B renames to `arcalium`
-- [ ] Plymouth (optional stub): add theme package later; not blocking Milestone A
+- [x] Plymouth MVP: theme `arcalium` from `assets/plymouthsplash.png` (hook `9045-atlas-plymouth`; GRUB `quiet splash`)
 
 ### Risks / migrations
 

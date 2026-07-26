@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+# Set Arcalium as the default Plymouth theme and rebuild initramfs so the
+# splash is available on the next real boot (live + installed).
+if ! command -v plymouth-set-default-theme >/dev/null 2>&1; then
+  echo "plymouth-set-default-theme not available; skipping" >&2
+  exit 0
+fi
+
+if [ ! -f /usr/share/plymouth/themes/arcalium/arcalium.plymouth ]; then
+  echo "Arcalium Plymouth theme missing; skipping" >&2
+  exit 0
+fi
+
+mkdir -p /etc/plymouth
+if [ -f /etc/plymouth/plymouthd.conf ]; then
+  if grep -q '^Theme=' /etc/plymouth/plymouthd.conf; then
+    sed -i 's/^Theme=.*/Theme=arcalium/' /etc/plymouth/plymouthd.conf
+  else
+    printf '\n[Daemon]\nTheme=arcalium\n' >> /etc/plymouth/plymouthd.conf
+  fi
+else
+  cat > /etc/plymouth/plymouthd.conf <<'EOF'
+[Daemon]
+Theme=arcalium
+ShowDelay=0
+EOF
+fi
+
+plymouth-set-default-theme -R arcalium

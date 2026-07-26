@@ -1,0 +1,14 @@
+# Arcalium OS: default Plasma global theme to Breeze Dark for all users.
+# Precedence: /etc/xdg beats desktop-base's org.debian.desktop
+# (/usr/share/desktop-base/kf5-settings/kdeglobals via plasma-workspace env.sh).
+# Plasma 5.24+ applies look-and-feel defaults into ~/.config/kdedefaults on first login.
+# SDDM greeter stays stock Breeze (see /etc/sddm.conf.d/10-atlas.conf).
+
+[General]
+ColorScheme=BreezeDark
+
+[Icons]
+Theme=breeze-dark
+
+[KDE]
+LookAndFeelPackage=org.kde.breezedark.desktop

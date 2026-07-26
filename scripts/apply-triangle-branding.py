@@ -123,17 +123,23 @@ def main() -> None:
     # Desktop / live wallpaper: keep the original composition (widescreen triangle)
     import shutil
 
-    wall_original = OUT_WALL / "atlas-wallpaper.png"
+    # Native default used by SDDM + set-wallpaper fallbacks
+    wall_original = OUT_WALL / "arcalium-default.png"
     shutil.copy2(SRC, wall_original)
     # Also write common display sizes for lighter live ISOs / HiDPI
     master.resize((1920, 1080), Image.Resampling.LANCZOS).save(
-        OUT_WALL / "atlas-wallpaper-1080p.png", optimize=True
+        OUT_WALL / "arcalium-wallpaper-1080p.png", optimize=True
     )
     master.resize((2560, 1440), Image.Resampling.LANCZOS).save(
-        OUT_WALL / "atlas-wallpaper-1440p.png", optimize=True
+        OUT_WALL / "arcalium-wallpaper-1440p.png", optimize=True
     )
-    # Native default used by SDDM + set-wallpaper fallbacks
-    shutil.copy2(wall_original, OUT_WALL / "arcalium-default.png")
+    master.resize((3840, 2160), Image.Resampling.LANCZOS).save(
+        OUT_WALL / "arcalium-wallpaper-4k.png", optimize=True
+    )
+    # Drop superseded Atlas-named assets if present from older trees.
+    for stale in OUT_WALL.glob("atlas-wallpaper*.png"):
+        stale.unlink(missing_ok=True)
+    (OUT_WALL / "atlas-default.png").unlink(missing_ok=True)
 
     # Plasma wallpaper plugin images
     master.resize((1920, 1080), Image.Resampling.LANCZOS).save(
@@ -142,7 +148,9 @@ def main() -> None:
     master.resize((2560, 1440), Image.Resampling.LANCZOS).save(
         OUT_PLASMA / "2560x1440.png", optimize=True
     )
-    shutil.copy2(wall_original, OUT_PLASMA / "1024x576.png")
+    master.resize((1024, 576), Image.Resampling.LANCZOS).save(
+        OUT_PLASMA / "1024x576.png", optimize=True
+    )
 
     # Icon for slideshow / about
     logo.resize((160, 160), Image.Resampling.LANCZOS).save(OUT_BRAND / "productIcon.png", optimize=True)

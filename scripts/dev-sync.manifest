@@ -86,10 +86,9 @@ packages/atlas-shell/usr/share/atlas/launcher/index.html|/usr/share/atlas/launch
 # Wallpaper (ISO path under includes.chroot; hot-sync for VM checks)
 config/includes.chroot/usr/lib/atlas/set-wallpaper.sh|/usr/lib/atlas/set-wallpaper.sh|
 config/includes.chroot/usr/share/backgrounds/atlas/arcalium-default.png|/usr/share/backgrounds/atlas/arcalium-default.png|
-config/includes.chroot/usr/share/backgrounds/atlas/atlas-wallpaper.png|/usr/share/backgrounds/atlas/atlas-wallpaper.png|
-config/includes.chroot/usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png|/usr/share/backgrounds/atlas/atlas-wallpaper-1080p.png|
-config/includes.chroot/usr/share/backgrounds/atlas/atlas-wallpaper-1440p.png|/usr/share/backgrounds/atlas/atlas-wallpaper-1440p.png|
-config/includes.chroot/usr/share/backgrounds/atlas/atlas-wallpaper-4k.png|/usr/share/backgrounds/atlas/atlas-wallpaper-4k.png|
+config/includes.chroot/usr/share/backgrounds/atlas/arcalium-wallpaper-1080p.png|/usr/share/backgrounds/atlas/arcalium-wallpaper-1080p.png|
+config/includes.chroot/usr/share/backgrounds/atlas/arcalium-wallpaper-1440p.png|/usr/share/backgrounds/atlas/arcalium-wallpaper-1440p.png|
+config/includes.chroot/usr/share/backgrounds/atlas/arcalium-wallpaper-4k.png|/usr/share/backgrounds/atlas/arcalium-wallpaper-4k.png|
 config/includes.chroot/usr/share/wallpapers/Atlas/contents/images/1024x576.png|/usr/share/wallpapers/Atlas/contents/images/1024x576.png|
 config/includes.chroot/usr/share/wallpapers/Atlas/contents/images/1920x1080.png|/usr/share/wallpapers/Atlas/contents/images/1920x1080.png|
 config/includes.chroot/usr/share/wallpapers/Atlas/contents/images/2560x1440.png|/usr/share/wallpapers/Atlas/contents/images/2560x1440.png|

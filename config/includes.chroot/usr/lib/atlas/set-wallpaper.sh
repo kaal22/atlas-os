@@ -36,22 +36,18 @@ pick_wall() {
     fi
   fi
   if [ "$w" -ge 3200 ] || [ "$h" -ge 1800 ]; then
-    [ -f "$base/atlas-wallpaper-4k.png" ] && { printf '%s' "$base/atlas-wallpaper-4k.png"; return 0; }
+    [ -f "$base/arcalium-wallpaper-4k.png" ] && { printf '%s' "$base/arcalium-wallpaper-4k.png"; return 0; }
   fi
   if [ "$w" -ge 2400 ] || [ "$h" -ge 1350 ]; then
-    [ -f "$base/atlas-wallpaper-1440p.png" ] && { printf '%s' "$base/atlas-wallpaper-1440p.png"; return 0; }
+    [ -f "$base/arcalium-wallpaper-1440p.png" ] && { printf '%s' "$base/arcalium-wallpaper-1440p.png"; return 0; }
     [ -f "$base/arcalium-default.png" ] && { printf '%s' "$base/arcalium-default.png"; return 0; }
   fi
-  if [ -f "$base/atlas-wallpaper-1080p.png" ]; then
-    printf '%s' "$base/atlas-wallpaper-1080p.png"
+  if [ -f "$base/arcalium-wallpaper-1080p.png" ]; then
+    printf '%s' "$base/arcalium-wallpaper-1080p.png"
     return 0
   fi
   if [ -f "$base/arcalium-default.png" ]; then
     printf '%s' "$base/arcalium-default.png"
-    return 0
-  fi
-  if [ -f "$base/atlas-wallpaper.png" ]; then
-    printf '%s' "$base/atlas-wallpaper.png"
     return 0
   fi
   if [ -f "/usr/share/wallpapers/Atlas/contents/images/1920x1080.png" ]; then

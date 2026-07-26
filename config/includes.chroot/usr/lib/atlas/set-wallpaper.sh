@@ -2,10 +2,22 @@
 # Apply Atlas wallpaper on KDE Plasma (live + installed sessions).
 set -e
 
-LOG="${ATLAS_WALLPAPER_LOG:-/tmp/atlas-wallpaper.log}"
+# Per-user log so a prior root run cannot leave an unwritable /tmp file.
+# Logging must never abort wallpaper application.
+if [ -n "${ATLAS_WALLPAPER_LOG:-}" ]; then
+  LOG="$ATLAS_WALLPAPER_LOG"
+elif [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -w "${XDG_RUNTIME_DIR}" ]; then
+  LOG="${XDG_RUNTIME_DIR}/atlas-wallpaper.log"
+else
+  LOG="/tmp/atlas-wallpaper.$(id -u).log"
+fi
+if ! ( : >>"$LOG" ) 2>/dev/null; then
+  LOG=/dev/null
+fi
 
 log() {
-  printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$LOG" 2>/dev/null || true
+  # Redirect failures (e.g. stale perms) must not trip set -e or spam stderr.
+  { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$LOG"; } 2>/dev/null || true
 }
 
 pick_wall() {

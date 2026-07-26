@@ -143,6 +143,19 @@ def test_knowledge_index_ingests_extracted_html():
         assert int(zim_rag.get("extracted") or 0) >= 1
         assert (atlas / "knowledge" / "packs" / "wikipedia-en" / "extracted" / "Gravity.html").is_file()
 
+        # Control / marker files must exist on disk but never enter the searchable index.
+        pack_dir = atlas / "knowledge" / "packs" / "wikipedia-en"
+        assert (pack_dir / "manifest.json").is_file()
+        from knowledge_service import KnowledgeService
+
+        ks = KnowledgeService(atlas / "knowledge", keyword_only=True)
+        ctrl_hits = ks.search("alice", "post_install_workflow size_class atlas-zim-rag extracted 0")
+        assert all(
+            (h.get("name") or "") not in {"manifest.json", ".atlas-zim-rag.json"}
+            for h in ctrl_hits
+        )
+        assert ks.search("alice", "Solar System planets") or ks.search("alice", "Gravity Attraction")
+
 
 def test_kolibri_prepare_writes_channel_lock():
     with tempfile.TemporaryDirectory() as td:

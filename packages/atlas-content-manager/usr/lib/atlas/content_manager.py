@@ -2778,10 +2778,34 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
             zim_rag_info = {"ok": False, "error": "zim_rag_failed"}
 
         try:
-            from knowledge_service import KnowledgeService, SUPPORTED_EXTENSIONS  # type: ignore
+            from knowledge_service import (  # type: ignore
+                KnowledgeService,
+                SUPPORTED_EXTENSIONS,
+                is_rag_control_path,
+            )
         except ImportError:
             SUPPORTED_EXTENSIONS = {".md", ".txt", ".markdown", ".html", ".htm", ".csv", ".json"}  # type: ignore
             KnowledgeService = None  # type: ignore
+
+            def is_rag_control_path(path):  # type: ignore
+                name = Path(path).name.lower()
+                return name in {
+                    "manifest.json",
+                    "checksums.json",
+                    "signature.json",
+                    "meta.json",
+                    "channel.lock.json",
+                    ".atlas-zim-rag.json",
+                    ".atlas-indexed",
+                    "readme.txt",
+                    "licence.txt",
+                    "license.txt",
+                    "readme.md",
+                    "import.txt",
+                } or name.startswith(".atlas-") or name.endswith(".lock.json")
+
+        # Pack RAG: content extracts only — never pack control JSON / markers.
+        pack_ingest_ext = {".md", ".txt", ".markdown", ".html", ".htm", ".rst", ".org", ".csv", ".pdf"}
 
         if KnowledgeService is not None:
             ks = KnowledgeService(atlas_root / "knowledge")
@@ -2790,10 +2814,11 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
             for path in sorted(target.rglob("*")):
                 if not path.is_file():
                     continue
+                if path.suffix.lower() not in pack_ingest_ext:
+                    continue
                 if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
                     continue
-                # Skip licence/attribution noise already handled separately
-                if path.name.lower() in {"readme.txt", "licence.txt", "license.txt", "readme.md"}:
+                if is_rag_control_path(path):
                     continue
                 try:
                     ks.ingest_file(user_id, path, trust="pack")
@@ -2805,12 +2830,17 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
             incoming = atlas_root / "knowledge" / "incoming" / str(manifest.get("id") or "pack")
             incoming.mkdir(parents=True, exist_ok=True)
             for path in sorted(target.rglob("*")):
-                if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
-                    try:
-                        shutil.copy2(path, incoming / path.name)
-                        ingested += 1
-                    except OSError:
-                        pass
+                if not path.is_file():
+                    continue
+                if path.suffix.lower() not in pack_ingest_ext:
+                    continue
+                if is_rag_control_path(path):
+                    continue
+                try:
+                    shutil.copy2(path, incoming / path.name)
+                    ingested += 1
+                except OSError:
+                    pass
 
     marker = {
         "pack_id": manifest.get("id"),

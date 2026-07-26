@@ -116,6 +116,60 @@ def test_reload_picks_up_external_index_writes():
         assert live.search("alice", "Democracy elections")
 
 
+def test_rag_control_files_rejected_and_hidden():
+    from knowledge_service import is_rag_control_path
+
+    assert is_rag_control_path("manifest.json")
+    assert is_rag_control_path(".atlas-zim-rag.json")
+    assert is_rag_control_path(Path("/pack/extracted/.atlas-zim-rag.json"))
+    assert is_rag_control_path("licences/LICENCE.txt")
+    assert not is_rag_control_path("articles/Solar_System.md")
+
+    with tempfile.TemporaryDirectory() as td:
+        ks = KnowledgeService(Path(td), keyword_only=True)
+        good = Path(td) / "Solar_System.md"
+        good.write_text("The Solar System has eight planets orbiting the Sun.", encoding="utf-8")
+        ks.ingest_file("system", good, trust="pack")
+
+        for name in ("manifest.json", ".atlas-zim-rag.json"):
+            bad = Path(td) / name
+            bad.write_text(
+                '{"pack_id":"atlas.knowledge.wikipedia-en","extracted":0,"processed":0,'
+                '"size_class":"large","licence":"CC-BY-SA-4.0"}',
+                encoding="utf-8",
+            )
+            try:
+                ks.ingest_file("system", bad, trust="pack")
+                assert False, f"expected rag_control_file for {name}"
+            except ValueError as e:
+                assert "rag_control_file" in str(e)
+
+        # Legacy index entry must still be filtered from search results.
+        from knowledge_service import DocumentRecord, chunk_text
+        import time
+
+        legacy = DocumentRecord(
+            doc_id="legacyctrl",
+            user_id="system",
+            path=str(Path(td) / "manifest.json"),
+            chunks=chunk_text(
+                "Wikipedia English mini ZIM file size_class large CC-BY-SA-4.0 "
+                "extracted 0 processed post_install_workflow"
+            ),
+            name="manifest.json",
+            trust="pack",
+            vectorized=False,
+            created_at=time.time(),
+        )
+        ks.docs[legacy.doc_id] = legacy
+        ks.save()
+
+        hits = ks.search("alice", "capabilities size_class wikipedia zim extracted")
+        assert all(h.get("name") != "manifest.json" for h in hits)
+        assert all(".atlas-zim-rag" not in str(h.get("name") or "") for h in hits)
+        assert ks.search("alice", "Solar System planets")
+
+
 if __name__ == "__main__":
     test_chunk_and_scrub()
     test_cross_user_isolation()
@@ -125,4 +179,5 @@ if __name__ == "__main__":
     test_html_extract()
     test_shared_system_pack_visible()
     test_reload_picks_up_external_index_writes()
+    test_rag_control_files_rejected_and_hidden()
     print("OK test_knowledge_service")

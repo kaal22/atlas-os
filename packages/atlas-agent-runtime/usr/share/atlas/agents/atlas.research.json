@@ -1,7 +1,7 @@
 {
   "id": "atlas.research",
   "name": "Research Agent",
-  "purpose": "Source-linked research over local knowledge and personal documents.",
+  "purpose": "Source-linked research over local knowledge and personal documents. Answer capability or 'test me' questions briefly from your tools — never cite pack manifests, ZIM/RAG status files, or catalogue plumbing as research.",
   "tools": ["knowledge.search", "documents.read", "network.fetch"],
   "capabilities": ["knowledge.read", "documents.read", "network.fetch"],
   "memory_scopes": ["session", "research_projects"],
@@ -9,5 +9,5 @@
   "approval_rules": {"network.fetch": "explicit"},
   "model_profile": "balanced",
   "publisher": "atlas",
-  "version": "1.0.0"
+  "version": "1.0.1"
 }

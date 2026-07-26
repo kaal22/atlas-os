@@ -29,6 +29,40 @@ TEXT_EXTENSIONS = {".md", ".txt", ".markdown", ".rst", ".csv", ".json", ".org", 
 PDF_EXTENSIONS = {".pdf"}
 SUPPORTED_EXTENSIONS = TEXT_EXTENSIONS | PDF_EXTENSIONS
 
+# Pack install markers / catalogue plumbing — never user-facing knowledge.
+RAG_CONTROL_NAMES = frozenset({
+    "manifest.json",
+    "checksums.json",
+    "signature.json",
+    "meta.json",
+    "index.json",
+    "channel.lock.json",
+    ".atlas-zim-rag.json",
+    ".atlas-indexed",
+    ".atlas-kolibri-prepared",
+    "import.txt",
+    "readme.txt",
+    "licence.txt",
+    "license.txt",
+    "readme.md",
+})
+RAG_CONTROL_DIR_NAMES = frozenset({"licences", "licenses", "attribution"})
+
+
+def is_rag_control_path(path: Path | str) -> bool:
+    """True for pack control / marker files that must not enter the knowledge index."""
+    p = Path(path)
+    name = p.name.lower()
+    if name in RAG_CONTROL_NAMES:
+        return True
+    if name.startswith(".atlas-"):
+        return True
+    if name.endswith(".lock.json"):
+        return True
+    if any(part.lower() in RAG_CONTROL_DIR_NAMES for part in p.parts):
+        return True
+    return False
+
 
 def chunk_text(text: str, size: int = 800, overlap: int = 100) -> list[str]:
     text = re.sub(r"\s+", " ", text).strip()
@@ -340,6 +374,8 @@ class KnowledgeService:
     def ingest_file(self, user_id: str, path: Path, *, trust: str = "user_document") -> DocumentRecord:
         self.reload_if_changed()
         path = Path(path)
+        if is_rag_control_path(path):
+            raise ValueError("rag_control_file")
         text = extract_text(path)
         if not text.strip():
             raise ValueError("empty_document")
@@ -503,6 +539,9 @@ class KnowledgeService:
         hits = sorted(merged.values(), key=lambda h: float(h.get("score") or 0), reverse=True)
         relevant: list[dict[str, Any]] = []
         for h in hits:
+            # Defense in depth: hide pack control files already present in older indexes.
+            if is_rag_control_path(h.get("name") or "") or is_rag_control_path(h.get("path") or ""):
+                continue
             score = float(h.get("score") or 0)
             src = str(h.get("source") or "keyword")
             if src == "keyword" and score < 1.0:

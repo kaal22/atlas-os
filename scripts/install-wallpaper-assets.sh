@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Regenerate Atlas desktop wallpaper assets from assets/atlas-wallpaper-master.png
+# Regenerate Atlas desktop wallpaper assets from assets/atlas-default.png
+# (native 2560×1440). Optional override: scripts/install-wallpaper-assets.sh /path/to.png
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="${1:-$ROOT/assets/atlas-wallpaper-master.png}"
+SRC="${1:-$ROOT/assets/atlas-default.png}"
 WALL="$ROOT/config/includes.chroot/usr/share/backgrounds/atlas"
 PLASMA="$ROOT/config/includes.chroot/usr/share/wallpapers/Atlas/contents/images"
 
@@ -14,8 +15,9 @@ fi
 
 mkdir -p "$WALL" "$PLASMA"
 
-magick "$SRC" -strip "$WALL/atlas-wallpaper.png"
-cp "$WALL/atlas-wallpaper.png" "$WALL/atlas-default.png"
+# Native / default install path used by SDDM + set-wallpaper fallbacks.
+magick "$SRC" -strip "$WALL/atlas-default.png"
+cp "$WALL/atlas-default.png" "$WALL/atlas-wallpaper.png"
 
 for spec in "1080p:1920x1080" "1440p:2560x1440" "4k:3840x2160"; do
   label="${spec%%:*}"
@@ -23,10 +25,10 @@ for spec in "1080p:1920x1080" "1440p:2560x1440" "4k:3840x2160"; do
   magick "$SRC" -strip -resize "${dim}!" "$WALL/atlas-wallpaper-${label}.png"
 done
 
+magick "$SRC" -strip -resize 1024x576! "$PLASMA/1024x576.png"
 magick "$SRC" -strip -resize 1920x1080! "$PLASMA/1920x1080.png"
 magick "$SRC" -strip -resize 2560x1440! "$PLASMA/2560x1440.png"
 magick "$SRC" -strip -resize 3840x2160! "$PLASMA/3840x2160.png"
-cp "$WALL/atlas-wallpaper.png" "$PLASMA/1024x576.png"
 
 echo "Wallpaper assets installed from $SRC"
-identify "$WALL/atlas-wallpaper.png" "$WALL/atlas-wallpaper-1080p.png" "$WALL/atlas-wallpaper-4k.png"
+identify "$WALL/atlas-default.png" "$WALL/atlas-wallpaper-1080p.png" "$WALL/atlas-wallpaper-1440p.png" "$WALL/atlas-wallpaper-4k.png"

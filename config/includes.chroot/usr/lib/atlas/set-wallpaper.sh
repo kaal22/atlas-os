@@ -28,9 +28,14 @@ pick_wall() {
   fi
   if [ "$w" -ge 2400 ] || [ "$h" -ge 1350 ]; then
     [ -f "$base/atlas-wallpaper-1440p.png" ] && { printf '%s' "$base/atlas-wallpaper-1440p.png"; return 0; }
+    [ -f "$base/atlas-default.png" ] && { printf '%s' "$base/atlas-default.png"; return 0; }
   fi
   if [ -f "$base/atlas-wallpaper-1080p.png" ]; then
     printf '%s' "$base/atlas-wallpaper-1080p.png"
+    return 0
+  fi
+  if [ -f "$base/atlas-default.png" ]; then
+    printf '%s' "$base/atlas-default.png"
     return 0
   fi
   if [ -f "$base/atlas-wallpaper.png" ]; then

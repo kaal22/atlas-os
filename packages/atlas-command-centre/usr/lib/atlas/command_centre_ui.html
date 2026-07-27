@@ -1334,7 +1334,8 @@ function formatFetchAge(state){
 function contentFetchRetryButtons(state){
   const failed=!!(state.error||state.status==='error');
   const cancelled=state.status==='cancelled'||!!state.cancelled;
-  if((failed||cancelled)&&state.retryKind==='zim'&&state.packId){
+  const incomplete=state.status==='incomplete'||!!state.zim_incomplete;
+  if((failed||cancelled||incomplete)&&state.retryKind==='zim'&&state.packId){
     return `<button class="btn" onclick="retryFetchZim('${escapeHtml(state.packId)}')">Retry ZIM</button>`;
   }
   if((failed||cancelled)&&state.retryKind==='maps'&&state.packId){
@@ -1500,7 +1501,9 @@ async function pollContentFetch(opts){
         continue;
       }
       const cancelled=st.status==='cancelled';
-      const failed=!!(st.error||st.status==='error');
+      // Transient resume/retry must not look like a hard failure (even if last_error is set).
+      const recovering=['retrying','resuming','downloading','starting','checking','warning'].includes(String(st.status||''));
+      const failed=!recovering&&!!st.done&&(!!st.error||st.status==='error');
       const tot=Number(st.total||opts.totalHint||0);
       const dl=Number(st.downloaded||0);
       // Only treat as finished when backend sets done — never when size_hint is merely reached.
@@ -1513,14 +1516,14 @@ async function pollContentFetch(opts){
         downloaded:dl,
         total:tot,
         percent:reallyDone&&st.status==='ready'?100:st.percent,
-        indeterminate:!reallyDone&&(!!st.indeterminate||(!st.done&&dl<=0&&!cancelled)),
+        indeterminate:!reallyDone&&(!!st.indeterminate||(!st.done&&dl<=0&&!cancelled&&!recovering)),
         message:cancelled?(st.message||'Download cancelled'):(failed?(st.error||st.message||'Download failed'):(st.message||'')),
-        error:st.error,
+        error:failed?st.error:undefined,
         cancelled,
         path:st.path,
         bytes_per_sec:reallyDone?0:st.bytes_per_sec,
         eta_seconds:reallyDone?null:st.eta_seconds,
-        stalled:!!st.stalled&&!reallyDone,
+        stalled:!!st.stalled&&!reallyDone&&!recovering,
         stall_seconds:st.stall_seconds,
         updated_at:st.updated_at,
         packId, country, packSlug, retryKind,
@@ -1627,10 +1630,15 @@ async function renderContent(){
           else st=`<span class="pill-sm wait">stub — wait for tiles</span>`;
         }else if(p.installed&&isZimKnowledgePack(p)){
           const extracted=Number(p.zim_rag_extracted||0);
+          const planned=Number(p.zim_rag_planned||40);
           if(p.zim_status==='fetching') st=`<span class="pill-sm wait">downloading ZIM…</span>`;
-          else if(p.has_zim&&extracted>0) st=`<span class="pill-sm ok">installed · ${extracted} indexed</span>`;
-          else if(p.has_zim) st=`<span class="pill-sm wait">installed · ZIM ready — index for agents</span>`;
-          else st=`<span class="pill-sm ok">installed ${escapeHtml(p.installed_version||'')}</span>`;
+          else if(p.zim_status==='incomplete'||p.zim_incomplete){
+            st=`<span class="pill-sm bad">ZIM incomplete — retry download</span>`;
+          }else if(p.zim_status==='error'){
+            st=`<span class="pill-sm bad">ZIM failed</span>`;
+          }else if(p.has_zim&&extracted>0) st=`<span class="pill-sm ok">installed · seeded ${extracted}/${planned||extracted}</span>`;
+          else if(p.has_zim) st=`<span class="pill-sm wait">installed · ZIM ready — index for agents (≤${planned} seeds)</span>`;
+          else st=`<span class="pill-sm wait">installed — ZIM not downloaded</span>`;
         }else if(p.installed){
           st=`<span class="pill-sm ok">installed ${escapeHtml(p.installed_version||'')}</span>`;
         }else if(avail){
@@ -1655,9 +1663,10 @@ async function renderContent(){
             }
           }
           if(isZimKnowledgePack(p)){
-            retries.push(`<button class="btn secondary" onclick="retryFetchZim('${escapeHtml(p.id)}')">Retry ZIM</button>`);
+            const zimBad=p.zim_status==='incomplete'||p.zim_incomplete||p.zim_status==='error'||!p.has_zim;
+            retries.push(`<button class="btn ${zimBad?'':'secondary'}" onclick="retryFetchZim('${escapeHtml(p.id)}')">${zimBad?'Retry ZIM':'Re-download ZIM'}</button>`);
             const indexing=_indexingPackId===p.id;
-            retries.push(`<button class="btn" type="button" ${indexing?'disabled':''} title="Build bounded ZIM extract for agent search (works even if extracted=0)" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">${indexing?'Indexing…':'Index for agents'}</button>`);
+            retries.push(`<button class="btn" type="button" ${indexing?'disabled':''} title="Build bounded ~40-article seed extract for agent search (not full Wikipedia)" onclick="indexKnowledgePack('${escapeHtml(p.id)}')">${indexing?'Indexing…':'Index for agents'}</button>`);
             retries.push(`<button class="btn" onclick="window.open(KIWIX_URL,'_blank','noopener')">Open Library</button>`);
           } else if(isKnowledgePack(p)){
             const indexing=_indexingPackId===p.id;

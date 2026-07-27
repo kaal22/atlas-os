@@ -98,6 +98,19 @@ DEFAULT_WIKIPEDIA_ZIM_URL = (
 DEFAULT_WIKIPEDIA_ZIM_NAME = "wikipedia_en_100_nopic.zim"
 DEFAULT_WIKIPEDIA_ZIM_SIZE_HINT = 14_000_000
 LARGE_ZIM_WARN_BYTES = 1_000_000_000
+# ZIM integrity gates — never promote truncated downloads into Kiwix.
+ZIM_MAGIC = b"ZIM\x04"
+MIN_ZIM_BYTES = 32  # enough for magic + entryCount header fields
+# Enforce size_hint floor only for packs at/above this (avoids tiny unit-test fixtures).
+ZIM_SIZE_HINT_ENFORCE_BYTES = 1_000_000
+# Incomplete if file is below this fraction of catalogue size_hint (5.6G of 12G ≈ 0.47).
+ZIM_SIZE_HINT_MIN_RATIO = float(os.environ.get("ATLAS_ZIM_SIZE_MIN_RATIO", "0.90"))
+# Large ZIM HTTP download resilience (resume + backoff).
+ZIM_DOWNLOAD_MAX_ATTEMPTS = int(os.environ.get("ATLAS_ZIM_DOWNLOAD_ATTEMPTS", "12"))
+ZIM_DOWNLOAD_RETRY_BASE_SEC = float(os.environ.get("ATLAS_ZIM_DOWNLOAD_RETRY_BASE", "2"))
+ZIM_DOWNLOAD_RETRY_MAX_SEC = float(os.environ.get("ATLAS_ZIM_DOWNLOAD_RETRY_MAX", "60"))
+ZIM_DOWNLOAD_CHUNK = 1024 * 1024
+ZIM_DOWNLOAD_TIMEOUT = int(os.environ.get("ATLAS_ZIM_DOWNLOAD_TIMEOUT", "300"))
 
 REQUIRED = {
     "schema",
@@ -913,7 +926,18 @@ def _download_url_to_file(
     *,
     progress_cb: Callable[[int, int], None] | None = None,
     cancel_event: threading.Event | None = None,
-) -> None:
+    status_cb: Callable[[dict[str, Any]], None] | None = None,
+    resume: bool = True,
+    max_attempts: int | None = None,
+) -> tuple[int, int]:
+    """
+    Download URL to dest via a .partial sibling.
+
+    Network downloads keep ``.partial`` across transient failures and resume with
+    HTTP Range when the server supports it. Returns (downloaded_bytes,
+    expected_total_or_0). Raises PackError if Content-Length/Range total is known
+    and the final file is shorter.
+    """
     dest.parent.mkdir(parents=True, exist_ok=True)
     partial = dest.with_suffix(dest.suffix + ".partial")
     # Local / file:// copies (kids expand shipped under /usr/share/atlas/content/).
@@ -936,45 +960,198 @@ def _download_url_to_file(
                     if cancel_event and cancel_event.is_set():
                         partial.unlink(missing_ok=True)
                         raise FetchCancelledError("download cancelled")
-                    chunk = inp.read(1024 * 1024)
+                    chunk = inp.read(ZIM_DOWNLOAD_CHUNK)
                     if not chunk:
                         break
                     out.write(chunk)
                     downloaded += len(chunk)
                     if progress_cb:
                         progress_cb(downloaded, total)
+            if total and downloaded < total:
+                partial.unlink(missing_ok=True)
+                raise PackError(f"incomplete download: got {downloaded} of {total} bytes")
             partial.replace(dest)
-            return
+            return downloaded, total
         except FetchCancelledError:
             raise
         except OSError as e:
             partial.unlink(missing_ok=True)
             raise PackError(f"tile download failed: {e}") from e
 
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
-        with urllib.request.urlopen(req, timeout=300) as resp, partial.open("wb") as out:
-            total = int(resp.headers.get("Content-Length") or 0)
-            downloaded = 0
-            while True:
-                if cancel_event and cancel_event.is_set():
-                    if partial.exists():
-                        partial.unlink(missing_ok=True)
-                    raise FetchCancelledError("download cancelled")
-                chunk = resp.read(1024 * 1024)
-                if not chunk:
-                    break
-                out.write(chunk)
-                downloaded += len(chunk)
-                if progress_cb:
-                    progress_cb(downloaded, total)
-    except FetchCancelledError:
-        raise
-    except (urllib.error.URLError, TimeoutError, OSError) as e:
-        if partial.exists():
+    attempts = max(1, int(max_attempts if max_attempts is not None else ZIM_DOWNLOAD_MAX_ATTEMPTS))
+    expected_total = 0
+    last_err: Exception | None = None
+
+    def _emit_status(payload: dict[str, Any]) -> None:
+        if status_cb:
+            try:
+                status_cb(payload)
+            except Exception:  # noqa: BLE001 — progress must not abort download
+                pass
+
+    for attempt in range(1, attempts + 1):
+        if cancel_event and cancel_event.is_set():
+            raise FetchCancelledError("download cancelled")
+
+        existing = 0
+        if resume and partial.is_file():
+            try:
+                existing = partial.stat().st_size
+            except OSError:
+                existing = 0
+        elif partial.is_file() and not resume:
             partial.unlink(missing_ok=True)
-        raise PackError(f"tile download failed: {e}") from e
-    partial.replace(dest)
+            existing = 0
+
+        headers = {"User-Agent": USER_AGENT}
+        if existing > 0:
+            headers["Range"] = f"bytes={existing}-"
+
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=ZIM_DOWNLOAD_TIMEOUT) as resp:
+                status = int(getattr(resp, "status", 200) or 200)
+                # Server ignored Range → restart from byte 0.
+                if existing > 0 and status == 200:
+                    existing = 0
+                    partial.unlink(missing_ok=True)
+                    _emit_status(
+                        {
+                            "status": "resuming",
+                            "message": "Server restarted transfer from the beginning…",
+                            "downloaded": 0,
+                            "total": expected_total,
+                        }
+                    )
+                elif existing > 0 and status == 206:
+                    _emit_status(
+                        {
+                            "status": "resuming",
+                            "message": (
+                                f"Connection dropped earlier — resuming at "
+                                f"{_format_bytes_short(existing)}"
+                                + (f" / {_format_bytes_short(expected_total)}" if expected_total else "")
+                            ),
+                            "downloaded": existing,
+                            "total": expected_total,
+                        }
+                    )
+
+                # Resolve absolute total size when possible.
+                cr = (resp.headers.get("Content-Range") or "").strip()
+                if cr.startswith("bytes ") and "/" in cr:
+                    try:
+                        expected_total = int(cr.rsplit("/", 1)[-1])
+                    except ValueError:
+                        pass
+                cl = int(resp.headers.get("Content-Length") or 0)
+                if expected_total <= 0 and status == 200 and cl > 0:
+                    expected_total = cl
+                elif expected_total <= 0 and status == 206 and cl > 0:
+                    expected_total = existing + cl
+
+                mode = "ab" if existing > 0 and status == 206 else "wb"
+                downloaded = existing if mode == "ab" else 0
+                with partial.open(mode) as out:
+                    while True:
+                        if cancel_event and cancel_event.is_set():
+                            raise FetchCancelledError("download cancelled")
+                        chunk = resp.read(ZIM_DOWNLOAD_CHUNK)
+                        if not chunk:
+                            break
+                        out.write(chunk)
+                        downloaded += len(chunk)
+                        if progress_cb:
+                            progress_cb(downloaded, expected_total)
+
+            # Finished this attempt's stream — check completeness.
+            try:
+                final_size = partial.stat().st_size if partial.is_file() else 0
+            except OSError:
+                final_size = 0
+            if expected_total > 0 and final_size < expected_total:
+                last_err = PackError(
+                    f"incomplete download: got {final_size} of {expected_total} bytes"
+                )
+                _emit_status(
+                    {
+                        "status": "retrying",
+                        "message": (
+                            f"Connection closed early at {_format_bytes_short(final_size)}"
+                            f" of {_format_bytes_short(expected_total)} — retrying…"
+                        ),
+                        "downloaded": final_size,
+                        "total": expected_total,
+                        "attempt": attempt,
+                    }
+                )
+                # Keep partial; backoff and resume.
+            else:
+                if not partial.is_file() or final_size <= 0:
+                    last_err = PackError("download produced empty file")
+                else:
+                    partial.replace(dest)
+                    return final_size, expected_total or final_size
+
+        except FetchCancelledError:
+            # Keep partial so an intentional Cancel→Retry can resume later.
+            raise
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, PackError) as e:
+            last_err = e
+            # Never delete partial on transient network failure — resume next attempt.
+            got = 0
+            try:
+                got = partial.stat().st_size if partial.is_file() else 0
+            except OSError:
+                got = 0
+            if isinstance(e, urllib.error.HTTPError) and e.code in {416}:
+                # Range not satisfiable — partial may be complete or corrupt.
+                if expected_total > 0 and got >= expected_total:
+                    partial.replace(dest)
+                    return got, expected_total
+                partial.unlink(missing_ok=True)
+                _emit_status(
+                    {
+                        "status": "retrying",
+                        "message": "Partial file rejected by server — restarting download…",
+                        "downloaded": 0,
+                        "total": expected_total,
+                        "attempt": attempt,
+                    }
+                )
+            else:
+                _emit_status(
+                    {
+                        "status": "retrying",
+                        "message": (
+                            f"Connection dropped at {_format_bytes_short(got)}"
+                            + (f" / {_format_bytes_short(expected_total)}" if expected_total else "")
+                            + f" — retrying in a moment (attempt {attempt}/{attempts})…"
+                        ),
+                        "downloaded": got,
+                        "total": expected_total,
+                        "attempt": attempt,
+                        "last_error": str(e),
+                    }
+                )
+
+        if attempt >= attempts:
+            break
+        delay = min(
+            ZIM_DOWNLOAD_RETRY_MAX_SEC,
+            ZIM_DOWNLOAD_RETRY_BASE_SEC * (2 ** (attempt - 1)),
+        )
+        # Sleep in short slices so cancel stays responsive.
+        slept = 0.0
+        while slept < delay:
+            if cancel_event and cancel_event.is_set():
+                raise FetchCancelledError("download cancelled")
+            step = min(0.5, delay - slept)
+            time.sleep(step)
+            slept += step
+
+    err = last_err or PackError("download failed")
+    raise PackError(f"tile download failed: {err}") from (err if isinstance(err, Exception) else None)
 
 
 def fetch_country_pmtiles(
@@ -1978,10 +2155,160 @@ def _list_zim_files(target: Path) -> list[str]:
     return sorted(p.name for p in target.rglob("*.zim") if p.is_file())
 
 
+def _format_bytes_short(n: int) -> str:
+    n = max(0, int(n or 0))
+    for unit, div in (("GiB", 1024**3), ("MiB", 1024**2), ("KiB", 1024)):
+        if n >= div:
+            return f"{n / div:.1f} {unit}"
+    return f"{n} B"
+
+
+def read_zim_header_info(zim_path: Path) -> dict[str, Any]:
+    """Parse ZIM magic + entryCount from the on-disk header (no libzim required)."""
+    path = Path(zim_path)
+    info: dict[str, Any] = {"magic_ok": False, "entry_count": 0, "bytes": 0}
+    if not path.is_file():
+        return info
+    try:
+        size = path.stat().st_size
+        info["bytes"] = size
+        with path.open("rb") as fh:
+            magic = fh.read(4)
+            info["magic_ok"] = magic == ZIM_MAGIC
+            if size >= 28:
+                fh.seek(24)
+                raw = fh.read(4)
+                if len(raw) == 4:
+                    info["entry_count"] = int(struct.unpack("<I", raw)[0])
+    except OSError:
+        return info
+    return info
+
+
+def zim_file_complete(
+    zim_path: Path,
+    *,
+    size_hint_bytes: int = 0,
+    expected_bytes: int = 0,
+) -> tuple[bool, str]:
+    """
+    Return (ok, reason). Incomplete / corrupt ZIMs must not be registered with Kiwix.
+
+    Gates:
+      - file exists and is at least MIN_ZIM_BYTES
+      - ZIM magic header
+      - if expected_bytes (Content-Length) known: size must meet it
+      - if size_hint_bytes is large: size must be >= ZIM_SIZE_HINT_MIN_RATIO of hint
+    """
+    path = Path(zim_path)
+    if not path.is_file():
+        return False, "zim_missing"
+    try:
+        size = path.stat().st_size
+    except OSError as e:
+        return False, f"zim_stat_failed: {e}"
+    if size < MIN_ZIM_BYTES:
+        return False, f"zim_too_small: {_format_bytes_short(size)}"
+
+    header = read_zim_header_info(path)
+    if not header.get("magic_ok"):
+        return False, "zim_bad_magic"
+
+    expected = int(expected_bytes or 0)
+    if expected > 0 and size < expected:
+        return (
+            False,
+            f"incomplete_download: got {_format_bytes_short(size)} of "
+            f"{_format_bytes_short(expected)} (Content-Length)",
+        )
+
+    hint = int(size_hint_bytes or 0)
+    if hint >= ZIM_SIZE_HINT_ENFORCE_BYTES:
+        min_ok = max(MIN_ZIM_BYTES, int(hint * ZIM_SIZE_HINT_MIN_RATIO))
+        if size < min_ok:
+            return (
+                False,
+                f"incomplete_zim: got {_format_bytes_short(size)}, expected ~"
+                f"{_format_bytes_short(hint)} (need ≥{_format_bytes_short(min_ok)}). "
+                "Delete truncated file and retry download.",
+            )
+
+    return True, "ok"
+
+
+def verify_zim_file(
+    zim_path: Path,
+    *,
+    size_hint_bytes: int = 0,
+    expected_bytes: int = 0,
+) -> dict[str, Any]:
+    """Raise PackError unless zim_path looks like a complete ZIM ready for Kiwix."""
+    ok, reason = zim_file_complete(
+        zim_path, size_hint_bytes=size_hint_bytes, expected_bytes=expected_bytes
+    )
+    header = read_zim_header_info(zim_path) if Path(zim_path).is_file() else {}
+    if not ok:
+        raise PackError(reason)
+    return {
+        "ok": True,
+        "bytes": int(header.get("bytes") or 0),
+        "entry_count": int(header.get("entry_count") or 0),
+        "path": str(zim_path),
+    }
+
+
 def _zim_fetch_config(manifest: dict[str, Any]) -> dict[str, Any]:
     meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
     cfg = meta.get("zim_fetch") if isinstance(meta.get("zim_fetch"), dict) else {}
     return dict(cfg)
+
+
+def _zim_size_hint_for(manifest: dict[str, Any]) -> int:
+    meta = manifest.get("meta") if isinstance(manifest.get("meta"), dict) else {}
+    cfg = _zim_fetch_config(manifest)
+    try:
+        return int(cfg.get("size_hint_bytes") or meta.get("size_hint_bytes") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _complete_zim_paths(
+    target: Path,
+    atlas_root: Path | None = None,
+    *,
+    size_hint_bytes: int = 0,
+    filename: str = "",
+) -> list[Path]:
+    """Return on-disk ZIM paths that pass completeness checks (pack target + optional kiwix)."""
+    found: list[Path] = []
+    seen: set[str] = set()
+
+    def _add(p: Path | None) -> None:
+        if not p or not p.is_file():
+            return
+        ok, _reason = zim_file_complete(p, size_hint_bytes=size_hint_bytes)
+        if not ok:
+            return
+        try:
+            key = str(p.resolve())
+        except OSError:
+            key = str(p)
+        if key in seen:
+            return
+        seen.add(key)
+        found.append(p)
+
+    if target.is_dir():
+        want = (filename or "").strip()
+        if want:
+            _add(target / want)
+            for hit in sorted(target.rglob(want)):
+                _add(hit)
+        for zim in sorted(target.rglob("*.zim")):
+            _add(zim)
+    if atlas_root is not None and filename:
+        _add(Path(atlas_root) / "kiwix" / Path(filename).name)
+    return found
 
 
 def should_auto_fetch_zim(manifest: dict[str, Any], target: Path) -> bool:
@@ -1990,12 +2317,15 @@ def should_auto_fetch_zim(manifest: dict[str, Any], target: Path) -> bool:
     ptype = manifest.get("type") or ""
     if ptype not in {"atlas.content.knowledge", "atlas.content.education"}:
         return False
-    if _list_zim_files(target):
-        return False
     cfg = _zim_fetch_config(manifest)
     if not cfg:
         return False
     if cfg.get("enabled") is False:
+        return False
+    hint = _zim_size_hint_for(manifest)
+    want = str(cfg.get("filename") or "").strip()
+    # Truncated ZIMs must not block a fresh download.
+    if _complete_zim_paths(target, size_hint_bytes=hint, filename=want):
         return False
     if cfg.get("url") or os.environ.get("ATLAS_ZIM_URL") or cfg.get("default_url"):
         return True
@@ -2166,8 +2496,81 @@ def _fetch_zim_for_manifest_body(
         },
         slug,
     )
+    partial_path = dest.with_suffix(dest.suffix + ".partial")
+    # Remove failed promotions / kiwix copies, but KEEP .partial so HTTP Range can resume.
+    for stale in (
+        dest,
+        dest.with_suffix(dest.suffix + ".incomplete"),
+        Path(atlas_root) / "kiwix" / out_name,
+    ):
+        try:
+            if stale.is_file():
+                ok, _ = zim_file_complete(stale, size_hint_bytes=hint)
+                if not ok or stale.name.endswith(".incomplete"):
+                    stale.unlink(missing_ok=True)
+        except OSError:
+            pass
+    unregister_zim_from_kiwix(out_name, atlas_root)
+
+    resumed_from = 0
     try:
-        _download_url_to_file(url, dest, progress_cb=_progress, cancel_event=cancel_event)
+        if partial_path.is_file():
+            resumed_from = int(partial_path.stat().st_size)
+    except OSError:
+        resumed_from = 0
+    if resumed_from > 0:
+        write_zim_fetch_progress(
+            atlas_root,
+            {
+                "pack_id": manifest.get("id"),
+                "pack_slug": slug,
+                "status": "resuming",
+                "done": False,
+                "downloaded": resumed_from,
+                "total": hint,
+                "url": url,
+                "filename": out_name,
+                "message": (
+                    f"Resuming ZIM download at {_format_bytes_short(resumed_from)}"
+                    + (f" / {_format_bytes_short(hint)}" if hint else "")
+                    + "…"
+                ),
+                "licence": licence,
+            },
+            slug,
+        )
+
+    def _status(payload: dict[str, Any]) -> None:
+        data = {
+            "pack_id": manifest.get("id"),
+            "pack_slug": slug,
+            "done": False,
+            "url": url,
+            "filename": out_name,
+            "licence": licence,
+            "downloaded": int(payload.get("downloaded") or 0),
+            "total": int(payload.get("total") or hint or 0),
+            "status": str(payload.get("status") or "downloading"),
+            "message": str(payload.get("message") or "Downloading Wikipedia ZIM…"),
+        }
+        if payload.get("attempt"):
+            data["attempt"] = payload["attempt"]
+        if payload.get("last_error"):
+            data["last_error"] = payload["last_error"]
+        write_zim_fetch_progress(atlas_root, data, slug)
+        if progress_cb:
+            progress_cb(data)
+
+    try:
+        _downloaded, content_length = _download_url_to_file(
+            url,
+            dest,
+            progress_cb=_progress,
+            cancel_event=cancel_event,
+            status_cb=_status,
+            resume=True,
+            max_attempts=ZIM_DOWNLOAD_MAX_ATTEMPTS,
+        )
     except FetchCancelledError:
         _cancelled()
         raise
@@ -2177,6 +2580,50 @@ def _fetch_zim_for_manifest_body(
         _cancelled()
         raise FetchCancelledError("download cancelled")
 
+    # Never mark ready / register with Kiwix until size + magic look complete.
+    try:
+        verified = verify_zim_file(
+            dest, size_hint_bytes=hint, expected_bytes=content_length or 0
+        )
+    except PackError as e:
+        # Quarantine incomplete download so Kiwix cannot advertise an empty book.
+        unregister_zim_from_kiwix(dest.name, atlas_root)
+        got_bytes = int(_downloaded or 0)
+        try:
+            if dest.is_file():
+                got_bytes = dest.stat().st_size
+        except OSError:
+            pass
+        incomplete = dest.with_suffix(dest.suffix + ".incomplete")
+        try:
+            if dest.is_file():
+                dest.replace(incomplete)
+        except OSError:
+            dest.unlink(missing_ok=True)
+        msg = str(e)
+        write_zim_fetch_progress(
+            atlas_root,
+            {
+                "pack_id": manifest.get("id"),
+                "pack_slug": slug,
+                "status": "error",
+                "done": True,
+                "downloaded": got_bytes,
+                "total": hint or content_length or got_bytes,
+                "url": url,
+                "filename": out_name,
+                "error": msg,
+                "message": (
+                    f"ZIM incomplete — {msg}. "
+                    f"Use Retry ZIM after freeing ~{_format_bytes_short(hint or content_length)} disk."
+                ),
+                "licence": licence,
+                "zim_incomplete": True,
+            },
+            slug,
+        )
+        raise PackError(msg) from e
+
     # Register with Kiwix immediately; optional bounded HTML extract feeds agent RAG.
     language = str(meta.get("language") or "eng")
     registered = register_zim_with_kiwix(
@@ -2185,6 +2632,7 @@ def _fetch_zim_for_manifest_body(
         title=str(manifest.get("name") or dest.stem),
         description=str(manifest.get("description") or ""),
         language=language,
+        size_hint_bytes=hint,
     )
     zim_rag = None
     try:
@@ -2199,7 +2647,7 @@ def _fetch_zim_for_manifest_body(
         if not isinstance(zim_rag, dict):
             zim_rag = {}
         zim_rag = {**(zim_rag or {}), "index_error": "knowledge_index_failed"}
-    size = dest.stat().st_size
+    size = int(verified.get("bytes") or dest.stat().st_size)
     result = {
         "ok": True,
         "pack_id": manifest.get("id"),
@@ -2210,6 +2658,7 @@ def _fetch_zim_for_manifest_body(
         "url": url,
         "licence": licence,
         "attribution": attribution,
+        "zim_entry_count": verified.get("entry_count"),
     }
     if zim_rag:
         result["zim_rag"] = zim_rag
@@ -2227,6 +2676,7 @@ def _fetch_zim_for_manifest_body(
             "licence": licence,
             "message": "ZIM ready offline (Kiwix)",
             "zim_rag_articles": (zim_rag or {}).get("extracted") or 0,
+            "zim_entry_count": verified.get("entry_count"),
         },
         slug,
     )
@@ -2301,8 +2751,13 @@ def _zim_rag_config(manifest: dict[str, Any]) -> dict[str, Any]:
     out["max_articles"] = _clamp_zim_rag_max_articles(
         out.get("max_articles") if "max_articles" in out else DEFAULT_ZIM_RAG_MAX_ARTICLES
     )
-    # Explicit opt-in only; default is seed-title extract (never zimdump list-all).
-    out["fill_from_listing"] = bool(out.get("fill_from_listing"))
+    # Explicit opt-in only; hard-disable full-archive listing (never zimdump list-all).
+    if out.get("fill_from_listing"):
+        raise PackError(
+            "fill_from_listing is disabled — Index for agents extracts seed titles only "
+            f"(≤{ABSOLUTE_ZIM_RAG_MAX_ARTICLES}); use Kiwix Library for full Wikipedia"
+        )
+    out["fill_from_listing"] = False
     return out
 
 
@@ -3049,6 +3504,59 @@ def _kiwix_library_path(atlas_root: Path) -> Path:
     return atlas_root / "kiwix" / "library.xml"
 
 
+def _restart_kiwix_serve() -> None:
+    """Best-effort reload so newly registered ZIMs appear without a reboot."""
+    compose = Path("/srv/atlas/compose/atlas-core.yml")
+    if not compose.is_file() or not shutil.which("docker"):
+        return
+    try:
+        subprocess.run(
+            ["docker", "compose", "-f", str(compose), "restart", "kiwix"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
+def unregister_zim_from_kiwix(zim_name: str, atlas_root: Path) -> None:
+    """Remove a ZIM (and its library.xml book) from /srv/atlas/kiwix — used for truncated files."""
+    name = Path(zim_name).name
+    if not name:
+        return
+    kiwix = Path(atlas_root) / "kiwix"
+    dest = kiwix / name
+    try:
+        dest.unlink(missing_ok=True)
+    except OSError:
+        pass
+    lib_path = _kiwix_library_path(atlas_root)
+    if not lib_path.is_file():
+        return
+    import xml.etree.ElementTree as ET
+
+    try:
+        tree = ET.parse(lib_path)
+        root = tree.getroot()
+    except (ET.ParseError, OSError):
+        return
+    stem = Path(name).stem
+    removed = False
+    for book in list(root.findall("book")):
+        path_attr = (book.get("path") or "").lstrip("./")
+        if path_attr == name or book.get("id") == stem or book.get("name") == stem:
+            root.remove(book)
+            removed = True
+    if removed:
+        try:
+            tree.write(lib_path, encoding="utf-8", xml_declaration=True)
+        except OSError:
+            pass
+        _restart_kiwix_serve()
+
+
 def register_zim_with_kiwix(
     zim_path: Path,
     atlas_root: Path,
@@ -3056,13 +3564,17 @@ def register_zim_with_kiwix(
     title: str | None = None,
     description: str | None = None,
     language: str = "eng",
+    size_hint_bytes: int = 0,
 ) -> Path:
-    """Copy a ZIM into /srv/atlas/kiwix and register it in library.xml."""
+    """Copy a verified ZIM into /srv/atlas/kiwix and register it in library.xml."""
+    zim_path = Path(zim_path)
+    verify_zim_file(zim_path, size_hint_bytes=size_hint_bytes)
     kiwix = atlas_root / "kiwix"
     kiwix.mkdir(parents=True, exist_ok=True)
     dest = kiwix / zim_path.name
     if zim_path.resolve() != dest.resolve():
         shutil.copy2(zim_path, dest)
+        verify_zim_file(dest, size_hint_bytes=size_hint_bytes)
 
     import xml.etree.ElementTree as ET
 
@@ -3078,19 +3590,43 @@ def register_zim_with_kiwix(
         root = ET.Element("library", version="20110515")
         tree = ET.ElementTree(root)
 
-    # Remove existing book with same path/id
+    # Remove existing book with same path/name/id
+    stem = dest.stem
     for book in list(root.findall("book")):
-        if book.get("path") == dest.name or book.get("id") == dest.stem:
+        path_attr = (book.get("path") or "").lstrip("./")
+        if path_attr == dest.name or book.get("id") == stem or book.get("name") == stem:
             root.remove(book)
 
+    header = read_zim_header_info(dest)
+    # Prefer real ZIM UUID when readable (bytes 8..24); else stable stem id.
+    book_id = stem
+    try:
+        with dest.open("rb") as fh:
+            fh.seek(8)
+            uuid_raw = fh.read(16)
+        if len(uuid_raw) == 16 and uuid_raw != b"\x00" * 16:
+            # Standard UUID string form
+            h = uuid_raw.hex()
+            book_id = f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
+    except OSError:
+        pass
+
     book = ET.SubElement(root, "book")
-    book.set("id", dest.stem)
+    book.set("id", book_id)
+    book.set("name", stem)
     book.set("path", dest.name)
-    book.set("title", title or dest.stem.replace("_", " "))
+    book.set("title", title or stem.replace("_", " "))
     book.set("description", description or "Offline ZIM knowledge pack")
     book.set("language", language)
+    book.set("articleCount", str(int(header.get("entry_count") or 0)))
+    book.set("mediaCount", "0")
+    try:
+        book.set("size", str(max(1, dest.stat().st_size // 1024)))
+    except OSError:
+        pass
     book.set("faviconMimeType", "image/png")
     tree.write(lib_path, encoding="utf-8", xml_declaration=True)
+    _restart_kiwix_serve()
     return dest
 
 
@@ -3138,8 +3674,16 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
     language = str(meta.get("language") or "eng")
 
     if target.is_dir():
-        # Register any .zim for offline browser (Kiwix); keep originals in pack target too.
+        hint = _zim_size_hint_for(manifest)
+        # Register complete .zim only — truncated files stay out of Kiwix library.
         for zim in sorted(target.rglob("*.zim")):
+            ok, reason = zim_file_complete(zim, size_hint_bytes=hint)
+            if not ok:
+                try:
+                    unregister_zim_from_kiwix(zim.name, atlas_root)
+                except OSError:
+                    pass
+                continue
             try:
                 dest = register_zim_with_kiwix(
                     zim,
@@ -3147,9 +3691,10 @@ def _workflow_knowledge_index(manifest: dict[str, Any], target: Path, atlas_root
                     title=str(manifest.get("name") or zim.stem),
                     description=str(manifest.get("description") or ""),
                     language=language,
+                    size_hint_bytes=hint,
                 )
                 zims.append(dest.name)
-            except OSError:
+            except (OSError, PackError):
                 continue
 
         # Selective ZIM → HTML for agent RAG (bounded; not full maxi dump).
@@ -3549,14 +4094,27 @@ def merge_catalogue_status(catalogue: dict[str, Any], atlas_root: Path) -> dict[
             slug = str(row.get("id") or inst.get("id") or "").rsplit(".", 1)[-1].strip().lower()
             if slug:
                 zprog = read_zim_fetch_progress(atlas_root, slug)
-                if zprog.get("status") in {"starting", "checking", "downloading", "warning"} and not zprog.get("done"):
+                if zprog.get("status") in {
+                    "starting",
+                    "checking",
+                    "downloading",
+                    "warning",
+                    "resuming",
+                    "retrying",
+                } and not zprog.get("done"):
                     row["zim_status"] = "fetching"
                 elif zprog.get("status") == "cancelled" and zprog.get("done"):
                     row["zim_status"] = "stub"
+                elif zprog.get("zim_incomplete") or (
+                    zprog.get("status") == "error" and zprog.get("done") and "incomplete" in str(zprog.get("error") or "").lower()
+                ):
+                    row["zim_status"] = "incomplete"
+                    row["zim_error"] = zprog.get("error") or zprog.get("message")
                 elif zprog.get("status") == "ready" and zprog.get("done"):
                     row["zim_status"] = "ready"
                 elif zprog.get("status") == "error" and zprog.get("done"):
                     row["zim_status"] = "error"
+                    row["zim_error"] = zprog.get("error") or zprog.get("message")
             # Knowledge / ZIM packs: surface Index-for-agents affordances even when
             # extracted=0 (UI uses has_zim / can_index_for_agents, not zim_rag alone).
             pack_id = str(row.get("id") or inst.get("id") or "")
@@ -3567,18 +4125,45 @@ def merge_catalogue_status(catalogue: dict[str, Any], atlas_root: Path) -> dict[
             )
             if is_knowledge:
                 target = Path(str(inst.get("target") or ""))
-                zim_names = _list_zim_files(target) if target.is_dir() else []
-                # Match catalogue zim_fetch.filename in shared Kiwix library if pack target is empty.
-                want = ""
                 zf = row.get("zim_fetch") if isinstance(row.get("zim_fetch"), dict) else {}
-                if isinstance(zf, dict):
-                    want = str(zf.get("filename") or "").strip()
-                if want and not zim_names:
+                if not isinstance(zf, dict):
+                    zf = {}
+                want = str(zf.get("filename") or "").strip()
+                try:
+                    hint = int(zf.get("size_hint_bytes") or row.get("size_hint_bytes") or 0)
+                except (TypeError, ValueError):
+                    hint = 0
+                complete = _complete_zim_paths(
+                    target, atlas_root, size_hint_bytes=hint, filename=want
+                )
+                raw_names = _list_zim_files(target) if target.is_dir() else []
+                if want and not raw_names:
                     kiwix_hit = Path(atlas_root) / "kiwix" / want
                     if kiwix_hit.is_file():
-                        zim_names = [want]
-                row["has_zim"] = bool(zim_names)
-                row["zim_files"] = zim_names
+                        raw_names = [want]
+                # Detect truncated ZIM still sitting on disk (common after interrupted download).
+                incomplete_paths: list[str] = []
+                check_paths: list[Path] = []
+                if target.is_dir():
+                    check_paths.extend(sorted(target.rglob("*.zim")))
+                if want:
+                    check_paths.append(Path(atlas_root) / "kiwix" / Path(want).name)
+                for zp in check_paths:
+                    if not zp.is_file():
+                        continue
+                    ok, reason = zim_file_complete(zp, size_hint_bytes=hint)
+                    if not ok:
+                        incomplete_paths.append(f"{zp.name}: {reason}")
+                        # Do not restart Kiwix here — catalogue polls frequently.
+                        # Truncated copies are stripped from library.xml on Retry / index.
+                row["has_zim"] = bool(complete)
+                row["zim_files"] = [p.name for p in complete]
+                if incomplete_paths and not complete:
+                    row["zim_status"] = "incomplete"
+                    row["zim_error"] = incomplete_paths[0]
+                    row["zim_incomplete"] = True
+                elif complete and row.get("zim_status") not in {"fetching", "error", "incomplete"}:
+                    row["zim_status"] = "ready"
                 extracted = 0
                 marker_path = target / ".atlas-indexed" if target.is_dir() else None
                 if marker_path and marker_path.is_file():
@@ -3591,6 +4176,17 @@ def merge_catalogue_status(catalogue: dict[str, Any], atlas_root: Path) -> dict[
                 row["zim_rag_extracted"] = extracted
                 # Always allow Index for agents on installed knowledge packs (curated + ZIM extract).
                 row["can_index_for_agents"] = True
+                # Planned seed count for UI ("seeded articles N/40").
+                try:
+                    row["zim_rag_planned"] = zim_rag_planned_extract_count(
+                        json.loads((target / "manifest.json").read_text(encoding="utf-8"))
+                        if (target / "manifest.json").is_file()
+                        else row
+                    )
+                except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                    row["zim_rag_planned"] = int(
+                        (row.get("zim_rag") or {}).get("max_articles") or DEFAULT_ZIM_RAG_MAX_ARTICLES
+                    ) if isinstance(row.get("zim_rag"), dict) else DEFAULT_ZIM_RAG_MAX_ARTICLES
         packs.append(row)
     out["packs"] = packs
     return out

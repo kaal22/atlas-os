@@ -109,7 +109,9 @@ def test_download_url_to_file_honours_cancel_event():
             except FetchCancelledError:
                 pass
         assert not dest.exists()
-        assert not dest.with_suffix(dest.suffix + ".partial").exists()
+        # Partial is retained so Retry can resume via HTTP Range.
+        partial = dest.with_suffix(dest.suffix + ".partial")
+        assert partial.is_file() and partial.stat().st_size > 0
 
 
 def test_fetch_country_pmtiles_cancel_during_extract():

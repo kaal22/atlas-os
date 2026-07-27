@@ -63,7 +63,8 @@ services:
       - /srv/atlas/kiwix:/data:ro
     # Empty library.xml is valid for Phase 2 (ZIMs arrive later as packs).
     # Args are passed to start.sh → kiwix-serve --port=$PORT <args>
-    command: ["--library", "/data/library.xml"]
+    # --monitorLibrary reloads when content_manager updates library.xml after a ZIM lands.
+    command: ["--library", "/data/library.xml", "--monitorLibrary"]
     ports:
       - "127.0.0.1:8080:8080"
     networks: [atlas_internal]
